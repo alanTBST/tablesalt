@@ -372,15 +372,11 @@ def main():
     shares for the data in the datastores
     """
     # create_db()
-    res = []
     region = 'sjælland'
     graph = ZoneGraph(region=region)
 
-    from datetime import datetime
-    st = datetieme.now()
     for x in tqdm(RK_STORES[:1], total=len(RK_STORES)):
         r = chunk_shares(graph, x, region)
-    print(st - datetime.now())
 
         # write_results(r)
     # create_dbindex()
@@ -393,4 +389,5 @@ if __name__ == "__main__":
     INHIBITOR = WindowsInhibitor()
     INHIBITOR.inhibit()
     res = main()
+    make_store(res, os.path.join(DB_DIR, 'calculated_stores'))
     INHIBITOR.uninhibit()
