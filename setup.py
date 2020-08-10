@@ -15,7 +15,6 @@ setup(name='tablesalt',
       author_email='alkj@tbst.dk, alanksjones@gmail.com',
       package_dir = {'tablesalt':'tablesalt'},
       packages = find_packages(),
-      scripts = ['tablesalt/scripts/*.py'],
       package_data={
           'resources': [
               'networktopodk/*.json', 
@@ -40,7 +39,7 @@ setup(name='tablesalt',
               'networktopodk/DKTariffZones/takstsjaelland/*.sbn', 
               'networktopodk/DKTariffZones/takstsjaelland/*.cpg', 
               'networktopodk/DKTariffZones/takstsjaelland/*.dbf', 
-              'networktopodk/gtfs/*.txt'
+              'networktopodk/gtfs/*.zip'
               ]
           },
       install_requires=['pandas', 'shapely', 'lmdb', 'msgpack',
