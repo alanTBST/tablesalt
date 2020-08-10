@@ -24,7 +24,7 @@ from tablesalt.running import WindowsInhibitor
 from tablesalt import StoreReader
 from tablesalt.common.io import mappers
 from tablesalt.preprocessing import find_datastores
-from tablesalt.common import triptools
+from tablesalt.common import triptools, make_store
 from tablesalt.revenue import multisharing
 from tablesalt.topology.tools import TakstZones
 from tablesalt.topology import (
