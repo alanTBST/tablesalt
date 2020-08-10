@@ -17,6 +17,9 @@ Details to follow...
 
 For Windows systems the easiest method to install
 all of the prerequisites is using conda
+
+1. If you do not have git installed, install it from [git-scm](https://git-scm.com/download/win)
+
 ### Using conda
 
 Download anaconda or miniconda.
