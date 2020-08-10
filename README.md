@@ -9,7 +9,7 @@ conda.
 
 Details to follow...
 
-## Instalation instructions
+## Installation Instructions
 
 
 
@@ -19,7 +19,8 @@ For Windows systems the easiest method to install
 all of the prerequisites is using conda
 ### Using conda
 
-Download anaconda or miniconda
+Download anaconda or miniconda.
+
 Clone this repository
 
 
