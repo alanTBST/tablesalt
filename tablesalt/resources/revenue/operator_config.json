@@ -1,0 +1,7 @@
+{"wanted_rail_operators": ["movia_h", "dsb", "s-tog", "metro", "first"], 
+"suburban": "s-tog", 
+"local": "movia_h", 
+"kystbanen": "first", 
+"fjernregional": "dsb", 
+"metro": "metro", 
+"busoperator": "movia_h"}

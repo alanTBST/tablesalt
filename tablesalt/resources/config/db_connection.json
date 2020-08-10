@@ -1,0 +1,1 @@
+{"DRIVER": "{SQL Server}", "SERVER": "TSDW03", "DATABASE": "dbDwhExtract", "trusted_connection": "yes"}

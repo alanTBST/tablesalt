@@ -1,0 +1,17 @@
+*.pyc
+__pycache__
+/dist/
+/*.egg-info
+/build/
+/__pycache__/
+/.pylint.d
+/.pylint.d/
+tablesalt/.vscode/settings.json
+/.vscode/
+tablesalt/season/.pylint.d/
+tablesalt/topology/route_shapes.geojson
+environment.yml
+/tablesalt/resources/networktopodk/gtfs/
+tablesalt/resources/networktopodk/stop_times.txt 
+tablesalt/resources/networktopodk/gtfs/stop_times.txt
+tablesalt/resources/networktopodk/gtfs/shapes.txt 
