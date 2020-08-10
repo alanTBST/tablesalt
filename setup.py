@@ -15,6 +15,7 @@ setup(name='tablesalt',
       author_email='alkj@tbst.dk, alanksjones@gmail.com',
       package_dir = {'tablesalt':'tablesalt'},
       packages = find_packages(),
+      scripts = ['tablesalt/scripts/*.py'],
       package_data={
           'resources': [
               'networktopodk/*.json', 
