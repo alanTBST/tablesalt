@@ -38,7 +38,8 @@ setup(name='tablesalt',
               'networktopodk/DKTariffZones/takstsjaelland/*.sbx', 
               'networktopodk/DKTariffZones/takstsjaelland/*.sbn', 
               'networktopodk/DKTariffZones/takstsjaelland/*.cpg', 
-              'networktopodk/DKTariffZones/takstsjaelland/*.dbf'
+              'networktopodk/DKTariffZones/takstsjaelland/*.dbf', 
+              'networktopodk/gtfs/*.txt'
               ]
           },
       install_requires=['pandas', 'shapely', 'lmdb', 'msgpack',
