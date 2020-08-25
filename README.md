@@ -9,6 +9,8 @@ conda.
 
 Details to follow...
 
+NOTE: Not all required package data is small enough for github
+
 ## Installation Instructions
 
 
