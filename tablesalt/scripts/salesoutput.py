@@ -135,6 +135,13 @@ def _load_operator_shares(
     for f in wanted:
         df = pd.read_csv(f, index_col=0)
         df = _check_names(df)
+        if 'Movia_H' in f:
+            df = df.query("startzone < 1100")
+        elif 'Movia_S' in f:
+            df = df.query("startzone > 1200")
+        else:
+            df = df.query("1100 < startzone < 1200")
+
         df = _stringify_merge_cols(df)
         frames.append(df)
 
@@ -270,6 +277,7 @@ def _short_specific_operator(short_frame: pd.core.frame.DataFrame):
             on=['startzone', 'betaltezoner'],
             how='left'
             )
+
         merged = _add_note(
             merged,
             f'short_ringzone_start_{v}',
@@ -871,7 +879,7 @@ def main():
     pendler_output = []
     for takst in ['th', 'ts', 'dsb', 'th']:
 
-        pendler = _process_pendler(sales_numbers, sales_data, 'th')
+        pendler = _process_pendler(sales_numbers, sales_data, takst)
         pendler_output.append(pendler)
 
     pendler_output = pd.concat(pendler_output)
@@ -899,5 +907,5 @@ def main():
     return final
 
 
-if __name__ == "__main__":
-      out = main()
+# if __name__ == "__main__":
+#       out = main()
