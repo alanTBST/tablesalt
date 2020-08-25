@@ -375,11 +375,11 @@ def main():
     region = 'sjælland'
     graph = ZoneGraph(region=region)
 
-    for x in tqdm(RK_STORES[:1], total=len(RK_STORES)):
+    for x in tqdm(RK_STORES, total=len(RK_STORES)):
         r = chunk_shares(graph, x, region)
+        make_store(r, os.path.join(DB_DIR, 'calculated_stores'))
 
-        # write_results(r)
-    # create_dbindex()
+
     return r
 
 
@@ -388,6 +388,5 @@ if __name__ == "__main__":
 
     INHIBITOR = WindowsInhibitor()
     INHIBITOR.inhibit()
-    res = main()
-    make_store(res, os.path.join(DB_DIR, 'calculated_stores'))
+    main()
     INHIBITOR.uninhibit()
