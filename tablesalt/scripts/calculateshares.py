@@ -55,10 +55,9 @@ if not os.path.isdir(YEAR_DIR):
     raise OSError(f"{YEAR_DIR} does not exist")
 
 STORE_DIR = os.path.join(YEAR_DIR, 'hdfstores')
-CONTR_DIR = os.path.join(YEAR_DIR, 'packs')
 DB_DIR = os.path.join(YEAR_DIR, 'dbs')
 RK_STORES = glob.glob(os.path.join(STORE_DIR, '*.h5'))
-CONTR_PACKS = glob.glob(os.path.join(CONTR_DIR, '*.msgpack'))
+
 
 ZONES = TakstZones()
 ZONEMAP = ZONES.stop_zone_map()
