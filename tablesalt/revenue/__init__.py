@@ -16,5 +16,5 @@ Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
 
 # from . import multisharing
 # from . import operatorvalidation
-from . import zonerelations
+#from . import zonerelations
 
