@@ -17,26 +17,19 @@ from multiprocessing import Pool
 from operator import itemgetter
 from typing import Set
 
+
 import lmdb
+import numpy as np
+import pandas as pd
 from tqdm import tqdm
 from turbodbc import connect, make_options
 
+from tablesalt.running import WindowsInhibitor
 from tablesalt import StoreReader
 from tablesalt.topology.tools import TakstZones
 from tablesalt.topology import ZoneGraph
 from tablesalt.common.triptools import split_list
-
-
-def _find_datastores(start_dir=None):
-    # TODO import this from preprocessing package
-
-    if start_dir is None:
-        start_dir = os.path.splitdrive(sys.executable)[0]
-        start_dir = os.path.join(start_dir, '\\')
-    for dirpath, subdirs, _ in os.walk(start_dir):
-        if 'rejsekortstores' in subdirs:
-            return dirpath
-    raise FileNotFoundError("cannot find a datastores location")
+from tablesalt.preprocessing import find_datastores
 
 
 def _make_db_paths(store_loc, year):
@@ -157,7 +150,6 @@ def _aggregate_zones(shares):
     t['n_trips'] = n_trips
     return t
 
-# for start_end
 
 def _map_zones(stop_arr, zonemap):
     # stop_arr must be sorted
@@ -172,7 +164,7 @@ def _map_zones(stop_arr, zonemap):
             mapped_zones[key] = zones
 
     return mapped_zones
-    
+
 def _max_zones(operator_zones, ringdict):
 
     out = {}
@@ -197,6 +189,7 @@ def _separate_keys(short, long, _max):
 
     #TODO ensure long ring ends at max ringzone
     for k, v in short.items():
+
         start_zone = v[0]
         end_zone = v[-1]
         distance = _max[k]
@@ -220,7 +213,7 @@ def _separate_keys(short, long, _max):
             long_ring[(start_zone, distance)] = set()
         long_ring[(start_zone, distance)].add(k)
 
-    # add one zone to two zones for short ring
+    # add 1 travelled zone to 2 travllled zones for short ring
     startzones = {k[0] for k in ring}
     for zone in startzones:
         one = ring.get((zone, 1), set())
@@ -236,7 +229,6 @@ def _separate_keys(short, long, _max):
 
     return analysis_tripkeys
 
-
 def _determine_keys(read_stops, stopzone_map, ringzones):
 
     zones = _map_zones(read_stops, stopzone_map)
@@ -246,7 +238,6 @@ def _determine_keys(read_stops, stopzone_map, ringzones):
     tripkeys = _separate_keys(short, long, _max)
 
     return tripkeys
-
 
 def _add_dicts_of_sets(dict1, dict2):
 
@@ -513,132 +504,67 @@ def _write_results():
             df.to_excel(f'sjælland/start_{name}_{tick}_2019_new.xlsx',
                         index=False)
 
-
 def main():
 
 
-    ringzones = ZoneGraph().ring_dict('sjælland')
+    ringzones = ZoneGraph.ring_dict('sjælland')
     stopzone_map = TakstZones().stop_zone_map()
 
-    store_loc = _find_datastores(r'H://')
+    store_loc = find_datastores(r'H://')
     db_dirs = _make_db_paths(store_loc, 2019)
     stores = _hdfstores(store_loc, 2019)
 
     db_path = db_dirs['calc_store']
+    print('inputs found\n')
 
-    dicts = _gather_all(stores, stopzone_map, ringzones)
+    rabatkeys = tuple(_get_rabatkeys())
 
-    try:
-        with open('rabat0trips.pickle', 'rb') as f:
-            rabatkeys = pickle.load(f)
-    except FileNotFoundError:
-        rabatkeys = helrejser_rabattrin(0)
+    wanted_operators = ['Metro', 'D**', 'Movia_S', 'Movia_V', 'Movia_H']
 
-    print('got rabatkeys')
-
-    # all_queue = Queue(1)
-
-    # p1 = Process(
-    #     target=_all_results,
-    #     args=(dicts['all'], db_path, rabatkeys, all_queue)
-    #     )
-
-    # movia_h_queue = Queue(1)
-    # p2 = Process(
-    #     target=_all_results,
-    #     args=(dicts['Movia_H'], db_path, rabatkeys, movia_h_queue)
-    #     )
-
-    # metro_queue = Queue(1)
-
-    # p3 = Process(
-    #     target=_all_results,
-    #     args=(dicts['Metro'], db_path, rabatkeys, metro_queue)
-    #     )
-
-    # dsb_queue = Queue(1)
-    # p4 = Process(
-    #     target=_all_results,
-    #     args=(dicts['D**'], db_path, rabatkeys, dsb_queue)
-    #     )
-
-    # movia_s_queue = Queue(1)
-    # p2 = Process(
-    #     target=_all_results,
-    #     args=(dicts['Movia_S'], db_path, rabatkeys, movia_s_queue)
-    #     )
-
-
-    # p1.start()
-    # p2.start()
-    # p3.start()
-    # p4.start()
-
-    results = {}
-    # p1.join()
-
-    # results['all'] = all_queue.get()
-
-    # p2.join()
-    # results['Movia_H'] = movia_h_queue.get()
-
-    # p3.join()
-    # results['Metro'] = metro_queue.get()
-
-    # p4.join()
-    # results['DSB'] = dsb_queue.get()
-
-
-    # with open('single_results.pickle', 'wb') as f:
-    #     pickle.dump(results, f)
-
-    long_res = get_results(
-        dicts['all']['long'], db_path, rabatkeys
-        )
-    long_d_res = get_results(
-        dicts['all']['long_ring'], db_path, rabatkeys
+    _get_all_store_keys(
+        stores, stopzone_map, ringzones, wanted_operators, rabatkeys
         )
 
-    short_d_res = get_results(
-        dicts['all']['short_ring'],
-        db_path, rabatkeys
-        )
+    nparts = 30
+    out_all, out_operators = \
+        _gather_all_store_keys(wanted_operators, nparts)
 
-    results['all'] = {
-        'long': long_res,
-        'long_ring': long_d_res,
-        'short_ring': short_d_res,
-        }
+    del rabatkeys
+    print('finding results\n')
+    all_wanted_keys = set()
+    for k, v in out_all.items():
+        for k1, v1 in v.items():
+            all_wanted_keys.update(v1)
 
-    ops = ['Movia_H', 'Movia_S', 'Movia_V', 'Metro', 'D**']
-    for x in ops:
-        print('getting results for: ', x)
+    result_dict = _get_trips(db_path, all_wanted_keys)
 
-        long_res = get_results(
-            dicts[x]['long'], db_path, rabatkeys
-            )
-        long_d_res = get_results(
-            dicts[x]['long_ring'], db_path, rabatkeys
-            )
+    print('results found\n')
+    del all_wanted_keys
 
-        short_d_res = get_results(
-            dicts[x]['short_ring'],
-            db_path, rabatkeys
-            )
 
-        results[x] = {
-            'long': long_res,
-            'long_ring':long_d_res,
-            'short_ring': short_d_res,
-            }
+    all_results = _map_all(out_all, result_dict)
+    all_results_ = agg_nested_dict(all_results)
 
-    with open('single_results.pickle', 'wb') as f:
-        pickle.dump(results, f)
-    # return dicts, res
+    operator_results = _map_operators(out_operators, result_dict)
+    operator_results_ = agg_nested_dict(operator_results)
+
+    operator_results_['all'] = all_results_
+
+    with open('single_results1.pickle', 'wb') as f:
+        pickle.dump(operator_results_, f)
+
+    _write_results()
 
 if __name__ == "__main__":
-    main()
+    from datetime import datetime
+    INHIBITOR = WindowsInhibitor()
+    INHIBITOR.inhibit()
 
+    dt = datetime.now()
+    main()
+    print(datetime.now() - dt)
+
+    INHIBITOR.uninhibit()
 
 
 
