@@ -158,14 +158,21 @@ def _aggregate_zones(shares):
     return t
 
 # for start_end
-def _map_zones(operator_stops, zonemap):
 
-    zonedict = {
-        key: tuple(zonemap.get(x[2]) for x in grp)
-        for key, grp in groupby(operator_stops, key=itemgetter(0))
-        }
-    return {k: v for k, v in zonedict.items() if all(x for x in v)}
+def _map_zones(stop_arr, zonemap):
+    # stop_arr must be sorted
 
+
+    mapped_zones = {}
+    stop_arr = stop_arr[np.lexsort((stop_arr[:, 1], stop_arr[:, 0]))]
+    for key, grp in groupby(stop_arr, key=itemgetter(0)):
+        zones = tuple(x[2] for x in grp)
+        zones = tuple(zonemap.get(x, 0) for x in zones)
+        if all(x > 0 for x in zones):
+            mapped_zones[key] = zones
+
+    return mapped_zones
+    
 def _max_zones(operator_zones, ringdict):
 
     out = {}
