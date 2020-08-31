@@ -247,8 +247,81 @@ def _determine_keys(read_stops, stopzone_map, ringzones):
 
     return tripkeys
 
-def _get_trips(db, tripkeys):
 
+def _add_dicts_of_sets(dict1, dict2):
+
+    return {key: dict1.get(key, set()) | dict2.get(key, set())
+            for key in set(dict1) | set(dict2)}
+
+def m_dicts(d1, d2):
+
+    return {k: _add_dicts_of_sets(v, d2[k]) for k, v in d1.items()}
+
+def merge_dicts(d1, d2):
+
+    out = {}
+    for k, v in d2.items():
+        both_long = _add_dicts_of_sets(v['long'], d1[k]['long'])
+        both_long_ring = _add_dicts_of_sets(
+            v['long_ring'], d1[k]['long_ring']
+            )
+
+        both_short_dist = _add_dicts_of_sets(
+            v['short_ring'],
+            d1[k]['short_ring']
+            )
+        out[k] = {
+            'long': both_long,
+            'long_ring': both_long_ring,
+            'short_ring': both_short_dist
+            }
+
+    return out
+
+def _filter_operators(ticket_keys, operator_tripkeys: Set[int]):
+
+    out = {}
+    for k, v in ticket_keys.items():
+        d = {
+            k1: v1.intersection(operator_tripkeys)
+            for k1, v1 in v.items()
+            }
+        out[k] = d
+
+    return out
+
+
+def _store_tripkeys(store, stopzone_map, ringzones, rabatkeys):
+
+    reader = StoreReader(store)
+    all_stops = reader.get_data('stops')
+    all_stops = all_stops[np.isin(all_stops[:, 0], rabatkeys)]
+    all_stops = all_stops[
+        np.lexsort((all_stops[:, 1], all_stops[:, 0]))
+        ]
+
+    tick_keys = _determine_keys(
+        all_stops, stopzone_map, ringzones
+        )
+    return tick_keys
+
+def _store_operator_tripkeys(store, ticket_keys, operators):
+
+    reader = StoreReader(store)
+
+    out = {}
+    for operator in operators:
+        operator_tripkeys = set(
+            reader.get_data('stops', startswith=operator)[:, 0]
+            )
+        out[operator] = _filter_operators(
+            ticket_keys, operator_tripkeys
+            )
+
+    return out
+
+
+def _get_trips(db, tripkeys):
 
     tripkeys_ = {bytes(str(x), 'utf-8') for x in tripkeys}
 
@@ -264,45 +337,182 @@ def _get_trips(db, tripkeys):
     return out
 
 
-def get_results(d, db_path, rabatkeys):
+def _get_store_num(store):
 
-    all_keys = set.union(*d.values())
-    all_keys = all_keys.intersection(rabatkeys)
-    calc_vals = _get_trips(db_path, all_keys)
+    st = store.split('.')[0]
+    st = st.split('rkfile')[1]
 
-    out = {}
-    for k, v in d.items():
-        shares = []
-        for tripkey in v:
-            try:
-                share = calc_vals[tripkey]
-                shares.append(share)
-            except KeyError:
-                pass
-        if shares:
-            out[k] = tuple(shares)
-
-    return {k: _aggregate_zones(v) for k, v in out.items()}
+    return st
 
 
-def _all_results(ddict, db_path, rabatkeys, q):
+def _get_store_keys(store, stopzone_map, ringzones, operators, rabatkeys):
 
-    long_res = get_results(
-        ddict['long'], db_path, rabatkeys
+    tripkeys = _store_tripkeys(
+        store, stopzone_map, ringzones, rabatkeys
         )
-    long_d_res = get_results(
-        ddict['long_ring'], db_path, rabatkeys
+    op_tripkeys = _store_operator_tripkeys(
+        store, tripkeys, operators
         )
 
-    short_d_res = get_results(
-        ddict['short_ring'],
-        db_path, rabatkeys
-        )
+    op_tripkeys['all'] = tripkeys
+    num = _get_store_num(store)
+    with open(f'temp/keys{num}.pickle', 'wb') as f:
+        pickle.dump(op_tripkeys, f)
 
-    q.put({'long': long_res,
-           'long_ring': long_d_res,
-           'short_ring': short_d_res,
-           })
+
+def _get_all_store_keys(stores, stopzone_map, ringzones, operators, rabatkeys):
+
+
+    pfunc = partial(_get_store_keys,
+                    stopzone_map=stopzone_map,
+                    ringzones=ringzones,
+                    operators=operators,
+                    rabatkeys=rabatkeys)
+
+    with Pool(5) as pool:
+        pool.map(pfunc, stores)
+
+
+def _load_store_keys(filepath):
+
+    with open(filepath, 'rb') as f:
+        pack = pickle.load(f)
+    return pack
+
+
+def _merge_dicts(old, new, old_op, new_op, operators):
+
+    out_all = m_dicts(old, new)
+    out_operators = old_op.copy()
+    for op in operators:
+        out_operators[op] = m_dicts(
+            out_operators[op], new_op[op]
+            )
+
+    return out_all, out_operators
+
+def _gather_store_keys(lst_of_temp, operators, nparts):
+
+    initial = _load_store_keys(lst_of_temp[0])
+    out_all = initial['all']
+    out_operators = {k: v for k, v in initial.items() if k != 'all'}
+
+    i = 1
+    for p in tqdm(lst_of_temp[1:], f'merging store keys {i}//{nparts} parts'):
+        keys = _load_store_keys(p)
+        out = keys['all']
+        opkeys = {k: v for k, v in keys.items() if k != 'all'}
+        out_all, out_operators = _merge_dicts(
+            out_all, out, out_operators, opkeys, operators
+            )
+        i+=1
+
+    return out_all, out_operators
+
+def _gather_all_store_keys(operators, nparts):
+
+
+    lst_of_temp = glob.glob(os.path.join('temp', '*.pickle'))
+    lst_of_lsts = split_list(lst_of_temp, wanted_parts=nparts)
+
+    all_vals = []
+    op_vals = []
+    for lst in lst_of_lsts:
+        out_all, out_operators = _gather_store_keys(lst, operators, nparts)
+        all_vals.append(out_all)
+        op_vals.append(out_operators)
+
+    out_all = all_vals[0]
+    out_operators = op_vals[0]
+    for i in tqdm(range(len(all_vals)), 'merging subparts'):
+        if i == 0:
+            continue
+        out = all_vals[i]
+        opkeys = op_vals[i]
+        out_all, out_operators = _merge_dicts(
+            out_all, out, out_operators, opkeys, operators
+            )
+
+    for p in lst_of_temp:
+        os.remove(p)
+
+    return out_all, out_operators
+
+
+def _get_rabatkeys():
+
+    try:
+        with open('rabat0trips.pickle', 'rb') as f:
+            rabatkeys = pickle.load(f)
+    except FileNotFoundError:
+        rabatkeys = helrejser_rabattrin(0)
+
+    return rabatkeys
+
+
+def _map_one_value(vals, res):
+    t = (res.get(x) for x in vals)
+    return tuple(x for x in t if x)
+
+
+def _map_all(out_all, result_dict):
+
+    new = {}
+    for k, v in out_all.items():
+        new[k] = {k1: _map_one_value(v1, result_dict) for k1, v1 in v.items()}
+
+    return new
+
+def _map_operators(out_operators, result_dict):
+
+    new = {}
+    for k, v in out_operators.items():
+        new[k] = _map_all(v, result_dict)
+        print(k)
+
+    return new
+
+def agg_nested_dict(node):
+    if isinstance(node, tuple):
+        return _aggregate_zones(node)
+    else:
+        dupe_node = {}
+        for key, val in node.items():
+            cur_node = agg_nested_dict(val)
+            if cur_node:
+                dupe_node[key] = cur_node
+        return dupe_node or None
+
+def _write_results():
+
+    with open('single_results1.pickle', 'rb') as f:
+        res = pickle.load(f)
+
+    tmap = {'D**': 'DSB'}
+    for start, tickets in res.items():
+        for tick, results in tickets.items():
+            df = pd.DataFrame.from_dict(results, orient='index')
+            df = df.fillna(0)
+            df = df.reset_index()
+            if 'ring' not in tick:
+                df = df.rename(columns={
+                    'level_0': 'StartZone', 'level_1': 'DestinationZone'
+                    })
+            else:
+                df = df.rename(columns={
+                    'level_0': 'StartZone', 'level_1': 'n_zones'
+                    })
+            col_order = df.columns
+            neworder = [x for x in col_order if x != 'n_trips']
+            neworder.append('n_trips')
+            df = df[neworder]
+            name = tmap.get(start, start)
+            if df.empty:
+                print('...')
+                break
+            df.to_excel(f'sjælland/start_{name}_{tick}_2019_new.xlsx',
+                        index=False)
+
 
 def main():
 
