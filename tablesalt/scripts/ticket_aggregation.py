@@ -247,48 +247,6 @@ def _determine_keys(read_stops, stopzone_map, ringzones):
 
     return tripkeys
 
-def _gather(stores, stopzone_map, ringzones):
-
-    ops = ['Movia_H', 'Movia_S', 'Movia_V', 'Metro', 'D**']
-    full_dict = {}
-    for store in stores:
-        reader = StoreReader(store)
-        outdict = {}
-        all_stops = reader.get_data('stops')
-        tripkeys = _determine_keys(all_stops, stopzone_map, ringzones)
-        outdict['all'] = tripkeys
-
-        for operator in ops:
-            stops = reader.get_data('stops', startswith=operator)
-            tripkeys = _determine_keys(stops, stopzone_map, ringzones)
-            outdict[operator] = tripkeys
-        if not full_dict:
-            full_dict = outdict
-        full_dict = merge_dicts(full_dict, outdict)
-
-    return full_dict
-
-def _gather_all(stores, stopzone_map, ringzones):
-
-    pfunc = partial(
-        _gather,
-        stopzone_map=stopzone_map,
-        ringzones=ringzones
-        )
-
-    lst_of_stores = split_list(stores, wanted_parts=60)
-
-    output = {}
-    with Pool(6) as pool:
-        res = pool.imap(pfunc, lst_of_stores)
-        for r in tqdm(res, total=len(lst_of_stores)):
-            if not output:
-                output = r
-            output = merge_dicts(output, r)
-
-    return output
-
-
 def _get_trips(db, tripkeys):
 
 
