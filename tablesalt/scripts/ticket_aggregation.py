@@ -10,12 +10,12 @@ import ast
 import glob
 import os
 import pickle
-import sqlite3
 import sys
 from functools import partial
 from itertools import groupby, chain
-from multiprocessing import Pool, Process, Queue
+from multiprocessing import Pool
 from operator import itemgetter
+from typing import Set
 
 import lmdb
 from tqdm import tqdm
