@@ -237,31 +237,6 @@ def _separate_keys(short, long, _max):
     return analysis_tripkeys
 
 
-def _add_dicts(dict1, dict2):
-
-    return {key: dict1.get(key, set()) | dict2.get(key, set())
-            for key in set(dict1) | set(dict2)}
-
-
-def merge_dicts(d1, d2):
-
-    out = {}
-    for k, v in d2.items():
-        both_long = _add_dicts(v['long'], d1[k]['long'])
-        both_long_ring = _add_dicts(v['long_ring'], d1[k]['long_ring'])
-
-        both_short_dist = _add_dicts(
-            v['short_ring'],
-            d1[k]['short_ring']
-            )
-        out[k] = {
-            'long': both_long,
-            'long_ring': both_long_ring,
-            'short_ring': both_short_dist
-            }
-
-    return out
-
 def _determine_keys(read_stops, stopzone_map, ringzones):
 
     zones = _map_zones(read_stops, stopzone_map)
