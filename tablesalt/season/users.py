@@ -26,8 +26,6 @@ import msgpack
 import pandas as pd
 
 
-
-
 def _load_zonerelations() -> Dict[int, Dict[str, Union[str, int, list, float]]]:
     """load the zone relations data"""
     fpath = pkg_resources.resource_filename(
@@ -393,6 +391,10 @@ class UserDict():
     It allows for easier subsetting of users
     based on valid zones, valid time periods/seasonpass ids, etc.
     """
+    
+    REGIONS = frozenset(
+        'hovedstad', 'sydsjælland', 'vestsjælland'
+        )
 
     def __init__(self, year, min_valid_days=14,
                  products_path=None,
@@ -504,30 +506,62 @@ class UserDict():
 
         zones_userset = self._find_users_with_zones(chosen_zones)
 
-        zones_userset = sorted(zones_userset, key=itemgetter(0, 1))
-        zones_userset = {key:tuple(x[1] for x in grp) for
-                         key, grp in groupby(zones_userset, key=itemgetter(0))}
+        zones_userset = sorted(
+            zones_userset, key=itemgetter(0, 1)
+            )
+        zones_userset = {
+            key: tuple(x[1] for x in grp) for
+            key, grp in groupby(zones_userset, key=itemgetter(0))
+            }
 
         user_subset = {}
         for k, v in self.users.items():
             if k not in zones_userset:
                 continue
-            user_d = {k1:v1 for k1, v1 in v.items()
+            user_d = {k1: v1 for k1, v1 in v.items()
                       if k1 in zones_userset[k]}
             user_subset[k] = user_d
 
         return (user_subset, len(user_subset),
                 sum(len(x) for x in user_subset.values()))
+    
+    @staticmethod
+    def _region_prodzones(product_zones, minimum, maximum):
+    
+       return {k:v for k, v in product_zones.items() 
+           if all(minimum < x < minimum for x in v)}
+    
+    def _subset_region(self, product_zones, region):
+        
+        fdict = {'sydsjælland': (1200, 1300), 
+                 'vestsjælland': (1100, 1200), 
+                 'hovedstad': (1000, 1100)} 
+        
+        return self._region_prodzones(product_zones, *fdict[region])
 
-    def get_data(self, paid_zones=None, ptype=None, user_group='all'):
+    def get_data(
+        self, 
+        paid_zones: Optional[int] = None,
+        ptype: Optional[str] = None,
+        region: Optional[str] = None,
+        user_group: Optional[str] ='all'
+        ):
 
         prodzones = self.input_data.product_zones
+        
         if paid_zones is not None:
             paid_valid = self._filter_paid_zones(paid_zones)
-            prodzones = {k: v for k, v in prodzones.items() if k in paid_valid}
+            prodzones = {
+                k: v for k, v in prodzones.items() if k in paid_valid
+                }
         if ptype is not None:
             pas_valid = self._filter_ptype(ptype)
-            prodzones = {k: v for k, v in prodzones.items() if k in pas_valid}
+            prodzones = {
+                k: v for k, v in prodzones.items() if k in pas_valid
+                }
+        if region is not None:
+            prodzones = self._subset_region(prodzones, region)
+            
 
         dynamic_exceptions = \
             self.input_data._find_dynamic_validity(prodzones)
