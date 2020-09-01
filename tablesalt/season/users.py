@@ -392,9 +392,6 @@ class UserDict():
     based on valid zones, valid time periods/seasonpass ids, etc.
     """
     
-    REGIONS = frozenset(
-        'hovedstad', 'sydsjælland', 'vestsjælland'
-        )
 
     def __init__(self, year, min_valid_days=14,
                  products_path=None,
