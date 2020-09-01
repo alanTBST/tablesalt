@@ -391,7 +391,11 @@ class UserDict():
     based on valid zones, valid time periods/seasonpass ids, etc.
     """
     
-
+    REGIONS = {
+        'sydsjælland': (1200, 1300), 
+        'vestsjælland': (1100, 1200), 
+        'hovedstad': (1000, 1100)
+        } 
     def __init__(self, year, min_valid_days=14,
                  products_path=None,
                  product_zones_path=None,
@@ -527,13 +531,9 @@ class UserDict():
        return {k:v for k, v in product_zones.items() 
            if all(minimum < x < maximum for x in v)}
     
-    def _subset_region(self, product_zones, region):
-        
-        fdict = {'sydsjælland': (1200, 1300), 
-                 'vestsjælland': (1100, 1200), 
-                 'hovedstad': (1000, 1100)} 
-        
-        return self._region_prodzones(product_zones, *fdict[region])
+    def _subset_region(self, product_zones, region):     
+        a, b = self.REGIONS[region]
+        return self._region_prodzones(product_zones, a, b)
 
     def get_data(
         self, 
