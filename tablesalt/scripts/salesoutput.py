@@ -65,21 +65,13 @@ def _check_names(frame):
 
 def _stringify_merge_cols(frame):
 
-    try:
-        frame.loc[:, 'betaltezoner'] = \
-            frame.loc[:, 'betaltezoner'].astype(str)
-    except KeyError:
-        pass
-    try:
-        frame.loc[:, 'slutzone'] = \
-            frame.loc[:, 'slutzone'].astype(str)
-    except KeyError:
-        pass
-    try:
-        frame.loc[:, 'startzone'] = \
-            frame.loc[:, 'startzone'].astype(str)
-    except KeyError:
-        pass
+    string_cols = ['betaltezoner', 'slutzone', 'startzone']
+    for col in string_cols:      
+        try:
+            frame.loc[:, 'betaltezoner'] = \
+                frame.loc[:, 'betaltezoner'].astype(str)
+        except KeyError:
+            pass
 
     return frame
 
