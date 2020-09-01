@@ -73,7 +73,7 @@ def db_paths(store_location: AnyStr, year: int) -> Dict[str, AnyStr]:
     out = {}    
     for name in kv_names:
         path = os.path.join(
-            store_loc, 'rejsekortstores', f'{year}DataStores',
+            store_location, 'rejsekortstores', f'{year}DataStores',
             'dbs', name
             )
         out[name] = path 
