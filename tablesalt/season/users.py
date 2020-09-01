@@ -50,7 +50,6 @@ def _zones_to_paid(zonerel: Dict) -> Dict[Tuple, int]:
                 paid = v['PaidZones']
                 outdict[zones] = paid
             except Exception as e:
-                print(str(e))
                 # TODO logging.log
                 pass
     return outdict
@@ -526,7 +525,7 @@ class UserDict():
     def _region_prodzones(product_zones, minimum, maximum):
     
        return {k:v for k, v in product_zones.items() 
-           if all(minimum < x < minimum for x in v)}
+           if all(minimum < x < maximum for x in v)}
     
     def _subset_region(self, product_zones, region):
         
