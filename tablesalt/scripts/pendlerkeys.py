@@ -337,7 +337,7 @@ def main():
 
     store_dir = find_datastores(r'H://')
     stores = _hdfstores(store_dir, year)
-    paths = db_paths(store_loc, year)
+    paths = db_paths(store_dir, year)
 
     userdict = UserDict(
         year, products_path=product_path,
