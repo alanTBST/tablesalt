@@ -25,6 +25,7 @@ from tqdm import tqdm
 from tablesalt import StoreReader
 from tablesalt.common.io import mappers
 from tablesalt.season.users import UserDict
+from tablesalt.preprocessing.tools import find_datastores, db_paths
 
 
 def parse_args():
@@ -59,51 +60,6 @@ def parse_args():
     args = parser.parse_args()
 
     return vars(args)
-
-
-def _find_datastores(start_dir=None):
-    # TODO import this from preprocessing package
-
-    if start_dir is None:
-        start_dir = os.path.splitdrive(sys.executable)[0]
-        start_dir = os.path.join(start_dir, '\\')
-    for dirpath, subdirs, _ in os.walk(start_dir):
-        if 'rejsekortstores' in subdirs:
-            return dirpath
-    raise FileNotFoundError("cannot find a datastores location")
-
-
-def _make_db_paths(store_loc, year):
-
-    usertrips_dir = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'user_trips_db'
-        )
-    kombi_dates_dir = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'kombi_dates_db'
-        )
-
-    kombi_valid_dates = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'kombi_valid_trips'
-        )
-    # this one exists from delrejsersetup.py
-    tripcarddb = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'trip_card_db'
-        )
-
-    calc_db = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'calculated_stores'
-        )
-
-    return {'usertrips': usertrips_dir,
-            'kombi_dates': kombi_dates_dir,
-            'kombi_valid': kombi_valid_dates,
-            'trip_card': tripcarddb,
-            'calc_store': calc_db}
 
 
 def _hdfstores(store_loc, year):
@@ -379,9 +335,9 @@ def main():
     product_path = args['products']
 
 
-    store_dir = _find_datastores(r'H://')
+    store_dir = find_datastores(r'H://')
     stores = _hdfstores(store_dir, year)
-    db_dirs = _make_db_paths(store_dir, year)
+    paths = db_paths(store_loc, year)
 
     userdict = UserDict(
         year, products_path=product_path,
@@ -400,10 +356,10 @@ def main():
 
     season_times = proc_user_data(userdata, zone_combo_users)
 
-    kombi_trips = load_valid(db_dirs['kombi_valid'])
+    kombi_trips = load_valid(paths['kombi_valid_trips'])
 
     season_trips = match_trip_to_season(
-        kombi_trips, season_times, db_dirs['kombi_dates']
+        kombi_trips, season_times, paths['kombi_dates_db']
         )
 
     zone_combo_trips = trips_to_zone_combination(
@@ -418,7 +374,7 @@ def main():
         zero_travel_price, zone_combo_trips
         )
 
-    t = get_zone_combination_shares(zone_combo_trips_valid, db_dirs['calc_store'])
+    t = get_zone_combination_shares(zone_combo_trips_valid, paths['calculated_stores'])
     t = {tuple(sorted(k)):v for k, v in t.items()}
     statistics = {tuple(sorted(k)):v for k, v in statistics.items()}
     for k, v in t.copy().items():
