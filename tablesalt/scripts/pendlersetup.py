@@ -81,6 +81,7 @@ import lmdb
 from tablesalt import StoreReader
 from tablesalt.season import users
 from tablesalt.common import make_store
+from tablesalt.preprocessing import find_datastores, db_paths
 
 def parse_args():
     """parse the cl arguments"""
@@ -114,46 +115,6 @@ def parse_args():
     args = parser.parse_args()
 
     return vars(args)
-
-
-def _find_datastores(start_dir=None):
-    # TODO import this from preprocessing package
-
-    if start_dir is None:
-        start_dir = os.path.splitdrive(sys.executable)[0]
-        start_dir = os.path.join(start_dir, '\\')
-    for dirpath, subdirs, _ in os.walk(start_dir):
-        if 'rejsekortstores' in subdirs:
-            return dirpath
-    raise FileNotFoundError("cannot find a datastores location")
-
-
-def _make_db_paths(store_loc, year):
-
-    usertrips_dir = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'user_trips_db'
-        )
-    kombi_dates_dir = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'kombi_dates_db'
-        )
-
-    kombi_valid_dates = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'kombi_valid_trips'
-        )
-    # this one exists from delrejsersetup.py
-    tripcarddb = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'trip_card_db'
-        )
-
-    return {'usertrips': usertrips_dir,
-            'kombi_dates': kombi_dates_dir,
-            'kombi_valid': kombi_valid_dates,
-            'trip_card': tripcarddb}
-
 
 def _hdfstores(store_loc, year):
 
@@ -344,8 +305,8 @@ def main():
     zone_path = args['zones']
     product_path = args['products']
 
-    store_dir = _find_datastores(r'H://')
-    db_dirs = _make_db_paths(store_dir, year)
+    store_dir = find_datastores(r'H://')
+    paths = db_paths(store_loc, year)
     store_files = _hdfstores(store_dir, year)
 
     pendler_cards = users._PendlerInput(
