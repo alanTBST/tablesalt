@@ -29,7 +29,7 @@ from tablesalt import StoreReader
 from tablesalt.topology.tools import TakstZones
 from tablesalt.topology import ZoneGraph
 from tablesalt.common.triptools import split_list
-from tablesalt.preprocessing import find_datastores
+from tablesalt.preprocessing import find_datastores, db_paths
 
 
 def _make_db_paths(store_loc, year):
@@ -511,10 +511,10 @@ def main():
     stopzone_map = TakstZones().stop_zone_map()
 
     store_loc = find_datastores(r'H://')
-    db_dirs = _make_db_paths(store_loc, 2019)
+    paths = db_paths(store_loc, year)
     stores = _hdfstores(store_loc, 2019)
 
-    db_path = db_dirs['calc_store']
+    db_path = paths['calculated_stores']
     print('inputs found\n')
 
     rabatkeys = tuple(_get_rabatkeys())
