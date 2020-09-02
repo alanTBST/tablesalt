@@ -318,17 +318,17 @@ def main():
     userdata = pendler_cards.get_user_data()
 
     pendler_trip_keys = get_pendler_trips(
-        userdata, db_dirs['trip_card'], db_dirs['usertrips']
+        userdata, paths['trip_card_db'], paths['user_trips_db']
         )
 
     thread_dates(
-        store_files, pendler_trip_keys, db_dirs['kombi_dates']
+        store_files, pendler_trip_keys, paths['kombi_dates_db']
         )
 
     print("validating travel dates")
     validate_travel_dates(
-        userdata, db_dirs['usertrips'],
-        db_dirs['kombi_dates'], db_dirs['kombi_valid']
+        userdata, paths['user_trips_db'],
+        db_dirs['kombi_dates_db'], paths['kombi_valid_trips']
         )
     return
 
