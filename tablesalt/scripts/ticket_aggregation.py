@@ -181,13 +181,12 @@ def _max_zones(operator_zones, ringdict):
         out[k] = current_max
     return out
 
-def _separate_keys(short, long, _max):
+def _separate_keys(short, long, _max, ringzones):
 
     ring = {}
     long_ = {}
     long_ring = {}
 
-    #TODO ensure long ring ends at max ringzone
     for k, v in short.items():
 
         start_zone = v[0]
@@ -203,7 +202,7 @@ def _separate_keys(short, long, _max):
         end_zone = v[-1]
         distance = _max[k]
 
-        if start_zone == end_zone:
+        if ringzones[(start_zone, end_zone)] != distance:
             continue
         if (start_zone, end_zone) not in long_:
             long_[(start_zone, end_zone)] = set()
@@ -235,7 +234,7 @@ def _determine_keys(read_stops, stopzone_map, ringzones):
     _max = _max_zones(zones, ringzones)
     short = {k: v for k, v in zones.items() if _max[k] <= 8}
     long = {k: v for k, v in zones.items() if _max[k] >= 9}
-    tripkeys = _separate_keys(short, long, _max)
+    tripkeys = _separate_keys(short, long, _max, ringzones)
 
     return tripkeys
 
