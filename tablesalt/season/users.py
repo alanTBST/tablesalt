@@ -564,7 +564,7 @@ class UserDict():
         self, 
         paid_zones: Optional[int] = None,
         ptype: Optional[str] = None,
-        region: Optional[str] = None,
+        takst: Optional[str] = None,
         user_group: Optional[str] ='all'
         ):
 
@@ -581,7 +581,7 @@ class UserDict():
                 k: v for k, v in prodzones.items() if k in pas_valid
                 }
         if region is not None:
-            prodzones = self._subset_region(prodzones, region)
+            prodzones = self._subset_takst(prodzones, takst)
             
 
         dynamic_exceptions = \
