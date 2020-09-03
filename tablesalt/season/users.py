@@ -548,12 +548,12 @@ class UserDict():
         takst_prods = {}
         for k, v in prodzones.items():
             try:
-                in_takst = any(_zone_in_region(x, takst) for x in v)
+                in_takst = any(self._zone_in_region(x, takst) for x in v)
             except KeyError:
                 in_takst = True
             if not in_takst:
                 continue                 
-            all_takst = (any(_zone_in_region(x, reg) for x in v) 
+            all_takst = (any(self._zone_in_region(x, reg) for x in v) 
                          for reg in self.REGIONS)
                     
             if count_func(all_takst):
