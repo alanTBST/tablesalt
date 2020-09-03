@@ -74,7 +74,14 @@ class TableArgParser:
         }
 
     def __init__(self, *args: str, description: AnyStr = None) -> None:
+        
         self.arglist = list(args)
+        
+        odd_args = set(self.arglist).intersection(self.ARGUMENTS)
+        if odd_args:
+            raise ValueError(
+                f"{list(map(str, odd_args))} not supported"
+                )
     
         self.arglist = [x.lower() for x in args]
         self.description = description
