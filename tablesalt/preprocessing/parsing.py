@@ -37,3 +37,10 @@ def parse_args():
     args = parser.parse_args()
 
     return vars(args)
+    
+class TableArgParser:
+    def __init__(self, *args):
+        self.arglist = list(args)
+    
+    
+   
