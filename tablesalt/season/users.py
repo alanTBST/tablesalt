@@ -580,7 +580,7 @@ class UserDict():
             prodzones = {
                 k: v for k, v in prodzones.items() if k in pas_valid
                 }
-        if region is not None:
+        if takst is not None:
             prodzones = self._subset_takst(prodzones, takst)
             
 
