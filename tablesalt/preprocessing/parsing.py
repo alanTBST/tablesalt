@@ -77,7 +77,7 @@ class TableArgParser:
         
         self.arglist = list(args)
         
-        odd_args = set(self.arglist).intersection(self.ARGUMENTS)
+        odd_args = set(self.arglist).intersection(set(self.ARGUMENTS))
         if odd_args:
             raise ValueError(
                 f"{list(map(str, odd_args))} not supported"
