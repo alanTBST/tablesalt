@@ -9,7 +9,8 @@ Classes for manipulating Pendler Product data sets
 
 
 import pkg_resources
-from itertools import groupby
+from collections import Counter
+from itertools import groupby, repeat
 from operator import itemgetter
 from typing import (
     Optional,
@@ -36,7 +37,7 @@ def _load_zonerelations() -> Dict[int, Dict[str, Union[str, int, list, float]]]:
     return zonerelations
 
 
-def _zones_to_paid(zonerel: Dict) -> Dict[Tuple, int]:
+def _zones_to_paid(zonerel: Dict[int, Dict[str, Union[str, int, list, float]]]) -> Dict[Tuple, int]:
     """create zones: npaid dict"""
     outdict = {}
     for _, v in zonerel.items():
@@ -141,6 +142,9 @@ def _process_cards(prodzones: Dict,
         return _process_static_cards(dates)
 
     return _process_dynamic_cards(dates)
+
+def count_trues(zones: Iterable, num: int) -> bool:
+    return all(map(any, repeat(iter(it), num)))
 
 class _PendlerInput():
     """
@@ -396,10 +400,14 @@ class UserDict():
         'vestsjælland': (1100, 1200), 
         'hovedstad': (1000, 1100)
         } 
-    def __init__(self, year, min_valid_days=14,
-                 products_path=None,
-                 product_zones_path=None,
-                 user_group='all'):
+    def __init__(
+        self, 
+        year: int, 
+        min_valid_days: Optional[int] = 14,
+        products_path=None,
+        product_zones_path=None,
+        user_group: Optional[str] = 'all'
+        ) -> None:
 
         """
         Parameters
@@ -524,17 +532,34 @@ class UserDict():
 
         return (user_subset, len(user_subset),
                 sum(len(x) for x in user_subset.values()))
-    
-    @staticmethod
-    def _region_prodzones(product_zones, minimum, maximum):
-    
-       return {k:v for k, v in product_zones.items() 
-           if all(minimum < x < maximum for x in v)}
-    
-    def _subset_region(self, product_zones, region):     
-        a, b = self.REGIONS[region]
-        return self._region_prodzones(product_zones, a, b)
+      
+    def _zone_in_region(self, zonenum: int, region: str) -> bool:    
+        x, y = self.REGIONS[region]
+        return x < zonenum < y
 
+    def _subset_takst(self, prodzones, takst):
+        # *takst - list(takst) for mulit takstset
+        
+        if takst in self.REGIONS:
+            count_func = lambda x: Counter(x)[True] == 1
+        else:
+            count_func = lambda x: Counter(x)[True] > 1
+    
+        takst_prods = {}
+        for k, v in prodzones.items():
+            try:
+                in_takst = any(_zone_in_region(x, takst) for x in v)
+            except KeyError:
+                in_takst = True
+            if not in_takst:
+                continue                 
+            all_takst = (any(_zone_in_region(x, reg) for x in v) 
+                         for reg in self.REGIONS)
+                    
+            if count_func(all_takst):
+                takst_prods[k] = v
+        return takst_prods
+    
     def get_data(
         self, 
         paid_zones: Optional[int] = None,
@@ -590,11 +615,7 @@ class UserDict():
         -----------
         zones: set, tuple, list
             the valid zones of wanted users
-        stats:
-            boolean, True or False
-            default=False
-            returns a three tuple
-            of (user_subset, n_users, n_period_cards)
+
         """
         # if not stats:
         #     return self._subset_users()
