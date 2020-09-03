@@ -6,38 +6,6 @@ from argparse import (
 from typing import AnyStr, NamedTuple, Union
 import pathlib 
 
-def parse_args():
-    """parse the cl arguments"""
-    DESC = ("Setup all the key-value stores needed \n"
-            "for the pendler card revenue distribution \n"
-            "for takstsjælland.")
-
-    parser = ArgumentParser(
-        description=DESC,
-        formatter_class=RawTextHelpFormatter
-        )
-    parser.add_argument(
-        '-y', '--year',
-        help='year to unpack',
-        type=int,
-        required=True
-        )
-    parser.add_argument(
-        '-z', '--zones',
-        help='path to input zones csv',
-        type=Path,
-        required=True
-        )
-    parser.add_argument(
-        '-p', '--products',
-        help='path to input pendler products csv',
-        type=Path,
-        required=True
-        )
-
-    args = parser.parse_args()
-
-    return vars(args)
 
 class ArgTuple(NamedTuple):
     
@@ -77,7 +45,7 @@ class TableArgParser:
         
         self.arglist = list(args)
         
-        odd_args = set(self.arglist).intersection(set(self.ARGUMENTS))
+        odd_args = set(self.arglist).symmetric_difference(set(self.ARGUMENTS))
         if odd_args:
             raise ValueError(
                 f"{list(map(str, odd_args))} not supported"
