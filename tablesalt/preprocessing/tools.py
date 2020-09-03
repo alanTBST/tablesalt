@@ -26,6 +26,15 @@ def find_datastores(start_dir: Optional[AnyStr] = None) -> AnyStr:
         "cannot find a rejsekort datastores location"
         )
 
+def _hdfstores(store_loc, year):
+
+    return glob.glob(
+        os.path.join(
+            store_loc, 'rejsekortstores',
+            f'{year}DataStores', 'hdfstores', '*.h5'
+            )
+        )
+
 
 def setup_directories(year: int, dstores: Optional[AnyStr] = None) -> Tuple:
     """
@@ -76,8 +85,10 @@ def db_paths(store_location: AnyStr, year: int) -> Dict[str, AnyStr]:
             store_location, 'rejsekortstores', f'{year}DataStores',
             'dbs', name
             )
-        out[name] = path 
-
+        out[name] = path
+    
+    out['store_paths'] = _hdfstores(store_location, year)
+    
     return out  
 
 def _get_sub_zips(lstzips: List) -> Dict:
