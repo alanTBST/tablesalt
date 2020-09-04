@@ -130,6 +130,7 @@ from tqdm import tqdm
 from tablesalt.common.io import mappers
 from tablesalt.common import make_store
 from tablesalt.running import WindowsInhibitor
+from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.preprocessing.tools import (
     setup_directories,
     get_zips,
