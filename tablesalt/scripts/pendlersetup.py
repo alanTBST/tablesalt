@@ -82,49 +82,7 @@ from tablesalt import StoreReader
 from tablesalt.season import users
 from tablesalt.common import make_store
 from tablesalt.preprocessing import find_datastores, db_paths
-
-def parse_args():
-    """parse the cl arguments"""
-    DESC = ("Setup all the key-value stores needed \n"
-            "for the pendler card revenue distribution \n"
-            "for takstsjælland.")
-
-    parser = ArgumentParser(
-        description=DESC,
-        formatter_class=RawTextHelpFormatter
-        )
-    parser.add_argument(
-        '-y', '--year',
-        help='year to unpack',
-        type=int,
-        required=True
-        )
-    parser.add_argument(
-        '-z', '--zones',
-        help='path to input zones csv',
-        type=Path,
-        required=True
-        )
-    parser.add_argument(
-        '-p', '--products',
-        help='path to input pendler products csv',
-        type=Path,
-        required=True
-        )
-
-    args = parser.parse_args()
-
-    return vars(args)
-
-def _hdfstores(store_loc, year):
-
-    return glob.glob(
-        os.path.join(
-            store_loc, 'rejsekortstores',
-            f'{year}DataStores', 'hdfstores', '*.h5'
-            )
-        )
-
+from tablesalt.preprocessing.parsing import TableArgParser
 
 def get_pendler_trips(pendler_cards, tripcarddb, userdb):
     """
@@ -299,19 +257,16 @@ def validate_travel_dates(
 
 def main():
 
-    args = parse_args()
+    parser = TableArgParser('year', 'products', 'zones')
 
-    year = args['year']
-    zone_path = args['zones']
-    product_path = args['products']
+    args = parser.parse()
 
-    store_dir = find_datastores(r'H://')
-    paths = db_paths(store_loc, year)
-    store_files = _hdfstores(store_dir, year)
+    paths = db_paths(find_datastores('H:/'), args['year'])
+    stores = paths['store_paths']
 
     pendler_cards = users._PendlerInput(
-        year, products_path=product_path,
-        product_zones_path=zone_path
+        args['year'],, products_path=args['products'],
+        product_zones_path=args['zones']
         )
 
     print("loading user data")
@@ -322,13 +277,15 @@ def main():
         )
 
     thread_dates(
-        store_files, pendler_trip_keys, paths['kombi_dates_db']
+        stores, pendler_trip_keys, paths['kombi_dates_db']
         )
 
     print("validating travel dates")
     validate_travel_dates(
-        userdata, paths['user_trips_db'],
-        db_dirs['kombi_dates_db'], paths['kombi_valid_trips']
+        userdata, 
+        paths['user_trips_db'],
+        paths['kombi_dates_db'], 
+        paths['kombi_valid_trips']
         )
     return
 
