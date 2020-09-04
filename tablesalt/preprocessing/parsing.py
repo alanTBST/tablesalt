@@ -38,7 +38,14 @@ class TableArgParser:
             'year to analyse', 
             True,
             int
-            )
+            ), 
+        'chunksize': ArgTuple(
+           '-c', 
+           '--chunksize', 
+           'The chunksize to read from the data',
+           False, 
+           int
+           )
         }
 
     def __init__(self, *args: str, description: AnyStr = None) -> None:
