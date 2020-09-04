@@ -144,35 +144,6 @@ from tablesalt.preprocessing.tools import (
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
-DEFAULT_CHUNKSIZE = 500000
-
-def parse_args():
-    """
-    Parse the command line arguments
-
-    Returns
-    -------
-    dict
-        a dictionary of the passed arguments.
-
-    """
-    parser = ArgumentParser(formatter_class=RawTextHelpFormatter)
-    parser.add_argument('-y', '--year', help='year to unpack',
-                        type=int, required=True)
-    parser.add_argument('-i', '--input_dir',
-                        help='path to input data directory', type=Path,
-                        required=True)
-    parser.add_argument('-o', '--output_dir',
-                        help='path to output data directory', type=Path,
-                        required=True)
-    parser.add_argument('-c', '--chunksize',
-                        help='the size of each chunk read in rows', type=int,
-                        default=DEFAULT_CHUNKSIZE,
-                        required=False)
-
-    args = parser.parse_args()
-
-    return vars(args)
 # =============================================================================
 # lmdb creation
 # =============================================================================
@@ -660,11 +631,6 @@ def consumer_process(q, location) -> None:
 
 def contractor_consumer(q, location) -> None:
     """
-
-    Returns
-    -------
-    None.
-
     """
     while True:
         if not q.empty():
@@ -688,14 +654,14 @@ def contractor_consumer(q, location) -> None:
 # =============================================================================
 def main() -> None:
     """entry"""
-    args = parse_args()
-
+    
+    parser = TableArgParser('year', 'products', 'zones', 'chunksize')
+    args = parser.parse()    
+ 
     year = args['year']
     output_dir = args['output_dir']
     input_dir = args['input_dir']
     chunk_size = args['chunksize']
-
-
 
     tc_store_path, hdf_path, cont_path = \
         setup_directories(year, output_dir)

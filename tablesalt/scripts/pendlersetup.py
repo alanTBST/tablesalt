@@ -67,11 +67,6 @@ from itertools import groupby
 from functools import partial
 from operator import itemgetter
 from pathlib import Path
-from argparse import (
-    ArgumentParser,
-    RawTextHelpFormatter
-    )
-
 
 #thrid party imports
 import numpy as np
