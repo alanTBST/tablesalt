@@ -396,7 +396,7 @@ def price_information(array, column_order):
 
 
 def check_collection_complete(arr_col, key):
-    """cheack the rkio collection mapper is the same"""
+    """cheack the common.io collection mapper is the same"""
     test_vals = mappers[key].keys()
     unseen = set()
     for x in arr_col:
@@ -409,7 +409,7 @@ def check_collection_complete(arr_col, key):
     return unseen
 
 def update_collection(unseen_ids, key):
-    """change the rkio mappers if needed"""
+    """change the io mappers if needed"""
     # TODO put this updating activity in a class
     current_max_key_id = max(mappers[key].values())
 
