@@ -3,7 +3,7 @@ from argparse import (
     ArgumentParser,
     RawTextHelpFormatter
     )
-from typing import AnyStr, NamedTuple, Union
+from typing import AnyStr, NamedTuple, Union, Any
 import pathlib 
 
 
@@ -14,6 +14,7 @@ class ArgTuple(NamedTuple):
     help: str
     required: bool
     type: Union[str, int, pathlib.Path]
+    default: Any
         
 class TableArgParser:
     
@@ -23,42 +24,48 @@ class TableArgParser:
             '--products', 
             'path to input pendler products csv', 
             True,
-            pathlib.Path
+            pathlib.Path,
+            None
             ), 
         'zones': ArgTuple(
             '-z', 
             '--zones', 
             'path to input zones csv', 
             True,
-            pathlib.Path
+            pathlib.Path,
+            None
             ), 
         'year': ArgTuple(
             '-y', 
             '--year', 
             'year to analyse', 
             True,
-            int
+            int,
+            None
             ), 
         'chunksize': ArgTuple(
            '-c', 
            '--chunksize', 
            'The chunksize to read from the data in rows',
            False, 
-           int
+           int,
+           500_000
            ), 
         'input_dir': ArgTuple(
            '-i', 
            '--input_dir', 
            'path to input directory of zip files',
            True, 
-           pathlib.Path
+           pathlib.Path,
+           None
            ),
         'output_dir': ArgTuple(
            '-o', 
            '--output_dir', 
            'path to out directory for the datastoresø',
            True, 
-           pathlib.Path
+           pathlib.Path,
+           None
            )                 
         }
 
@@ -86,6 +93,7 @@ class TableArgParser:
                 help=opt.help, 
                 type=opt.type, 
                 required=opt.required
+                default=opt.default
                 )
     def parse(self):
         
