@@ -42,10 +42,24 @@ class TableArgParser:
         'chunksize': ArgTuple(
            '-c', 
            '--chunksize', 
-           'The chunksize to read from the data',
+           'The chunksize to read from the data in rows',
            False, 
            int
-           )
+           ), 
+        'input_dir': ArgTuple(
+           '-i', 
+           '--input_dir', 
+           'path to input directory of zip files',
+           True, 
+           pathlib.Path
+           ),
+        'output_dir': ArgTuple(
+           '-o', 
+           '--output_dir', 
+           'path to out directory for the datastoresø',
+           True, 
+           pathlib.Path
+           )                 
         }
 
     def __init__(self, *args: str, description: AnyStr = None) -> None:
