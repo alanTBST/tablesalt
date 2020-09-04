@@ -14,11 +14,39 @@ from datetime import datetime
 # third party imports
 import h5py
 import numpy as np
+import pandas as pd
 import msgpack
 
 #package imports
-from storereader import StoreReader
+from .storereader import StoreReader
 
+
+def get_zero_price(p):
+    df = pd.DataFrame(
+        p[:, (0, -1)],
+        columns=['tripkey', 'price']
+        ).set_index('tripkey')
+
+    df = df.groupby(level=0)['price'].transform(max)
+    df = df[df == 0]
+    return tuple(set(df.index.values))
+
+def proc(store):
+
+    price = StoreReader(store).get_data('price')
+
+    return get_zero_price(price)
+
+def find_zero_pay_trips(stores):
+
+    out = set()
+    with Pool(os.cpu_count() - 1) as pool:
+        results = pool.imap(proc, stores)
+        for res in tqdm(results, 'finding trips inside zones', total=len(stores)):
+            out.update(set(res))
+    return out
+    
+    
 class DataSetError(ValueError):
     """
     ValueError that raises when file in the filepath
