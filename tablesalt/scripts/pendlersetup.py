@@ -178,7 +178,7 @@ def thread_dates(lst_of_stores, pendler_keys, dbpath):
     """
     func = partial(load_store_dates, pendler_trip_keys=pendler_keys)
     print("Loading travel dates...")
-    with Pool(3) as pool:
+    with Pool(os.cpu_count() // 2) as pool:
         results = pool.imap(func, lst_of_stores)
         for res in results:
             make_store(res, dbpath, start_size=5)
@@ -277,9 +277,9 @@ def main():
 
     print("validating travel dates")
     validate_travel_dates(
-        userdata, 
+        userdata,
         paths['user_trips_db'],
-        paths['kombi_dates_db'], 
+        paths['kombi_dates_db'],
         paths['kombi_valid_trips']
         )
     return
