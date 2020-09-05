@@ -652,10 +652,10 @@ def contractor_consumer(q, location) -> None:
 # =============================================================================
 def main() -> None:
     """entry"""
-    
-    parser = TableArgParser('year', 'products', 'zones', 'chunksize')
-    args = parser.parse()    
- 
+
+    parser = TableArgParser('year', 'chunksize')
+    args = parser.parse()
+
     year = args['year']
     output_dir = args['output_dir']
     input_dir = args['input_dir']
