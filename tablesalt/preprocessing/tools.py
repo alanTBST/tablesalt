@@ -3,6 +3,7 @@ import os
 import sys
 import socket
 import zipfile
+from pathlib import Path
 from typing import (
     Optional,
     AnyStr,
@@ -14,6 +15,9 @@ from typing import (
     )
 
 import pandas as pd
+
+THIS_DIR = os.path.dirname(os.path.realpath(__file__))
+
 def find_datastores(start_dir: Optional[AnyStr] = None) -> AnyStr:
 
     if start_dir is None:
