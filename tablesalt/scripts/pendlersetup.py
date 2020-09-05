@@ -260,7 +260,7 @@ def main():
     stores = paths['store_paths']
 
     pendler_cards = users._PendlerInput(
-        args['year'],, products_path=args['products'],
+        args['year'], products_path=args['products'],
         product_zones_path=args['zones']
         )
 
