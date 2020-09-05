@@ -173,7 +173,7 @@ def card_trip_generator(
             error_bad_lines=False, low_memory=False
             )
         for chunk in df_gen:
-            chunk_dict = dict(set(chunk.itertuples(name=None, index=False)))
+            chunk_dict = dict(chunk.iloc[:, 0], chunk.iloc[:, 1])
             byte_dict = {bytes(str(k), 'utf-8'): bytes(str(v), 'utf-8')
                          for k, v in chunk_dict.items()}
             yield byte_dict
