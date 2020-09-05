@@ -140,7 +140,6 @@ from tablesalt.preprocessing.tools import (
     sumblocks
     )
 
-THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
 # =============================================================================
 # lmdb creation
@@ -156,7 +155,7 @@ def card_trip_generator(
     col_indices : dict
         a dictionary of column names and corresponding indices.
     chunksize : int, optional
-        the chunksize to use. The default is 1000000.
+        the chunksize to use.
     skiprows : int, optional
         the number of rows to skip in the file. The default is 0.
 
