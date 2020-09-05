@@ -97,9 +97,7 @@ Created on Sat Mar 14 18:07:24 2020
 """
 # standard imports
 import os
-import glob
 import zipfile
-from pathlib import Path
 from threading import Thread
 from datetime import datetime
 import time
