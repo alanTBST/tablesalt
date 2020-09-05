@@ -26,50 +26,8 @@ from tablesalt import StoreReader
 from tablesalt.common.io import mappers
 from tablesalt.season.users import UserDict
 from tablesalt.preprocessing.tools import find_datastores, db_paths
+from tablesalt.preprocessing.parsing import TableArgParser
 
-
-def parse_args():
-    """parse the cl arguments"""
-    DESC = ("Setup all the key-value stores needed \n"
-            "for the pendler card revenue distribution \n"
-            "for takstsjælland.")
-
-    parser = ArgumentParser(
-        description=DESC,
-        formatter_class=RawTextHelpFormatter
-        )
-    parser.add_argument(
-        '-y', '--year',
-        help='year to unpack',
-        type=int,
-        required=True
-        )
-    parser.add_argument(
-        '-z', '--zones',
-        help='path to input zones csv',
-        type=Path,
-        required=True
-        )
-    parser.add_argument(
-        '-p', '--products',
-        help='path to input pendler products csv',
-        type=Path,
-        required=True
-        )
-
-    args = parser.parse_args()
-
-    return vars(args)
-
-
-def _hdfstores(store_loc, year):
-
-    return glob.glob(
-        os.path.join(
-            store_loc, 'rejsekortstores',
-            f'{year}DataStores', 'hdfstores', '*.h5'
-            )
-        )
 
 
 def get_zone_combinations(udata):
@@ -328,16 +286,17 @@ def main():
     None.
 
     """
-    args = parse_args()
+    parser = TableArgParser('year', 'products', 'zones')
+
+    args = parser.parse()
+
+    paths = db_paths(find_datastores('H:/'), args['year'])
+    stores = paths['store_paths']
+
 
     year = args['year']
     zone_path = args['zones']
     product_path = args['products']
-
-
-    store_dir = find_datastores(r'H://')
-    stores = _hdfstores(store_dir, year)
-    paths = db_paths(store_dir, year)
 
     userdict = UserDict(
         year, products_path=product_path,
