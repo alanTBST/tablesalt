@@ -2,6 +2,7 @@ import glob
 import os
 import sys
 import socket
+import zipfile
 from typing import (
     Optional,
     AnyStr,
@@ -73,24 +74,24 @@ def setup_directories(year: int, dstores: Optional[AnyStr] = None) -> Tuple:
 def db_paths(store_location: AnyStr, year: int) -> Dict[str, AnyStr]:
 
     kv_names = [
-        'user_trips_db', 
-        'kombi_dates_db', 
+        'user_trips_db',
+        'kombi_dates_db',
         'kombi_valid_trips',
-        'trip_card_db', 
+        'trip_card_db',
         'calculated_stores'
         ]
-    
-    out = {}    
+
+    out = {}
     for name in kv_names:
         path = os.path.join(
             store_location, 'rejsekortstores', f'{year}DataStores',
             'dbs', name
             )
         out[name] = path
-    
+
     out['store_paths'] = _hdfstores(store_location, year)
-    
-    return out  
+
+    return out
 
 def _get_sub_zips(lstzips: List) -> Dict:
     """get the names of the files in each zipfile"""
