@@ -13,6 +13,7 @@ from typing import (
     Union
     )
 
+import pandas as pd
 def find_datastores(start_dir: Optional[AnyStr] = None) -> AnyStr:
 
     if start_dir is None:
