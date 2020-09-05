@@ -9,8 +9,10 @@ Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
 import pkg_resources
 import json
 
-import pandas as pd
+
 import lmdb
+import msgpack
+import pandas as pd
 
 try:
     from turbodbc import connect, make_options
@@ -97,6 +99,19 @@ def insert_query(schema, table_name, ncols):
 
     return (f"INSERT INTO [{schema}].[{table_name}] "
             f"VALUES {vals}")
+
+def _to_bytes(val):
+    if not isinstance(val, bytes):
+        if not isinstance(val, str):
+            val = str(val)
+        val = bytes(val, 'utf-8')
+
+    return val
+
+def to_bytes_msg(val):
+
+    return msgpack.packb(val)
+
 
 def _make_key_val(d, db_path, map_size=None):
     """
