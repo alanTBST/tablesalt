@@ -283,7 +283,7 @@ def _get_store_num(store):
     return st
 
 
-def _get_store_keys(store, stopzone_map, ringzones, operators, rabatkeys):
+def _get_store_keys(year, store, stopzone_map, ringzones, operators, rabatkeys):
 
     tripkeys = _store_tripkeys(
         store, stopzone_map, ringzones, rabatkeys
@@ -294,20 +294,26 @@ def _get_store_keys(store, stopzone_map, ringzones, operators, rabatkeys):
 
     op_tripkeys['all'] = tripkeys
     num = _get_store_num(store)
-    with open(f'temp/keys{num}.pickle', 'wb') as f:
+    fp = os.path.join(
+        '__result_cache__',
+        f'{year}',
+        f'skeys{num}.pickle'
+        )
+    with open(fp, 'wb') as f:
         pickle.dump(op_tripkeys, f)
 
 
-def _get_all_store_keys(stores, stopzone_map, ringzones, operators, rabatkeys):
+def _get_all_store_keys(year, stores, stopzone_map, ringzones, operators, rabatkeys):
 
 
-    pfunc = partial(_get_store_keys,
+    pfunc = partial(year,
+                    _get_store_keys,
                     stopzone_map=stopzone_map,
                     ringzones=ringzones,
                     operators=operators,
                     rabatkeys=rabatkeys)
 
-    with Pool(5) as pool:
+    with Pool(os.cpu_count() - 1) as pool:
         pool.map(pfunc, stores)
 
 
@@ -350,7 +356,8 @@ def _gather_store_keys(lst_of_temp, operators, nparts):
 def _gather_all_store_keys(operators, nparts):
 
 
-    lst_of_temp = glob.glob(os.path.join('temp', '*.pickle'))
+    lst_of_temp = glob.glob(os.path.join('__result_cache__', '*.pickle'))
+    lst_of_temp = [x for x in lst_of_temp if 'skeys' in x]
     lst_of_lsts = split_list(lst_of_temp, wanted_parts=nparts)
 
     all_vals = []
@@ -380,7 +387,7 @@ def _gather_all_store_keys(operators, nparts):
 def _get_rabatkeys(rabattrin, year):
 
     try:
-        with open(f'rabat{rabattrin}trips.pickle', 'rb') as f:
+        with open(f'__result_cache__/rabat{rabattrin}trips.pickle', 'rb') as f:
             rabatkeys = pickle.load(f)
     except FileNotFoundError:
         rabatkeys = helrejser_rabattrin(rabattrin, year)
@@ -421,9 +428,14 @@ def agg_nested_dict(node):
                 dupe_node[key] = cur_node
         return dupe_node or None
 
-def _write_results(rabattrin):
+def _write_results(rabattrin, year):
 
-    with open('single_results_{year}_r{rabat_level}.pickle', 'rb') as f:
+    fp = os.path.join(
+        '__result_cache__',
+        f'{year}',
+        f'single_results_{year}_r{rabattrin}.pickle'
+        )
+    with open(fp, 'rb') as f:
         res = pickle.load(f)
 
     tmap = {'D**': 'DSB'}
@@ -478,6 +490,7 @@ def main():
         ]
 
     _get_all_store_keys(
+        year,
         stores,
         stopzone_map,
         ringzones,
@@ -510,11 +523,13 @@ def main():
 
     operator_results_['all'] = all_results_
 
+    fp = os.path.join(
+        '__result_cache__',
+        f'{year}',
+        f'single_results_{year}_r{rabat_level}.pickle'
+        )
 
-    with open(
-            f'single_results_{year}_r{rabat_level}.pickle',
-            'wb'
-        ) as f:
+    with open(fp, 'wb') as f:
         pickle.dump(operator_results_, f)
 
     # _write_results()
