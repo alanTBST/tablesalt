@@ -22,60 +22,18 @@ import lmdb
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from turbodbc import connect, make_options
+# from turbodbc import connect, make_options
 
 from tablesalt.running import WindowsInhibitor
 from tablesalt import StoreReader
 from tablesalt.topology.tools import TakstZones
 from tablesalt.topology import ZoneGraph
 from tablesalt.common.triptools import split_list
-from tablesalt.preprocessing import find_datastores, db_paths
+from tablesalt.common.connections import make_connection
+from tablesalt.preprocessing.tools import find_datastores, db_paths
+from tablesalt.preprocessing.parsing import TableArgParser
 
-
-def _make_db_paths(store_loc, year):
-
-    usertrips_dir = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'user_trips_db'
-        )
-    kombi_dates_dir = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'kombi_dates_db'
-        )
-
-    kombi_valid_dates = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'kombi_valid_trips'
-        )
-    # this one exists from delrejsersetup.py
-    tripcarddb = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'trip_card_db'
-        )
-
-    calc_db = os.path.join(
-        store_loc, 'rejsekortstores', f'{year}DataStores',
-        'dbs', 'calculated_stores'
-        )
-
-    return {'usertrips': usertrips_dir,
-            'kombi_dates': kombi_dates_dir,
-            'kombi_valid': kombi_valid_dates,
-            'trip_card': tripcarddb,
-            'calc_store': calc_db}
-
-
-def _hdfstores(store_loc, year):
-
-    return glob.glob(
-        os.path.join(
-            store_loc, 'rejsekortstores',
-            f'{year}DataStores', 'hdfstores', '*.h5'
-            )
-        )
-
-
-def helrejser_rabattrin(rabattrin):
+def helrejser_rabattrin(rabattrin, year):
     """
     return a set of the tripkeys from the helrejser data in
     the datawarehouse
@@ -92,41 +50,32 @@ def helrejser_rabattrin(rabattrin):
     query = (
         "SELECT Turngl FROM "
         "[dbDwhExtract].[Rejsedata].[EXTRACT_FULL_Helrejser_DG7] "
-        "where [År] = 2019 and [Manglende-check-ud] = 'Nej' and "
+        f"where [År] = {year} and [Manglende-check-ud] = 'Nej' and "
         f"Produktfamilie = '5' and [Rabattrin] = {rabattrin}"
         )
 
-    ops = make_options(
-        prefer_unicode=True,
-        use_async_io=True
-        ) # , use_async_io=True
-    with connect(
-            driver='{SQL Server}',
-            server="tsdw03",
-            database="dbDwhExtract",
-            turbodbc_options=ops
-            ) as conn:
+    # ops = make_options(
+    #     prefer_unicode=True,
+    #     use_async_io=True
+    #     ) # , use_async_io=True
+    with make_connection() as conn:
 
         cursor = conn.cursor()
         cursor.execute(query)
-        gen = cursor.fetchnumpybatches()
         try:
-            out = set().union(*[set(batch['Turngl']) for batch in gen])
-        except KeyError:
+            gen = cursor.fetchnumpybatches()
             try:
-                out = set().union(*[set(batch['turngl']) for batch in gen])
+                out = set().union(*[set(batch['Turngl']) for batch in gen])
             except KeyError:
-                raise KeyError("can't find turngl")
-        cursor = conn.cursor()
-        cursor.execute(query)
-        gen = cursor.fetchnumpybatches()
-        try:
-            out = set().union(*[set(batch['Turngl']) for batch in gen])
-        except KeyError:
-            try:
-                out = set().union(*[set(batch['turngl']) for batch in gen])
-            finally:
-                raise ValueError("can't find turngl")
+                try:
+                    out = set().union(*[set(batch['turngl']) for batch in gen])
+                except KeyError:
+                    raise KeyError("can't find turngl")
+        except AttributeError:
+            gen = cursor.fetchall()
+
+        out = set(chain(*gen))
+
     return {int(x) for x in out}
 
 def _aggregate_zones(shares):
@@ -509,6 +458,8 @@ def main():
     ringzones = ZoneGraph.ring_dict('sjælland')
     stopzone_map = TakstZones().stop_zone_map()
 
+    args = TableArgParser('year')
+
     store_loc = find_datastores(r'H://')
     paths = db_paths(store_loc, year)
     stores = _hdfstores(store_loc, 2019)
@@ -548,6 +499,7 @@ def main():
     operator_results_ = agg_nested_dict(operator_results)
 
     operator_results_['all'] = all_results_
+
 
     with open('single_results1.pickle', 'wb') as f:
         pickle.dump(operator_results_, f)
