@@ -448,32 +448,39 @@ def _write_results():
             if df.empty:
                 print('...')
                 break
-            df.to_excel(
-                f'__result_cache__/single/start_{name}_{tick}_2019.xlsx',
+            df.to_csv(
+                f'__result_cache__/single/start_{name}_{tick}_2019.csv',
                 index=False
                 )
 
 def main():
 
-    parser = TableArgParser('year')
+    parser = TableArgParser('year', 'rabattrin')
     args = parser.parse()
     year = args['year']
     store_loc = find_datastores(r'H://')
     paths = db_paths(store_loc, year)
     stores = db_paths['store_paths']
     db_path = paths['calculated_stores']
+    rabat_level = args['rabattrin']
 
     ringzones = ZoneGraph.ring_dict('sjælland')
     stopzone_map = TakstZones().stop_zone_map()
 
     print('inputs found\n')
 
-    rabatkeys = tuple(_get_rabatkeys())
+    rabatkeys = tuple(_get_rabatkeys(rabat_level, year))
 
-    wanted_operators = ['Metro', 'D**', 'Movia_S', 'Movia_V', 'Movia_H']
+    wanted_operators = [
+        'Metro', 'D**', 'Movia_S', 'Movia_V', 'Movia_H'
+        ]
 
     _get_all_store_keys(
-        stores, stopzone_map, ringzones, wanted_operators, rabatkeys
+        stores,
+        stopzone_map,
+        ringzones,
+        wanted_operators,
+        rabatkeys
         )
 
     nparts = 30
@@ -502,7 +509,7 @@ def main():
     operator_results_['all'] = all_results_
 
 
-    with open('single_results1.pickle', 'wb') as f:
+    with open('fsingle_results_{year}_r{rabat_level}.pickle', 'wb') as f:
         pickle.dump(operator_results_, f)
 
     _write_results()
