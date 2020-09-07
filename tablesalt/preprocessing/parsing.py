@@ -62,9 +62,17 @@ class TableArgParser:
         'output_dir': ArgTuple(
            '-o',
            '--output_dir',
-           'path to out directory for the datastoresø',
+           'path to out directory for the datastores',
            True,
            pathlib.Path,
+           None
+           ),
+        'rabattrin': ArgTuple(
+           '-r',
+           '--rabattrin',
+           'path to out directory for the datastores',
+           False,
+           int,
            None
            )
         }
