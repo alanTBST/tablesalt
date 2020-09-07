@@ -52,13 +52,11 @@ def helrejser_rabattrin(rabattrin, year):
         f"where [År] = {year} and [Manglende-check-ud] = 'Nej' and "
         f"Produktfamilie = '5' and [Rabattrin] = {rabattrin}"
         )
-
     # ops = make_options(
     #     prefer_unicode=True,
     #     use_async_io=True
     #     ) # , use_async_io=True
     with make_connection() as conn:
-
         cursor = conn.cursor()
         cursor.execute(query)
         try:
@@ -266,7 +264,7 @@ def _get_trips(db, tripkeys):
     out = {}
     with lmdb.open(db) as env:
         with env.begin() as txn:
-            for k in tripkeys_:
+            for k in tqdm(tripkeys_):
                 shares = txn.get(k)
                 if shares:
                     shares = shares.decode('utf-8')
@@ -306,8 +304,8 @@ def _get_store_keys(year, store, stopzone_map, ringzones, operators, rabatkeys):
 def _get_all_store_keys(year, stores, stopzone_map, ringzones, operators, rabatkeys):
 
 
-    pfunc = partial(year,
-                    _get_store_keys,
+    pfunc = partial(_get_store_keys,
+                    year=year,
                     stopzone_map=stopzone_map,
                     ringzones=ringzones,
                     operators=operators,
@@ -341,15 +339,15 @@ def _gather_store_keys(lst_of_temp, operators, nparts):
     out_all = initial['all']
     out_operators = {k: v for k, v in initial.items() if k != 'all'}
 
-    i = 1
-    for p in tqdm(lst_of_temp[1:], f'merging store keys {i}//{nparts} parts'):
+    count = 1
+    for p in tqdm(lst_of_temp[1:], f'merging store keys {count}/{nparts} parts'):
         keys = _load_store_keys(p)
         out = keys['all']
         opkeys = {k: v for k, v in keys.items() if k != 'all'}
         out_all, out_operators = _merge_dicts(
             out_all, out, out_operators, opkeys, operators
             )
-        i+=1
+        count += 1
 
     return out_all, out_operators
 
@@ -430,6 +428,9 @@ def agg_nested_dict(node):
 
 def _write_results(rabattrin, year):
 
+    dir_path = os.path.join('__result_cache__', f'{year}','single')
+    if not os.path.isdir(dir_path):
+        os.makedirs(dir_path)
     fp = os.path.join(
         '__result_cache__',
         f'{year}',
@@ -457,13 +458,13 @@ def _write_results(rabattrin, year):
             neworder.append('n_trips')
             df = df[neworder]
             name = tmap.get(start, start)
-            if df.empty:
-                print('...')
-                break
-            df.to_csv(
-                f'__result_cache__/single/start_{name}_{tick}_2019.csv',
-                index=False
+            fp = os.path.join(
+                '__result_cache__',
+                f'{year}',
+                'single',
+                f'start_{name}_{tick}_{year}_r{rabattrin}.csv'
                 )
+            df.to_csv(fp, index=False)
 
 def main():
 
@@ -480,14 +481,13 @@ def main():
     ringzones = ZoneGraph.ring_dict('sjælland')
     stopzone_map = TakstZones().stop_zone_map()
 
-
+    wanted_operators = [
+        'Metro', 'D**', 'Movia_S', 'Movia_V', 'Movia_H'
+        ]
 
     rabatkeys = tuple(_get_rabatkeys(rabat_level, year))
     print('inputs found\n')
 
-    wanted_operators = [
-        'Metro', 'D**', 'Movia_S', 'Movia_V', 'Movia_H'
-        ]
 
     _get_all_store_keys(
         year,
@@ -532,18 +532,23 @@ def main():
     with open(fp, 'wb') as f:
         pickle.dump(operator_results_, f)
 
-    # _write_results()
+    _write_results()
 
 if __name__ == "__main__":
     from datetime import datetime
-    INHIBITOR = WindowsInhibitor()
-    INHIBITOR.inhibit()
-
     dt = datetime.now()
-    main()
+
+    if os.name == 'nt':
+        INHIBITOR = WindowsInhibitor()
+        INHIBITOR.inhibit()
+        main()
+        INHIBITOR.uninhibit()
+    else:
+        main()
+
     print(datetime.now() - dt)
 
-    INHIBITOR.uninhibit()
+
 
 
 
