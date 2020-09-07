@@ -23,10 +23,10 @@ import pandas as pd
 from tqdm import tqdm
 # from turbodbc import connect, make_options
 
-from tablesalt.running import WindowsInhibitor
 from tablesalt import StoreReader
-from tablesalt.topology.tools import TakstZones
+from tablesalt.running import WindowsInhibitor
 from tablesalt.topology import ZoneGraph
+from tablesalt.topology.tools import TakstZones
 from tablesalt.common.triptools import split_list
 from tablesalt.common.connections import make_connection
 from tablesalt.preprocessing.tools import find_datastores, db_paths
@@ -377,13 +377,13 @@ def _gather_all_store_keys(operators, nparts):
     return out_all, out_operators
 
 
-def _get_rabatkeys():
+def _get_rabatkeys(rabattrin, year):
 
     try:
-        with open('rabat0trips.pickle', 'rb') as f:
+        with open(f'rabat{rabattrin}trips.pickle', 'rb') as f:
             rabatkeys = pickle.load(f)
     except FileNotFoundError:
-        rabatkeys = helrejser_rabattrin(0)
+        rabatkeys = helrejser_rabattrin(rabattrin, year)
 
     return rabatkeys
 
@@ -448,8 +448,10 @@ def _write_results():
             if df.empty:
                 print('...')
                 break
-            df.to_excel(f'sjælland/start_{name}_{tick}_2019_new.xlsx',
-                        index=False)
+            df.to_excel(
+                f'__result_cache__/single/start_{name}_{tick}_2019.xlsx',
+                index=False
+                )
 
 def main():
 
