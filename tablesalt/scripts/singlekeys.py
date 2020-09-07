@@ -421,9 +421,9 @@ def agg_nested_dict(node):
                 dupe_node[key] = cur_node
         return dupe_node or None
 
-def _write_results():
+def _write_results(rabattrin):
 
-    with open('single_results1.pickle', 'rb') as f:
+    with open('single_results_{year}_r{rabat_level}.pickle', 'rb') as f:
         res = pickle.load(f)
 
     tmap = {'D**': 'DSB'}
@@ -457,19 +457,21 @@ def main():
 
     parser = TableArgParser('year', 'rabattrin')
     args = parser.parse()
+
     year = args['year']
     store_loc = find_datastores(r'H://')
     paths = db_paths(store_loc, year)
-    stores = db_paths['store_paths']
+    stores = paths['store_paths']
     db_path = paths['calculated_stores']
     rabat_level = args['rabattrin']
 
     ringzones = ZoneGraph.ring_dict('sjælland')
     stopzone_map = TakstZones().stop_zone_map()
 
-    print('inputs found\n')
+
 
     rabatkeys = tuple(_get_rabatkeys(rabat_level, year))
+    print('inputs found\n')
 
     wanted_operators = [
         'Metro', 'D**', 'Movia_S', 'Movia_V', 'Movia_H'
@@ -509,10 +511,13 @@ def main():
     operator_results_['all'] = all_results_
 
 
-    with open('fsingle_results_{year}_r{rabat_level}.pickle', 'wb') as f:
+    with open(
+            f'single_results_{year}_r{rabat_level}.pickle',
+            'wb'
+        ) as f:
         pickle.dump(operator_results_, f)
 
-    _write_results()
+    # _write_results()
 
 if __name__ == "__main__":
     from datetime import datetime
@@ -520,7 +525,7 @@ if __name__ == "__main__":
     INHIBITOR.inhibit()
 
     dt = datetime.now()
-    a = main()
+    main()
     print(datetime.now() - dt)
 
     INHIBITOR.uninhibit()
