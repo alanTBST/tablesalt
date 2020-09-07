@@ -454,57 +454,63 @@ def _write_results():
 
 def main():
 
+    parser = TableArgParser('year')
+    args = parser.parse()
 
-    ringzones = ZoneGraph.ring_dict('sjælland')
-    stopzone_map = TakstZones().stop_zone_map()
-
-    args = TableArgParser('year')
-
-    store_loc = find_datastores(r'H://')
-    paths = db_paths(store_loc, year)
-    stores = _hdfstores(store_loc, 2019)
-
-    db_path = paths['calculated_stores']
-    print('inputs found\n')
-
-    rabatkeys = tuple(_get_rabatkeys())
-
-    wanted_operators = ['Metro', 'D**', 'Movia_S', 'Movia_V', 'Movia_H']
-
-    _get_all_store_keys(
-        stores, stopzone_map, ringzones, wanted_operators, rabatkeys
-        )
-
-    nparts = 30
-    out_all, out_operators = \
-        _gather_all_store_keys(wanted_operators, nparts)
-
-    del rabatkeys
-    print('finding results\n')
-    all_wanted_keys = set()
-    for k, v in out_all.items():
-        for k1, v1 in v.items():
-            all_wanted_keys.update(v1)
-
-    result_dict = _get_trips(db_path, all_wanted_keys)
-
-    print('results found\n')
-    del all_wanted_keys
+    return args
 
 
-    all_results = _map_all(out_all, result_dict)
-    all_results_ = agg_nested_dict(all_results)
-
-    operator_results = _map_operators(out_operators, result_dict)
-    operator_results_ = agg_nested_dict(operator_results)
-
-    operator_results_['all'] = all_results_
+    # ringzones = ZoneGraph.ring_dict('sjælland')
+    # stopzone_map = TakstZones().stop_zone_map()
 
 
-    with open('single_results1.pickle', 'wb') as f:
-        pickle.dump(operator_results_, f)
 
-    _write_results()
+
+    # store_loc = find_datastores(r'H://')
+    # paths = db_paths(store_loc, year)
+    # stores = _hdfstores(store_loc, 2019)
+
+    # db_path = paths['calculated_stores']
+    # print('inputs found\n')
+
+    # rabatkeys = tuple(_get_rabatkeys())
+
+    # wanted_operators = ['Metro', 'D**', 'Movia_S', 'Movia_V', 'Movia_H']
+
+    # _get_all_store_keys(
+    #     stores, stopzone_map, ringzones, wanted_operators, rabatkeys
+    #     )
+
+    # nparts = 30
+    # out_all, out_operators = \
+    #     _gather_all_store_keys(wanted_operators, nparts)
+
+    # del rabatkeys
+    # print('finding results\n')
+    # all_wanted_keys = set()
+    # for k, v in out_all.items():
+    #     for k1, v1 in v.items():
+    #         all_wanted_keys.update(v1)
+
+    # result_dict = _get_trips(db_path, all_wanted_keys)
+
+    # print('results found\n')
+    # del all_wanted_keys
+
+
+    # all_results = _map_all(out_all, result_dict)
+    # all_results_ = agg_nested_dict(all_results)
+
+    # operator_results = _map_operators(out_operators, result_dict)
+    # operator_results_ = agg_nested_dict(operator_results)
+
+    # operator_results_['all'] = all_results_
+
+
+    # with open('single_results1.pickle', 'wb') as f:
+    #     pickle.dump(operator_results_, f)
+
+    # _write_results()
 
 if __name__ == "__main__":
     from datetime import datetime
@@ -512,7 +518,7 @@ if __name__ == "__main__":
     INHIBITOR.inhibit()
 
     dt = datetime.now()
-    main()
+    a = main()
     print(datetime.now() - dt)
 
     INHIBITOR.uninhibit()
