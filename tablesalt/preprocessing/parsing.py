@@ -73,8 +73,8 @@ class TableArgParser:
 
         self.arglist = list(args)
 
-        odd_args = set(self.arglist).symmetric_difference(set(self.ARGUMENTS))
-        if odd_args:
+        if not all(x in self.ARGUMENTS for x in self.arglist):
+            odd_args = {x for x in self.arglist if x not in self.ARGUMENTS}
             raise ValueError(
                 f"{list(map(str, odd_args))} not supported"
                 )
