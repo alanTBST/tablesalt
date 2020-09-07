@@ -74,7 +74,7 @@ def setup_directories(year: int, dstores: Optional[AnyStr] = None) -> Tuple:
     for path in new_paths:
         if not os.path.isdir(path):
             os.makedirs(path)
-    os.mkdir('./__result_cache__')
+    os.mkdir(f'./__result_cache__/{year}')
     return new_paths
 
 def db_paths(store_location: AnyStr, year: int) -> Dict[str, AnyStr]:
