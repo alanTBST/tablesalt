@@ -24,7 +24,7 @@ from tqdm import tqdm
 
 from tablesalt import StoreReader
 from tablesalt.common.io import mappers
-from tablesalt.season.users import UserDict
+from tablesalt.season.users import PendlerKombiUsers
 from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
 
@@ -60,7 +60,7 @@ def get_users_for_zones(udict, zone_set):
 
     Parameters
     ----------
-    udict : users.UserDict
+    udict : users.PendlerKombiUsers
         the user dictionary for pendler kombi users.
     zone_set : set
         distinct valid zone combinations of all users .
@@ -298,7 +298,7 @@ def main():
     zone_path = args['zones']
     product_path = args['products']
 
-    userdict = UserDict(
+    userdict = PendlerKombiUsers(
         year, products_path=product_path,
         product_zones_path=zone_path,
         min_valid_days=14
@@ -311,7 +311,8 @@ def main():
     zone_combinations = {x for x in zone_combinations
                           if all(y < 1300 for y in x)}
 
-    zone_combo_users, statistics = get_users_for_zones(userdict, zone_combinations)
+    zone_combo_users, statistics = \
+        get_users_for_zones(userdict, zone_combinations)
 
     season_times = proc_user_data(userdata, zone_combo_users)
 
