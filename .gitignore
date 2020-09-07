@@ -12,4 +12,4 @@ tablesalt/.vscode/settings.json
 tablesalt/topology/route_shapes.geojson
 environment.yml
 tablesalt/resources/gtfs/
-/__result_cache__/
+tablesalt/scripts/__result_cache__/
