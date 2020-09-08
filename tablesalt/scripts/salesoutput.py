@@ -8,7 +8,8 @@ import ast
 import glob
 import os
 
-from typing import AnyStr, Dict, List, Tuple, Optional
+from typing import AnyStr, Dict, Tuple, Optional
+
 
 import pandas as pd
 
@@ -20,6 +21,7 @@ LOCATIONS = {
     'lokaltog-automater i 25 nordsjællandske togsæt': 'movia',
     'enkeltbilletter bus': 'movia'
     }
+
 
 # =============================================================================
 # Loading functions
@@ -66,8 +68,8 @@ def _stringify_merge_cols(frame):
     string_cols = ['betaltezoner', 'slutzone', 'startzone']
     for col in string_cols:
         try:
-            frame.loc[:, 'betaltezoner'] = \
-                frame.loc[:, 'betaltezoner'].astype(str)
+            frame.loc[:, col] = \
+                frame.loc[:, col].astype(str)
         except KeyError:
             pass
 
@@ -75,9 +77,9 @@ def _stringify_merge_cols(frame):
 
 def _load_ringzone_shares() -> pd.core.frame.DataFrame:
 
-    filename = r'sjælland\start_all_short_ring_2019.csv'
+    filename = r'__result_cache__/single/start_all_short_ring_2019_new.xlsx'
 
-    df = pd.read_csv(filename, index_col=0)
+    df = pd.read_excel(filename)
     df = _check_names(df)
     df = _stringify_merge_cols(df)
 
@@ -86,10 +88,10 @@ def _load_ringzone_shares() -> pd.core.frame.DataFrame:
 def _load_long_shares(ring: Optional[bool] = False):
 
     if not ring:
-        filename = r'sjælland\start_all_long_2019.csv'
+        filename = r'__result_cache__/single/start_all_long_2019_new.xlsx'
     else:
-        filename = r'sjælland\start_all_long_ring_2019.csv'
-    df = pd.read_csv(filename)
+        filename = r'__result_cache__/single/start_all_long_ring_2019_new.xlsx'
+    df = pd.read_excel(filename)
     df = _check_names(df)
     df = _stringify_merge_cols(df)
 
@@ -105,9 +107,9 @@ def _load_operator_shares(
     operator = operator.lower()
     length = length.lower()
 
-    filedir = r'sjælland'
+    filedir = os.path.join('__result_cache__', 'single')
 
-    files = glob.glob(os.path.join(filedir, '*.csv'))
+    files = glob.glob(os.path.join(filedir, '*.xlsx'))
     files = [x for x in files if 'start_' in x and 'all' not in x]
     wanted = [x for x in files if operator in x.lower() and length in x.lower()]
 
@@ -123,7 +125,7 @@ def _load_operator_shares(
 
     frames = []
     for f in wanted:
-        df = pd.read_csv(f, index_col=0)
+        df = pd.read_excel(f)
         df = _check_names(df)
         if 'Movia_H' in f:
             df = df.query("startzone < 1100")
@@ -487,7 +489,7 @@ def _process_single(
 
 def _load_kombi_shares() -> pd.core.frame.DataFrame:
 
-    filename = r'sjælland\pendlerkeys2019.csv'
+    filename = r'__result_cache__/pendlerkeys2019.csv'
 
     df = pd.read_csv(filename, index_col=0)
     df.index.name = 'valgtezoner'
@@ -498,7 +500,7 @@ def _load_kombi_shares() -> pd.core.frame.DataFrame:
 
 def _load_kombi_map_shares() -> pd.core.frame.DataFrame:
 
-    filename = r'sjælland\zone_relation_keys2019.csv'
+    filename = r'__result_cache__/zone_relation_keys2019.csv'
     df = pd.read_csv(filename)
     df = _check_names(df)
     df.loc[:, 'betaltezoner'] = df.loc[:, 'betaltezoner'].fillna(0)
@@ -738,7 +740,7 @@ def _process_pendler(
 
 def _load_rabatzero_shares():
 
-    filename = r'sjælland\citypass_shares.csv'
+    filename = r'__result_cache__/citypass_shares.csv'
     df = pd.read_csv(filename, index_col=0)
     df.index.name = 'betaltezoner'
     df = df.reset_index()
@@ -854,34 +856,30 @@ def _process_other(sales_idxs, frame, takst):
 def main():
     """main function"""
 
-    sales_data = _load_sales_data(r'mergesales.xlsx')
-    sales_numbers = _sales_ref(sales_data)
-    # sources = _location_ref(sales_data)
+    sales_data = _load_sales_data(r'mergedsales.csv')
+    sales_idxs = _sales_ref(sales_data)
 
 # =============================================================================
-
     single_output = []
-    for takst in ['th', 'ts', 'dsb', 'th']:
-        single = _process_single(sales_numbers, sales_data, takst)
+    for takst in ['th', 'ts', 'dsb', 'tv']:
+        single = _process_single(sales_idxs, sales_data, takst)
         single_output.append(single)
     single_output = pd.concat(single_output)
+# =============================================================================
 
     pendler_output = []
-    for takst in ['th', 'ts', 'dsb', 'th']:
-
-        pendler = _process_pendler(sales_numbers, sales_data, takst)
+    for takst in ['th', 'ts', 'dsb', 'tv']:
+        pendler = _process_pendler(sales_idxs, sales_data, takst)
         pendler_output.append(pendler)
-
     pendler_output = pd.concat(pendler_output)
-
-    other_output_h = _process_other(sales_numbers, sales_data, 'th')
+# =============================================================================
+    other_output_h = _process_other(sales_idxs, sales_data, 'th')
+# =============================================================================
 
 
     found = set(single_output.NR).union(set(pendler_output.NR)).union(
         set(other_output_h.NR))
     missing = sales_data.query("NR not in @found")
-
-    # missing = missing.query("takstsæt == 'th'")
 
     final = pd.concat([single_output, pendler_output, other_output_h, missing])
     final = final.sort_values(['NR'])
