@@ -100,7 +100,6 @@ def _aggregate_zones(shares):
 def _map_zones(stop_arr, zonemap):
     # stop_arr must be sorted
 
-
     mapped_zones = {}
     stop_arr = stop_arr[np.lexsort((stop_arr[:, 1], stop_arr[:, 0]))]
     for key, grp in groupby(stop_arr, key=itemgetter(0)):
@@ -262,7 +261,7 @@ def _get_trips(db, tripkeys):
     tripkeys_ = {bytes(str(x), 'utf-8') for x in tripkeys}
 
     out = {}
-    with lmdb.open(db) as env:
+    with lmdb.open(db, readahead=False) as env:
         with env.begin() as txn:
             for k in tqdm(tripkeys_):
                 shares = txn.get(k)
@@ -281,7 +280,7 @@ def _get_store_num(store):
     return st
 
 
-def _get_store_keys(year, store, stopzone_map, ringzones, operators, rabatkeys):
+def _get_store_keys(store, stopzone_map, ringzones, operators, rabatkeys, year):
 
     tripkeys = _store_tripkeys(
         store, stopzone_map, ringzones, rabatkeys
@@ -301,17 +300,17 @@ def _get_store_keys(year, store, stopzone_map, ringzones, operators, rabatkeys):
         pickle.dump(op_tripkeys, f)
 
 
-def _get_all_store_keys(year, stores, stopzone_map, ringzones, operators, rabatkeys):
+def _get_all_store_keys(stores, stopzone_map, ringzones, operators, rabatkeys, year):
 
 
     pfunc = partial(_get_store_keys,
-                    year=year,
                     stopzone_map=stopzone_map,
                     ringzones=ringzones,
                     operators=operators,
-                    rabatkeys=rabatkeys)
+                    rabatkeys=rabatkeys,
+                    year=year)
 
-    with Pool(os.cpu_count() - 1) as pool:
+    with Pool(os.cpu_count() - 2) as pool:
         pool.map(pfunc, stores)
 
 
@@ -351,10 +350,11 @@ def _gather_store_keys(lst_of_temp, operators, nparts):
 
     return out_all, out_operators
 
-def _gather_all_store_keys(operators, nparts):
+def _gather_all_store_keys(operators, nparts, year):
 
 
-    lst_of_temp = glob.glob(os.path.join('__result_cache__', '*.pickle'))
+    lst_of_temp = glob.glob(os.path.join(
+        '__result_cache__', f'{year}', '*.pickle'))
     lst_of_temp = [x for x in lst_of_temp if 'skeys' in x]
     lst_of_lsts = split_list(lst_of_temp, wanted_parts=nparts)
 
@@ -472,11 +472,13 @@ def main():
     args = parser.parse()
 
     year = args['year']
+    rabat_level = args['rabattrin']
+
     store_loc = find_datastores(r'H://')
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
-    rabat_level = args['rabattrin']
+
 
     ringzones = ZoneGraph.ring_dict('sjælland')
     stopzone_map = TakstZones().stop_zone_map()
@@ -490,17 +492,16 @@ def main():
 
 
     _get_all_store_keys(
-        year,
         stores,
         stopzone_map,
         ringzones,
         wanted_operators,
-        rabatkeys
-        )
+        rabatkeys,
+        year)
 
     nparts = 30
     out_all, out_operators = \
-        _gather_all_store_keys(wanted_operators, nparts)
+        _gather_all_store_keys(wanted_operators, nparts, year)
 
     del rabatkeys
     print('finding results\n')
@@ -513,7 +514,6 @@ def main():
 
     print('results found\n')
     del all_wanted_keys
-
 
     all_results = _map_all(out_all, result_dict)
     all_results_ = agg_nested_dict(all_results)
@@ -532,25 +532,18 @@ def main():
     with open(fp, 'wb') as f:
         pickle.dump(operator_results_, f)
 
-    _write_results()
+    _write_results(rabat_level, year)
 
 if __name__ == "__main__":
     from datetime import datetime
     dt = datetime.now()
 
     if os.name == 'nt':
-        INHIBITOR = WindowsInhibitor()
-        INHIBITOR.inhibit()
-        main()
-        INHIBITOR.uninhibit()
+       INHIBITOR = WindowsInhibitor()
+       INHIBITOR.inhibit()
+       main()
+       INHIBITOR.uninhibit()
     else:
-        main()
+       main()
 
     print(datetime.now() - dt)
-
-
-
-
-
-
-
