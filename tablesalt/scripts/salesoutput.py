@@ -10,7 +10,6 @@ import os
 
 from typing import AnyStr, Dict, List, Tuple, Optional
 
-
 import pandas as pd
 
 
@@ -21,7 +20,6 @@ LOCATIONS = {
     'lokaltog-automater i 25 nordsjællandske togsæt': 'movia',
     'enkeltbilletter bus': 'movia'
     }
-
 
 # =============================================================================
 # Loading functions
@@ -66,7 +64,7 @@ def _check_names(frame):
 def _stringify_merge_cols(frame):
 
     string_cols = ['betaltezoner', 'slutzone', 'startzone']
-    for col in string_cols:      
+    for col in string_cols:
         try:
             frame.loc[:, 'betaltezoner'] = \
                 frame.loc[:, 'betaltezoner'].astype(str)
