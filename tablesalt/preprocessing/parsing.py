@@ -82,7 +82,7 @@ class TableArgParser:
            False,
            str,
            None
-           )       
+           )
         }
 
     def __init__(self, *args: str, description: AnyStr = None) -> None:

@@ -279,7 +279,6 @@ def main():
     paths = db_paths(find_datastores('H:/'), args['year'])
     stores = paths['store_paths']
 
-
     year = args['year']
     zone_path = args['zones']
     product_path = args['products']
@@ -312,7 +311,6 @@ def main():
         season_trips, zone_combo_users
         )
 
-    # print("determining valid trips...")
     zero_travel_price = find_no_pay(stores)
     zero_travel_price = {str(x) for x in zero_travel_price}
 
@@ -334,7 +332,12 @@ def main():
     colorder = [x for x in out.columns if x not in ('n_users', 'n_period_cards', 'n_trips')]
     colorder = colorder + ['n_users', 'n_period_cards', 'n_trips']
     out = out[colorder]
-    out.to_csv(f'pendlerkeys{year}.csv', index=True)
+    
+    fp = os.path.join(
+        '__result_cache__', f'{year}', 
+        'pendler', 'pendlerchosenzones.csv'
+        )
+    out.to_csv(fp, index=True)
 
 
 if __name__ == "__main__":
