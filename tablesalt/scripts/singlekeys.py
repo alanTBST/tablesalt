@@ -426,7 +426,27 @@ def agg_nested_dict(node):
                 dupe_node[key] = cur_node
         return dupe_node or None
 
-def _write_results(rabattrin, year):
+def _output_df(results, tick) -> pd.core.dataframe.DataFrame:
+    
+    frame = pd.DataFrame.from_dict(results, orient='index')
+    frame = frame.fillna(0)
+    frame = frame.reset_index()
+    if 'ring' not in tick:
+        frame = frame.rename(columns={
+            'level_0': 'StartZone', 'level_1': 'DestinationZone'
+            })
+    else:
+        frame = frame.rename(columns={
+            'level_0': 'StartZone', 'level_1': 'n_zones'
+            })
+    col_order = frame.columns
+    neworder = [x for x in col_order if x != 'n_trips']
+    neworder.append('n_trips')
+    frame = frame[neworder]
+    
+    return frame
+
+def _write_results(rabattrin, year) -> None:
 
     dir_path = os.path.join(
         '__result_cache__', 
@@ -445,22 +465,8 @@ def _write_results(rabattrin, year):
 
     tmap = {'D**': 'DSB'}
     for start, tickets in res.items():
-        for tick, results in tickets.items():
-            df = pd.DataFrame.from_dict(results, orient='index')
-            df = df.fillna(0)
-            df = df.reset_index()
-            if 'ring' not in tick:
-                df = df.rename(columns={
-                    'level_0': 'StartZone', 'level_1': 'DestinationZone'
-                    })
-            else:
-                df = df.rename(columns={
-                    'level_0': 'StartZone', 'level_1': 'n_zones'
-                    })
-            col_order = df.columns
-            neworder = [x for x in col_order if x != 'n_trips']
-            neworder.append('n_trips')
-            df = df[neworder]
+        for tick, results in tickets.items():           
+            df = _output_df(results, tick)          
             name = tmap.get(start, start)
             fp = os.path.join(
                 '__result_cache__',
