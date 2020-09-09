@@ -29,7 +29,10 @@ import numpy as np
 import tqdm
 import pandas as pd
 
-from tablesalt.season.users import UserDict
+from tablesalt.season.users import PendlerKombiUsers
+from tablesalt.preprocessing.tools import find_datastores, db_paths
+from tablesalt.preprocessing.parsing import TableArgParser
+
 
 def parse_args():
     """parse the cl arguments"""
@@ -250,32 +253,31 @@ def get_user_shares(all_trips):
 
 def main():
 
-
-    args = parse_args()
+    parser = TableArgParser('year', 'zones', 'products')
+    args = parser.parse()
 
     year = args['year']
     zone_path = args['zones']
     product_path = args['products']
 
-    store_dir = _find_datastores(r'H://')
-    db_dirs = _make_db_paths(store_dir, year)
-    store_files = _hdfstores(store_dir, year)
+    paths = db_paths(find_datastores('H:/'), year)
+    calc_store = paths['calculated_stores']
+    valid_kombi_store = paths['kombi_valid_trips']
+    kombi_dates =  paths['kombi_dates_db']
 
-    userdata = UserDict(
+    userdata = PendlerKombiUsers(
         year, products_path=product_path,
         product_zones_path=zone_path,
         min_valid_days=0
         ).get_data()
 
     userdata = process_user_data(userdata)
-    kombi_trips = load_valid(db_dirs['kombi_valid'])
-    # l_dicts = divide_dict(kombi_trips, 100)
-    # d = l_dicts[0]
-    # u1 = {k:v for k, v in userdata.items() if k[0] in d}
-    # f = partial(match_trip_to_season, userdata=userdata)
-    tofetch = match_trip_to_season(kombi_trips, userdata, db_dirs['kombi_dates'])
+    kombi_trips = load_valid(valid_kombi_store)
+    tofetch = match_trip_to_season(
+        kombi_trips, userdata, kombi_dates
+        )
 
-    with lmdb.open(db_dirs['calc_store']) as env:
+    with lmdb.open(calc_store) as env:
         final = {}
         with env.begin() as txn:
             for k, v in tofetch.items():
@@ -291,11 +293,8 @@ def main():
     cols = [x for x in out.columns if x != 'n_trips']
     colorder = cols + ['n_trips']
     out = out[colorder]
-    # out = out.query("FromZoneNr < 1100 and ToZoneNr < 1100")
-    out.to_csv(f'{year}kombiusershares.csv', index=False)
-    out.to_excel(f'{year}kombishares.xlsx', index=False)
-
-    return
-
-
-
+    
+    fp = os.path.join(
+        '__result_cache__', f'{year}', 'pendler', 'kombiusershares.csv'
+        )
+    out.to_csv(fp, index=False)
