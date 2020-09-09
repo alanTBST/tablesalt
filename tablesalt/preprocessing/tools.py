@@ -10,7 +10,6 @@ from typing import (
     List,
     Tuple,
     Dict,
-    Generator,
     Union
     )
 
@@ -19,6 +18,25 @@ import pandas as pd
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
 def find_datastores(start_dir: Optional[AnyStr] = None) -> AnyStr:
+    """
+    Find the location of the processed rejsekort datastores
+
+    Parameters
+    ----------
+    start_dir : Optional[AnyStr], optional
+        The directory to start searching from . The default is None.
+
+    Raises
+    ------
+    FileNotFoundError
+        If no rejsekort datastores can be found.
+
+    Returns
+    -------
+    AnyStr
+        The directory of the rejsekort datastores.
+
+    """
 
     if start_dir is None:
         if socket.gethostname() == "tsdw03":
@@ -34,7 +52,7 @@ def find_datastores(start_dir: Optional[AnyStr] = None) -> AnyStr:
         )
 
 def _hdfstores(store_loc: AnyStr, year: int) -> List[AnyStr]:
-
+    """Return path of the hdf5 files"""
     return glob.glob(
         os.path.join(
             store_loc, 'rejsekortstores',
@@ -81,8 +99,7 @@ def setup_directories(year: int, dstores: Optional[AnyStr] = None) -> List[AnySt
             f'{year}', 
             d
             )
-        new_paths.append(new_path)
-    
+        new_paths.append(new_path) 
   
     for path in new_paths:
         if not os.path.isdir(path):
@@ -91,6 +108,22 @@ def setup_directories(year: int, dstores: Optional[AnyStr] = None) -> List[AnySt
     return new_paths
 
 def db_paths(store_location: AnyStr, year: int) -> Dict[str, AnyStr]:
+    """
+    Return a dictionary of the paths to the databases
+
+    Parameters
+    ----------
+    store_location : AnyStr
+        the directory location of the datastores.
+    year : int
+        the analysis year.
+
+    Returns
+    -------
+    Dict[str, AnyStr]
+        dict of database name and their paths.
+
+    """
 
     kv_names = [
         'user_trips_db',
@@ -112,7 +145,7 @@ def db_paths(store_location: AnyStr, year: int) -> Dict[str, AnyStr]:
 
     return out
 
-def _get_sub_zips(lstzips: List) -> Dict:
+def _get_sub_zips(lstzips: List[AnyStr]) -> Dict:
     """get the names of the files in each zipfile"""
     return {zipf: tuple(zipfile.ZipFile(zipf).namelist()) for zipf in lstzips}
 
@@ -150,7 +183,7 @@ def get_columns(zfile: AnyStr, content: AnyStr) -> List[str]:
     file_columns = df_0.columns
     return [x.lower() for x in file_columns]
 
-def check_all_file_headers(file_list: List[Tuple[str, ...]]) -> Optional[bool]:
+def check_all_file_headers(file_list: List[Tuple[AnyStr, ...]]) -> Optional[bool]:
     """test to see if all file headers are like the first"""
     if len(file_list) == 1:
         return True
@@ -204,7 +237,7 @@ def col_index_dict(
 
     return colindices, coltypes
 
-def blocks(files: AnyStr, size: Optional[int] = 65536) -> Generator:
+def blocks(files: AnyStr, size: Optional[int] = 65536) -> int:
     """yield the bytes of the specified file"""
     while True:
         b = files.read(size)
@@ -219,10 +252,10 @@ def sumblocks(zfile: AnyStr, content: AnyStr) -> int:
 
     Parameters
     ----------
-    zfile : str
+    zfile : AnyStr
         a path to a zipfile.
-    content : TYPE
-        DESCRIPTION.
+    content : AnyStr
+        the subfile contents of the given zfile.
 
     Returns
     -------
