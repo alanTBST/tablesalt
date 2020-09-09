@@ -44,8 +44,8 @@ def get_zone_combinations(udata):
         for _id, card_info in seasons.items():
             if card_info['zones'] not in zone_set:
                 zone_set.add(card_info['zones'])
-
-    return zone_set
+    # THIS IS ONLY FOR SJÆLLAND
+    return {x for x in zone_set if all(y < 1300 for y in x)}
 
 def get_users_for_zones(udict, zone_set):
     """
@@ -292,9 +292,6 @@ def main():
     userdata = userdict.get_data()
 
     zone_combinations = get_zone_combinations(userdata)
-
-    zone_combinations = {x for x in zone_combinations
-                          if all(y < 1300 for y in x)}
 
     zone_combo_users, statistics = \
         get_users_for_zones(userdict, zone_combinations)
