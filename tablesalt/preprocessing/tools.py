@@ -64,16 +64,31 @@ def setup_directories(year: int, dstores: Optional[AnyStr] = None) -> Tuple:
             )
     if not os.path.isdir(dstores):
         os.makedirs(dstores)
+    
+    dstore_paths = ('dbs', 'dbs', 'packs')
+    
+    new_paths = []
+    for d in dstore_paths:
+        new_path = os.path.join(dstores, f'{year}DataStores', d)
+        new_paths.append(new_path)
 
-    new_paths = (
-        os.path.join(dstores, f'{year}DataStores', 'dbs'),
-        os.path.join(dstores, f'{year}DataStores', 'hdfstores'),
-        os.path.join(dstores, f'{year}DataStores', 'packs')
-        )
-
+    result_paths = ['other', 'pendler', 'single', 'preprocessed']
+    for d in result_paths:
+        new_path =  os.path.join(
+            Path(THIS_DIR).parent,
+            'scripts',
+            '__result_cache__', 
+            f'{year}', 
+            d
+            )
+        new_paths.append(new_path)
+    
+    
     for path in new_paths:
         if not os.path.isdir(path):
             os.makedirs(path)
+    
+    
     os.makedirs(
         os.path.join(
             Path(THIS_DIR).parent,
