@@ -353,8 +353,13 @@ def _gather_store_keys(lst_of_temp, operators, nparts):
 def _gather_all_store_keys(operators, nparts, year):
 
 
-    lst_of_temp = glob.glob(os.path.join(
-        '__result_cache__', f'{year}', '*.pickle'))
+    lst_of_temp = glob.glob(
+        os.path.join(
+            '__result_cache__', 
+            f'{year}', 
+            '*.pickle'
+            )
+        )
     lst_of_temp = [x for x in lst_of_temp if 'skeys' in x]
     lst_of_lsts = split_list(lst_of_temp, wanted_parts=nparts)
 
@@ -384,8 +389,12 @@ def _gather_all_store_keys(operators, nparts, year):
 
 def _get_rabatkeys(rabattrin, year):
 
+    fp = os.path.join(
+        '__result_cache__', 
+        f'rabat{rabattrin}trips.pickle'
+        )
     try:
-        with open(f'__result_cache__/rabat{rabattrin}trips.pickle', 'rb') as f:
+        with open(fp, 'rb') as f:
             rabatkeys = pickle.load(f)
     except FileNotFoundError:
         rabatkeys = helrejser_rabattrin(rabattrin, year)
