@@ -21,7 +21,7 @@ from tablesalt.season.users import PendlerKombiUsers
 from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
 
-
+THIS_DIR = os.path.join(os.path.realpath(__file__))
 
 def get_zone_combinations(udata):
     """
@@ -159,7 +159,9 @@ def find_no_pay(stores):
     out = set()
     with Pool(os.cpu_count() - 2) as pool:
         results = pool.imap(proc, stores)
-        for res in tqdm(results, 'finding trips inside zones'):
+        for res in tqdm(results, 
+                        'finding trips inside zones', 
+                        total=len(stores)):
             out.update(set(res))
     return out
 
@@ -224,7 +226,6 @@ def _aggregate_zones(shares):
     # TODO: import this from package
     test_out = sorted(shares, key=itemgetter(1))
     totalzones = sum(x[0] for x in test_out)
-    rev = {v:k for k, v in mappers['operator_id'].items()}
     t = {key:sum(x[0] for x in group) for
          key, group in groupby(test_out, key=itemgetter(1))}
     t = {k:v/totalzones for k, v in t.items()}
@@ -329,6 +330,7 @@ def main():
     out = out[colorder]
     
     fp = os.path.join(
+        THIS_DIR, 
         '__result_cache__', f'{year}', 
         'pendler', 'pendlerchosenzones.csv'
         )
