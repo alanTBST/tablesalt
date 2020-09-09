@@ -12,9 +12,7 @@ of zones
 """
 
 import ast
-import glob
 import os
-import sys
 from itertools import groupby, chain
 from multiprocessing import Pool
 from operator import itemgetter
@@ -122,12 +120,13 @@ def main():
     parser = TableArgParser('year', 'products', 'zones')
 
     args = parser.parse()
+    
+    year = args['year']
 
-    paths = db_paths(find_datastores('H:/'), args['year'])
+    paths = db_paths(find_datastores('H:/'), year)
     stores = paths['store_paths']
     calc_store = paths['calculated_stores']
     valid_kombi_store = paths['kombi_valid_trips']
-
 
     print("loading user data...\n")
     users = PendlerKombiUsers(
@@ -162,7 +161,12 @@ def main():
         frame.index.name = "betaltezoner"
         frame = frame.reset_index()
         frame = frame.fillna(0)
-        frame.to_csv(f'sjælland/kombi_paid_zones_region_{takst}.csv', index=False)
+        fp = os.path.join(
+            '__result_cache__',
+            f'{year}', 
+            f'kombi_paid_zones_region_{takst}.csv'
+            )
+        frame.to_csv(fp, index=False)
 
     return
 
