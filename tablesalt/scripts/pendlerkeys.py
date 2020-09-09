@@ -5,18 +5,11 @@ Created on Thu Feb  6 09:31:46 2020
 @author: alkj
 """
 import ast
-import glob
 import os
-import sys
-from argparse import (
-    ArgumentParser,
-    RawTextHelpFormatter
-    )
 from datetime import datetime
 from itertools import groupby, chain
 from multiprocessing import Pool
 from operator import itemgetter
-from pathlib import Path
 
 import lmdb
 import pandas as pd
@@ -131,7 +124,7 @@ def load_valid(valid_kombi_store):
         DESCRIPTION.
 
     """
-    env = lmdb.open(valid_kombi_store)
+    env = lmdb.open(valid_kombi_store, readahead=False)
     valid_kombi = {}
     with env.begin() as txn:
         cursor = txn.cursor()
@@ -164,21 +157,14 @@ def proc(store):
 def find_no_pay(stores):
 
     out = set()
-    with Pool(6) as pool:
+    with Pool(os.cpu_count() - 2) as pool:
         results = pool.imap(proc, stores)
         for res in tqdm(results, 'finding trips inside zones'):
             out.update(set(res))
     return out
 
 def assert_internal_zones(zero_travel_price, zone_combo_trips):
-    """
 
-
-    Returns
-    -------
-    None.
-
-    """
     return {k: v.intersection(zero_travel_price) for k, v in zone_combo_trips.items()}
 
 def match_trip_to_season(kombi_trips, season_dates, kombi_dates):
@@ -349,7 +335,7 @@ def main():
     colorder = colorder + ['n_users', 'n_period_cards', 'n_trips']
     out = out[colorder]
     out.to_csv(f'pendlerkeys{year}.csv', index=True)
-    # out.to_excel(f'pendlerkeys{year}.xlsx', index=True)
+
 
 if __name__ == "__main__":
     st = datetime.now()
