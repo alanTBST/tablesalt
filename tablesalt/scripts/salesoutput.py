@@ -856,7 +856,9 @@ def _process_other(sales_idxs, frame, takst):
 def main():
     """main function"""
 
-    sales_data = _load_sales_data(r'mergedsales.csv')
+    data = os.path.join('revenue', 'mergedsales.csv')
+    
+    sales_data = _load_sales_data(data)
     sales_idxs = _sales_ref(sales_data)
 
 # =============================================================================

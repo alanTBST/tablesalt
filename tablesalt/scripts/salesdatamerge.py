@@ -559,18 +559,25 @@ def clean_frame(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
 
 def main():
     """main function"""
+    
     d = r'..\salesdata'
+    year = 2019
     contents = directory_contents(d)
     operators = identify_operator(contents)
     given_columns = find_columns(operators)
     columns_matched = match_columns(given_columns)
     df = read_and_merge(operators, columns_matched)
     df = clean_frame(df)
-    # df = df[MERGE_COLUMNS]
-    return df
+    fp = os.path.join(
+        '__result_cache__', 
+        f'{year}', 
+        'mergedsales.csv'
+        )
+    df.to_csv(fp, index=False)
+
 
 if __name__ == "__main__":
     from datetime import datetime
     st = datetime.now()
-    df = main()
+    main()
     print(datetime.now() - st)
