@@ -435,7 +435,7 @@ def agg_nested_dict(node):
                 dupe_node[key] = cur_node
         return dupe_node or None
 
-def _output_df(results, tick) -> pd.core.dataframe.DataFrame:
+def _output_df(results, tick) -> pd.core.frame.DataFrame:
     
     frame = pd.DataFrame.from_dict(results, orient='index')
     frame = frame.fillna(0)
@@ -558,11 +558,11 @@ if __name__ == "__main__":
     dt = datetime.now()
 
     if os.name == 'nt':
-       INHIBITOR = WindowsInhibitor()
-       INHIBITOR.inhibit()
-       main()
-       INHIBITOR.uninhibit()
+        INHIBITOR = WindowsInhibitor()
+        INHIBITOR.inhibit()
+        main()
+        INHIBITOR.uninhibit()
     else:
-       main()
+        main()
 
     print(datetime.now() - dt)
