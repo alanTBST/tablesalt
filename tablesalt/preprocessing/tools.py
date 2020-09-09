@@ -39,10 +39,10 @@ def find_datastores(start_dir: Optional[AnyStr] = None) -> AnyStr:
     """
 
     if start_dir is None:
-        if socket.gethostname() == "tsdw03":
+        if socket.gethostname() == "tsdw03": # TBST server
             start_dir='H:\\'
         else:
-            start_dir = os.path.splitdrive(sys.executable)[0]
+            start_dir = os.path.splitdrive(sys.executable)[0] # drive letter of your python installation
             start_dir = os.path.join(start_dir, '\\')
     for dirpath, subdirs, _ in os.walk(start_dir):
         if 'rejsekortstores' in subdirs:
