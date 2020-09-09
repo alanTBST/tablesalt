@@ -186,24 +186,23 @@ def match_trip_to_season(kombi_trips, season_dates, kombi_dates):
 
     """
     out = {k: [] for k, v in season_dates.items()}
-    env = lmdb.open(kombi_dates)
-    with env.begin() as txn:
-        for k, v in tqdm(kombi_trips.items(), 'matching trips to season passes'):
-            v = (bytes(str(x), 'utf-8') for x in v)
-            utripdates = {x: txn.get(x) for x in v}
-            utripdates = {
-                k.decode('utf-8'): datetime.strptime(
-                    v.decode('utf-8'), '%Y-%m-%d'
-                    ).date() for k, v in utripdates.items()
-                }
-            user_seasons = {v: k1 for k1, v in
-                            season_dates.items() if k1[0] == k}
-            for key, date in utripdates.items():
-                for window, season in user_seasons.items():
-                    if _date_in_window(window, date):
-                        out[season].append(key)
-                        break
-    env.close()
+    with lmdb.open(kombi_dates, readahead=False) as env:
+        with env.begin() as txn:
+            for k, v in tqdm(kombi_trips.items(), 'matching trips to season passes'):
+                v = (bytes(str(x), 'utf-8') for x in v)
+                utripdates = {x: txn.get(x) for x in v}
+                utripdates = {
+                    k.decode('utf-8'): datetime.strptime(
+                        v.decode('utf-8'), '%Y-%m-%d'
+                        ).date() for k, v in utripdates.items()
+                    }
+                user_seasons = {v: k1 for k1, v in
+                                season_dates.items() if k1[0] == k}
+                for key, date in utripdates.items():
+                    for window, season in user_seasons.items():
+                        if _date_in_window(window, date):
+                            out[season].append(key)
+                            break
     return {k: tuple(v) for k, v in out.items()}
 
 
@@ -246,19 +245,18 @@ def get_user_shares(all_trips):
 
 def get_zone_combination_shares(tofetch, calculated_stores):
 
-    env = lmdb.open(calculated_stores)
-
-    final = {}
-    with env.begin() as txn:
-        for k, v in tqdm(tofetch.items(), 'fetching valid trip results'):
-            all_trips = []
-            for trip in v:
-                t = txn.get(trip.encode('utf-8'))
-                if t:
-                    all_trips.append(t.decode('utf-8'))
-            all_trips = tuple(ast.literal_eval(x) for x in all_trips)
-            final[k] = get_user_shares(all_trips)
-    env.close()
+    with lmdb.open(calculated_stores, readahead=False) as env:
+    
+        final = {}
+        with env.begin() as txn:
+            for k, v in tqdm(tofetch.items(), 'fetching valid trip results'):
+                all_trips = []
+                for trip in v:
+                    t = txn.get(trip.encode('utf-8'))
+                    if t:
+                        all_trips.append(t.decode('utf-8'))
+                all_trips = tuple(ast.literal_eval(x) for x in all_trips)
+                final[k] = get_user_shares(all_trips)
 
     return final
 

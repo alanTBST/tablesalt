@@ -37,55 +37,6 @@ def _load_zone_relations():
     return zonerelations
 
 
-def _load_old_relations():
-    """
-
-
-    Returns
-    -------
-    zonerelations_old : TYPE
-        DESCRIPTION.
-
-    """
-
-    fpath = 'zone_relations.msgpack'
-    if os.path.isfile(fpath):
-        with open(fpath, 'rb') as fp:
-            zonerelations_old = msgpack.load(fp, strict_map_key=False)
-    return zonerelations_old
-
-
-def _find_differences(zonerelations, zonerelations_old):
-    """
-
-
-    Parameters
-    ----------
-    zonerelations : TYPE
-        DESCRIPTION.
-    zonerelations_old : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    diff : TYPE
-        DESCRIPTION.
-
-    """
-
-
-    diff = {}
-    for k, v in zonerelations.items():
-        if zonerelations_old[k] == v:
-            continue
-
-        if ((v[b'StartZone'] == zonerelations_old[k][b'StartZone']) and
-           (v[b'DestinationZone'] == zonerelations_old[k][b'DestinationZone']) and
-           (v[b'Zones'] == zonerelations_old[k][ b'Zones'])):
-            continue
-        diff[k] = v
-    return diff
-
 def _proc_zone_relations(zone_rels: dict):
     """
 
