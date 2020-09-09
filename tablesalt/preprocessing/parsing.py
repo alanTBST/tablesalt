@@ -74,7 +74,15 @@ class TableArgParser:
            False,
            int,
            None
-           )
+           ),
+        'passenger_type': ArgTuple(
+           '-t',
+           '--passenger_type',
+           'the type of passenger to analyse',
+           False,
+           str,
+           None
+           )       
         }
 
     def __init__(self, *args: str, description: AnyStr = None) -> None:
