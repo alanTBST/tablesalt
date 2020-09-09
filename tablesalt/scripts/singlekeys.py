@@ -428,7 +428,11 @@ def agg_nested_dict(node):
 
 def _write_results(rabattrin, year):
 
-    dir_path = os.path.join('__result_cache__', f'{year}','single')
+    dir_path = os.path.join(
+        '__result_cache__', 
+        f'{year}',
+        'single'
+        )
     if not os.path.isdir(dir_path):
         os.makedirs(dir_path)
     fp = os.path.join(
