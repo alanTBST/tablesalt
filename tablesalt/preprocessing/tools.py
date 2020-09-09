@@ -33,7 +33,7 @@ def find_datastores(start_dir: Optional[AnyStr] = None) -> AnyStr:
         "cannot find a rejsekort datastores location"
         )
 
-def _hdfstores(store_loc, year):
+def _hdfstores(store_loc: AnyStr, year: int) -> List[AnyStr]:
 
     return glob.glob(
         os.path.join(
@@ -43,7 +43,7 @@ def _hdfstores(store_loc, year):
         )
 
 
-def setup_directories(year: int, dstores: Optional[AnyStr] = None) -> Tuple:
+def setup_directories(year: int, dstores: Optional[AnyStr] = None) -> List[AnyStr]:
     """
     Setup the directories needed for the chosen year
 
@@ -83,19 +83,10 @@ def setup_directories(year: int, dstores: Optional[AnyStr] = None) -> Tuple:
             )
         new_paths.append(new_path)
     
-    
+  
     for path in new_paths:
         if not os.path.isdir(path):
             os.makedirs(path)
-    
-    
-    os.makedirs(
-        os.path.join(
-            Path(THIS_DIR).parent,
-            'scripts',
-            f'./__result_cache__/{year}'
-            )
-        )
 
     return new_paths
 
@@ -159,7 +150,7 @@ def get_columns(zfile: AnyStr, content: AnyStr) -> List[str]:
     file_columns = df_0.columns
     return [x.lower() for x in file_columns]
 
-def check_all_file_headers(file_list: List[Tuple]) -> Optional[bool]:
+def check_all_file_headers(file_list: List[Tuple[str, ...]]) -> Optional[bool]:
     """test to see if all file headers are like the first"""
     if len(file_list) == 1:
         return True
@@ -222,7 +213,7 @@ def blocks(files: AnyStr, size: Optional[int] = 65536) -> Generator:
         yield b
 
 
-def sumblocks(zfile, content) -> int:
+def sumblocks(zfile: AnyStr, content: AnyStr) -> int:
     """
     Get the total number of new lines in the zipfile content
 
