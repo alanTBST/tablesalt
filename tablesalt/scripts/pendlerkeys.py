@@ -10,6 +10,7 @@ from datetime import datetime
 from itertools import groupby, chain
 from multiprocessing import Pool
 from operator import itemgetter
+from pathlib import Path
 
 import lmdb
 import pandas as pd
@@ -20,7 +21,7 @@ from tablesalt.season.users import PendlerKombiUsers
 from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
 
-THIS_DIR = os.path.join(os.path.realpath(__file__))
+THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 
 def get_zone_combinations(udata):
     """

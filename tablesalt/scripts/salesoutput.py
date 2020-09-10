@@ -7,11 +7,11 @@ Created on Sat May 23 00:18:51 2020
 import ast
 import glob
 import os
-
 from typing import AnyStr, Dict, Tuple, Optional
-
-
+from pathlib import Path
 import pandas as pd
+
+THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 
 
 # TODO maybe put this in a config file
@@ -41,7 +41,7 @@ def _load_sales_data(filename: AnyStr) -> pd.core.frame.DataFrame:
         df = pd.read_excel(filename)
         return _proc_sales(df)
     elif 'csv' in filename:
-        df = pd.read_csv(filename)
+        df = pd.read_csv(filename, low_memory=False)
         return _proc_sales(df)
 
     raise NotImplementedError("unsupported filetype")
@@ -77,9 +77,9 @@ def _stringify_merge_cols(frame):
 
 def _load_ringzone_shares() -> pd.core.frame.DataFrame:
 
-    filename = r'__result_cache__/single/start_all_short_ring_2019_new.xlsx'
+    filename = r'__result_cache__/2019/single/start_all_short_ring_2019_r0.csv'
 
-    df = pd.read_excel(filename)
+    df = pd.read_csv(filename)
     df = _check_names(df)
     df = _stringify_merge_cols(df)
 
@@ -88,10 +88,10 @@ def _load_ringzone_shares() -> pd.core.frame.DataFrame:
 def _load_long_shares(ring: Optional[bool] = False):
 
     if not ring:
-        filename = r'__result_cache__/single/start_all_long_2019_new.xlsx'
+        filename = r'__result_cache__/2019/single/start_all_long_2019_r0.csv'
     else:
-        filename = r'__result_cache__/single/start_all_long_ring_2019_new.xlsx'
-    df = pd.read_excel(filename)
+        filename = r'__result_cache__/2019/single/start_all_long_ring_2019_r0.csv'
+    df = pd.read_csv(filename)
     df = _check_names(df)
     df = _stringify_merge_cols(df)
 
@@ -107,11 +107,12 @@ def _load_operator_shares(
     operator = operator.lower()
     length = length.lower()
 
-    filedir = os.path.join('__result_cache__', 'single')
+    filedir = os.path.join('__result_cache__', '2019', 'single')
 
-    files = glob.glob(os.path.join(filedir, '*.xlsx'))
+    files = glob.glob(os.path.join(filedir, '*.csv'))
     files = [x for x in files if 'start_' in x and 'all' not in x]
     wanted = [x for x in files if operator in x.lower() and length in x.lower()]
+    wanted = [x for x in wanted if '_r0' in x]
 
     if not ring:
         wanted = [x for x in wanted if 'ring' not in x.lower()]
@@ -125,7 +126,7 @@ def _load_operator_shares(
 
     frames = []
     for f in wanted:
-        df = pd.read_excel(f)
+        df = pd.read_csv(f)
         df = _check_names(df)
         if 'Movia_H' in f:
             df = df.query("startzone < 1100")
@@ -489,7 +490,7 @@ def _process_single(
 
 def _load_kombi_shares() -> pd.core.frame.DataFrame:
 
-    filename = r'__result_cache__/pendlerkeys2019.csv'
+    filename = r'__result_cache__/2019/pendler/pendlerkeys2019.csv'
 
     df = pd.read_csv(filename, index_col=0)
     df.index.name = 'valgtezoner'
@@ -500,7 +501,7 @@ def _load_kombi_shares() -> pd.core.frame.DataFrame:
 
 def _load_kombi_map_shares() -> pd.core.frame.DataFrame:
 
-    filename = r'__result_cache__/zone_relation_keys2019.csv'
+    filename = r'__result_cache__/2019/pendler/zone_relation_keys2019.csv'
     df = pd.read_csv(filename)
     df = _check_names(df)
     df.loc[:, 'betaltezoner'] = df.loc[:, 'betaltezoner'].fillna(0)
@@ -513,20 +514,26 @@ def _load_kombi_map_shares() -> pd.core.frame.DataFrame:
     return df
 
 
-def _load_nzone_shares():
+def _load_nzone_shares(takst: str, year: int):
+    
+    takst_map = {'dsb': 'dsb', 'th': 'hovedstad', 'ts': 'sydsjælland', 'tv': 'vestsjælland'}
+    takst = takst_map[takst]
+    
+    filedir = os.path.join(THIS_DIR, '__result_cache__', f'{year}', 'pendler')
+    files = glob.glob(os.path.join(filedir, '*.csv'))
+    kombi = [x for x in files if 'kombi_paid' in x]
+    region = [x for x in kombi if takst in x][0]
 
-    filename = r'sælland\kombi_zones_all_trips.csv'
-
-    df = pd.read_csv(filename, index_col=0)
+    df = pd.read_csv(region, index_col=0)
     df.index.name = 'betaltezoner'
     df = df.reset_index()
     df = _check_names(df)
     df = _stringify_merge_cols(df)
     return df
 
-def _chosen_fallback(nullframe):
+def _chosen_fallback(nullframe, takst, year):
 
-    nzones = _load_nzone_shares()
+    nzones = _load_nzone_shares(takst, year)
 
     nullframe = nullframe.drop([
         'movia', 'stog', 'metro',
@@ -556,7 +563,7 @@ def _mappable_fallback():
 
     return
 
-def _sub_kombi(sub_frame):
+def _sub_kombi(sub_frame, takst, year):
 
     cols = ['movia', 'stog', 'metro',
             'dsb', 'first', 'n_users',
@@ -577,14 +584,14 @@ def _sub_kombi(sub_frame):
     missed = chosen_merge[chosen_merge.n_trips.isnull() |
                           (chosen_merge.n_trips == 0)]
     if not missed.empty:
-        chosenfall =  _chosen_fallback(missed)
+        chosenfall =  _chosen_fallback(missed, takst, year)
         chosen_merge = pd.concat(
             [chosen_merge[chosen_merge.n_trips.notnull()], chosenfall]
             )
 
     return chosen_merge
 
-def _kombi_mappable_pendler(sale_id, frame, takst):
+def _kombi_mappable_pendler(sale_id, frame, takst, year):
 
     sub_frame = frame.query("NR in @sale_id")
     sub_frame = sub_frame.query("takstsæt == @takst")
@@ -605,7 +612,7 @@ def _kombi_mappable_pendler(sale_id, frame, takst):
 
     try:
         if not missed.empty:
-            chosenfall =  _chosen_fallback(missed)
+            chosenfall =  _chosen_fallback(missed, takst, year)
             chosen_merge = pd.concat(
                 [chosen_merge[chosen_merge.n_trips.notnull()], chosenfall]
                 )
@@ -642,7 +649,7 @@ def _kombi_mappable_pendler(sale_id, frame, takst):
             missed.loc[:, 'valgtezoner'] = missed.loc[:, 'valgtezoner'].apply(
                 lambda x: str(tuple(sorted(x)))
                 )
-            recursive_fallback = _sub_kombi(missed)
+            recursive_fallback = _sub_kombi(missed, takst, year)
             mappable_merge = pd.concat(
                 [mappable_merge[
                     mappable_merge.n_trips.notnull()], recursive_fallback
@@ -661,7 +668,8 @@ def _kombi_mappable_pendler(sale_id, frame, takst):
 def _nzone_pendler(
         sale_id: Dict,
         frame: pd.core.frame.DataFrame,
-        takst: str
+        takst: str,
+        year: int
         ) -> pd.core.frame.DataFrame:
 
     sub_frame = frame.query("NR in @sale_id")
@@ -672,7 +680,7 @@ def _nzone_pendler(
         ]
     sub_frame = _stringify_merge_cols(sub_frame)
 
-    nzone_shares = _load_nzone_shares()
+    nzone_shares = _load_nzone_shares(takst, year)
 
     nzone_output = pd.merge(
         sub_frame, nzone_shares,
@@ -685,8 +693,8 @@ def _nzone_pendler(
 def _process_pendler(
         sales_idxs: Dict,
         frame: pd.core.frame.DataFrame,
-        takst: str
-        ) -> pd.core.frame.DataFrame:
+        takst: str,
+        year:int) -> pd.core.frame.DataFrame:
 
     # TODO make these a user input option
 
@@ -697,7 +705,7 @@ def _process_pendler(
                     sales_idxs.get('ungdomskort uu', ()) + \
                         sales_idxs.get('flexcard', ())
     kombi_pendler = _kombi_mappable_pendler(
-        kombi_pendler_ids, frame, takst
+        kombi_pendler_ids, frame, takst, year
         )
     kombi_ids = set(kombi_pendler.loc[:, 'NR'])
 
@@ -726,7 +734,7 @@ def _process_pendler(
         )
 
     try:
-        gen_pendler = _nzone_pendler(general_pendler_ids, frame, takst)
+        gen_pendler = _nzone_pendler(general_pendler_ids, frame, takst, year)
         gen_pendler = _add_note(
             gen_pendler,
             'kombi_any_nzone',
@@ -740,7 +748,7 @@ def _process_pendler(
 
 def _load_rabatzero_shares():
 
-    filename = r'__result_cache__/citypass_shares.csv'
+    filename = r'__result_cache__/2019/other/citypass_shares.csv'
     df = pd.read_csv(filename, index_col=0)
     df.index.name = 'betaltezoner'
     df = df.reset_index()
@@ -855,10 +863,13 @@ def _process_other(sales_idxs, frame, takst):
 
 def main():
     """main function"""
+    year = 2019
+    fp = os.path.join(
+        THIS_DIR, '__result_cache__', f'{year}', 'preprocessed', 'mergedsales.csv'
+        )
 
-    data = os.path.join('revenue', 'mergedsales.csv')
     
-    sales_data = _load_sales_data(data)
+    sales_data = _load_sales_data(fp)
     sales_idxs = _sales_ref(sales_data)
 
 # =============================================================================
@@ -871,7 +882,7 @@ def main():
 
     pendler_output = []
     for takst in ['th', 'ts', 'dsb', 'tv']:
-        pendler = _process_pendler(sales_idxs, sales_data, takst)
+        pendler = _process_pendler(sales_idxs, sales_data, takst, year)
         pendler_output.append(pendler)
     pendler_output = pd.concat(pendler_output)
 # =============================================================================
@@ -897,5 +908,5 @@ def main():
     return final
 
 
-# if __name__ == "__main__":
-#       out = main()
+if __name__ == "__main__":
+      out = main()
