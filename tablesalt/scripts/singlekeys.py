@@ -261,9 +261,9 @@ def _get_trips(db, tripkeys):
     tripkeys_ = {bytes(str(x), 'utf-8') for x in tripkeys}
 
     out = {}
-    with lmdb.open(db, readahead=False) as env:
+    with lmdb.open(db) as env:
         with env.begin() as txn:
-            for k in tqdm(tripkeys_):
+            for k in tqdm(tripkeys_, 'loadimg trip results'):
                 shares = txn.get(k)
                 if shares:
                     shares = shares.decode('utf-8')
@@ -310,7 +310,7 @@ def _get_all_store_keys(stores, stopzone_map, ringzones, operators, rabatkeys, y
                     rabatkeys=rabatkeys,
                     year=year)
 
-    with Pool(os.cpu_count() - 2) as pool:
+    with Pool(os.cpu_count() - 1) as pool:
         pool.map(pfunc, stores)
 
 
@@ -485,6 +485,16 @@ def _write_results(rabattrin, year) -> None:
                 )
             df.to_csv(fp, index=False)
 
+
+def _nzone_merge(resultdict):
+    
+    nzone = {k[1]: tuple() for k in resultdict}
+    
+    for k, v in resultdict.items():
+        nzone[k[1]] = nzone[k[1]] + v
+    
+    return agg_nested_dict(nzone)
+
 def main():
 
     parser = TableArgParser('year', 'rabattrin')
@@ -518,7 +528,7 @@ def main():
         rabatkeys,
         year)
 
-    nparts = 30
+    nparts = 20
     out_all, out_operators = \
         _gather_all_store_keys(wanted_operators, nparts, year)
 
@@ -530,15 +540,22 @@ def main():
             all_wanted_keys.update(v1)
 
     result_dict = _get_trips(db_path, all_wanted_keys)
-
-    print('results found\n')
+    
+    print('loaded results\n')
     del all_wanted_keys
 
     all_results = _map_all(out_all, result_dict)
+    short_all = _nzone_merge(all_results['short_ring'])
+    long_all = _nzone_merge(all_results['long_ring'])
     all_results_ = agg_nested_dict(all_results)
+    all_results_['paid_zones'] = {**short_all, **long_all}
 
     operator_results = _map_operators(out_operators, result_dict)
     operator_results_ = agg_nested_dict(operator_results)
+    for k, v in operator_results.items():
+        short_op = _nzone_merge(v['short_ring'])
+        long_op = _nzone_merge(v['long_ring'])
+        operator_results_[k]['paid_zones'] = {**short_op, **long_op}
 
     operator_results_['all'] = all_results_
 
@@ -551,7 +568,7 @@ def main():
     with open(fp, 'wb') as f:
         pickle.dump(operator_results_, f)
 
-    _write_results(rabat_level, year)
+    # _write_results(rabat_level, year)
 
 if __name__ == "__main__":
     from datetime import datetime
