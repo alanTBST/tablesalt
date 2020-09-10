@@ -16,7 +16,6 @@ import pandas as pd
 from tqdm import tqdm
 
 from tablesalt import StoreReader
-from tablesalt.common.io import mappers
 from tablesalt.season.users import PendlerKombiUsers
 from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
