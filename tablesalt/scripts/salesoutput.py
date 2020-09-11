@@ -7,8 +7,11 @@ Created on Sat May 23 00:18:51 2020
 import ast
 import glob
 import os
+import pickle
 from typing import AnyStr, Dict, Tuple, Optional
 from pathlib import Path
+
+import numpy as np
 import pandas as pd
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
@@ -22,7 +25,25 @@ LOCATIONS = {
     'enkeltbilletter bus': 'movia'
     }
 
-
+def _get_single_results(year):
+    
+    fp = os.path.join(
+        THIS_DIR, '__result_cache__', 
+        f'{year}', 'preprocessed'
+        )
+    singles = glob.glob(os.path.join(fp, 'single*'))
+    
+    out = {}
+    for i in range(3):
+        fmatch = [x for x in singles if f'r{i}' in x]
+        times = [os.path.getmtime(x) for x in fmatch]
+        min_id = np.argmin(times)
+        fp = fmatch[min_id]
+        with open(fp, 'rb') as f:
+            res = pickle.load(f)
+        out[f'rabat{i}'] = res
+            
+    return out
 # =============================================================================
 # Loading functions
 # =============================================================================
@@ -864,6 +885,8 @@ def _process_other(sales_idxs, frame, takst):
 def main():
     """main function"""
     year = 2019
+    
+    
     fp = os.path.join(
         THIS_DIR, '__result_cache__', f'{year}', 'preprocessed', 'mergedsales.csv'
         )
@@ -908,5 +931,5 @@ def main():
     return final
 
 
-if __name__ == "__main__":
-      out = main()
+# if __name__ == "__main__":
+#       out = main()
