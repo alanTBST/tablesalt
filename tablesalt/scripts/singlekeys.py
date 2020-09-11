@@ -526,7 +526,8 @@ def main():
         ringzones,
         wanted_operators,
         rabatkeys,
-        year)
+        year
+        )
 
     nparts = 20
     out_all, out_operators = \
@@ -562,6 +563,7 @@ def main():
     fp = os.path.join(
         '__result_cache__',
         f'{year}',
+        'preprocessed', 
         f'single_results_{year}_r{rabat_level}.pickle'
         )
 
