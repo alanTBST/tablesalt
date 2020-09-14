@@ -32,25 +32,6 @@ from tablesalt.topology import (
     )
 
 
-parser = TableArgParser('year')
-args = parser.parse()
-
-year = args['year']
-
-store_loc = find_datastores(r'H://')
-paths = db_paths(store_loc, year)
-RK_STORES = paths['store_paths']
-DB_PATH = paths['calculated_stores']
-
-
-ZONES = TakstZones()
-ZONEMAP = ZONES.stop_zone_map()
-
-REGION_CONTRACTORS = {
-    'hovedstaden': ['Movia_H', 'DSB', 'First', 'Stog', 'Metro'],
-    'sjælland': ['Movia_H', 'Movia_S', 'Movia_V', 'DSB', 'First', 'Stog', 'Metro']
-    }
-
 def proc_contractors(contrpack):
     """return the contractors dict as an array"""
     arr_length = len(tuple(chain(*contrpack.values())))
@@ -206,7 +187,7 @@ def _load_contractor_pack(rkstore, region):
 
     return op_dict
 
-def _load_stop_store(rkstore, region):
+def _load_stop_store(rkstore, region, zonemap):
     """
     load the stop data from the h5 file and create
     the stop, zone and usage dicts
@@ -245,7 +226,7 @@ def _load_stop_store(rkstore, region):
         groupby(stops, key=itemgetter(0)) if key in usage_dict
         }
     zone_dict = {
-        k: tuple(ZONEMAP.get(x) for x in v) for
+        k: tuple(zonemap.get(x) for x in v) for
         k, v in stop_dict.items()
         }
 
@@ -267,7 +248,7 @@ def _load_stop_store(rkstore, region):
 
     return stop_dict, zone_dict, usage_dict
 
-def chunk_shares(graph, store, region):
+def chunk_shares(graph, store, region, zonemap):
 
     """
     Calculate the operator shares for trips in the
@@ -283,7 +264,7 @@ def chunk_shares(graph, store, region):
     """
 
     stop_dict, zone_dict, usage_dict = _load_stop_store(
-        store, region
+        store, region, zonemap
         )
     op_dict = _load_contractor_pack(store, region)
 
@@ -306,7 +287,26 @@ def main():
     main function to create the operator
     shares for the data in the datastores
     """
-    # create_db()
+
+    parser = TableArgParser('year')
+    args = parser.parse()
+    
+    year = args['year']
+    
+    store_loc = find_datastores(r'H://')
+    paths = db_paths(store_loc, year)
+    RK_STORES = paths['store_paths']
+    DB_PATH = paths['calculated_stores']
+    
+    
+    ZONES = TakstZones()
+    ZONEMAP = ZONES.stop_zone_map()
+    
+    REGION_CONTRACTORS = {
+        'hovedstaden': ['Movia_H', 'DSB', 'First', 'Stog', 'Metro'],
+        'sjælland': ['Movia_H', 'Movia_S', 'Movia_V', 'DSB', 'First', 'Stog', 'Metro']
+        }
+    
     region = 'sjælland'
     graph = ZoneGraph(region=region)
 
