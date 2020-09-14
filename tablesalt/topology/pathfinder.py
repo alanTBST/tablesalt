@@ -247,11 +247,28 @@ class ZoneProperties():
             'touched_zones': self.touched_zones,
             'stop_sequence': self.stop_sequence,
             'zone_sequence': self.zone_sequence
-            }
-        
+            }        
         
         return prop_dict
+    
+    def _bordered_properties(self):
+        prop_dict = self._borderless_properties()
+        
+        stoplegs = self._to_legs(self.stop_sequence)
+        border_legs = [
+            i for i, j in enumerate(stoplegs) if
+            any(x in BORDER_STATIONS for x in j)
+            ]
+        
+        if self._border_is_dest(): #and not double_back:
 
+            stopnum = self.stop_sequence[-1]
+            end_stop_border = BORDER_STATIONS[stopnum]
+            if all(x in prop_dict['visited_zones'] for x in end_stop_border):
+                vis_list = list(prop_dict['visited_zones'])
+
+        
+        return 
     @property
     def property_dict(self):
         """
@@ -262,14 +279,11 @@ class ZoneProperties():
             'total_travelled_zones' -
             'double_back' -
         """
-
-
         if not self.border_trip:
             return self._borderless_properties()
 
         both = self._border_is_dest() and self._border_is_orig()
-                
-        
+        prop_dict = self._borderless_properties()              
         if self._border_is_dest(): #and not double_back:
 
             stopnum = self.stop_sequence[-1]
