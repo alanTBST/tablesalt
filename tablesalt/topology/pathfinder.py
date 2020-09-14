@@ -43,32 +43,6 @@ def load_border_stations(): # put this in TBSTtopology
 
 BORDER_STATIONS = load_border_stations()
 
-def clean_ringzone(ringdf): # put this in TBSTtopology.tools # actually maybe not needed
-    """
-    create the "real" adjacency matrix by
-    removing adjacencies that occur
-    at vertices of the polygons. Some of the
-    vertices are valid neighbours. They are not removed.
-
-    NOTE: this may change in future with added routes, road construction,
-    zone changes, etc.
-
-    #TODO: try and automate the the removal list from gtfs shapes
-    and zones
-    """
-
-    non_edges = pd.read_csv(r'inputdata/non_edges.csv', header=None)
-    non_edges = list(non_edges.itertuples(name=None, index=False))
-    # this is only for hovedstaden
-    update_list = [tuple(reversed(x)) for x in non_edges]
-
-    non_edges = list(set(non_edges + update_list))
-
-    for x, y in non_edges:
-        ringdf.loc[x, str(y)] = 0
-
-    return ringdf
-
 def shrink_search(graph, start, goal, ringzones, distance_buffer=2):
     """
     subset the graph based on a given distance_buffer of zones
