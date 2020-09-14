@@ -18,10 +18,11 @@ a trip. Calculated from the given zones
 in which a user taps in or out
 
 """
-
+import pkg_resources
 from itertools import chain
 from collections import Counter
-import pkg_resources
+from typing import Tuple, Union
+
 
 import pandas as pd
 import numpy as np
@@ -85,7 +86,10 @@ class ZoneProperties():
     
     VISITED_CACHE = {}
 
-    def __init__(self, graph, zone_sequence, stop_sequence):
+    def __init__(self, 
+                 graph, 
+                 zone_sequence: Tuple[int, ...], 
+                 stop_sequence: Tuple[int, ...]) -> None:
         
         """
 
@@ -118,8 +122,34 @@ class ZoneProperties():
 
         self.touched_zones = self.get_touched_zones()
         self.touched_zone_legs = self._to_legs(self.touched_zones)
+    
+    def _border_touch_postions(self) -> Tuple[int, ...]:
+        """
+        return the card touch positions on the trip
+        as a tuple
+        """
 
-    def get_touched_zones(self):
+        return tuple(i for i, j in enumerate(self.stop_sequence)
+                     if j in BORDER_STATIONS)
+    def _border_is_dest(self) -> bool:
+        """
+        test whether a border station check is the
+        ultimate check
+        returns boolean
+        """
+        assert self.border_trip
+        return self.border_positions[-1] == len(self.stop_sequence) - 1
+
+    def _border_is_orig(self) -> bool:
+        """
+        test whether a border station check is the
+        original check
+        returns boolean
+        """
+        assert self.border_trip
+        return self.border_positions[0] == 0
+
+    def get_touched_zones(self) -> Tuple[int, ...]:
         """
         get the zones in which the card has been checked,
         preserving the order of taps
@@ -140,7 +170,7 @@ class ZoneProperties():
 
         return triptools.sep_legs(sequence)
 
-    def _visited_zones_on_leg(self, zone_leg):
+    def _visited_zones_on_leg(self, zone_leg: Tuple[int, int]) -> None:
         """
         for a tuple of start and end zone
         find the zones travelled through
@@ -161,7 +191,7 @@ class ZoneProperties():
                 visited = all_short_paths[0]
         self.VISITED_CACHE[zone_leg] = visited
 
-    def get_visited_zones(self):
+    def get_visited_zones(self) -> Tuple[Union[int, Tuple[int, ...]], ...]:
         """
         visited zones is a list of the zones visited on a trip,
         in order, but removing adjacent duplicate zones
@@ -185,31 +215,6 @@ class ZoneProperties():
 
         return tuple(visited_zones)
 
-    def _border_touch_postions(self):
-        """
-        return the card touch positions on the trip
-        as a tuple
-        """
-
-        return tuple(i for i, j in enumerate(self.stop_sequence)
-                     if j in BORDER_STATIONS)
-    def _border_is_dest(self):
-        """
-        test whether a border station check is the
-        ultimate check
-        returns boolean
-        """
-        assert self.border_trip
-        return self.border_positions[-1] == len(self.stop_sequence) - 1
-
-    def _border_is_orig(self):
-        """
-        test whether a border station check is the
-        original check
-        returns boolean
-        """
-        assert self.border_trip
-        return self.border_positions[0] == 0
 
     @property
     def property_dict(self):
