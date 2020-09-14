@@ -28,6 +28,7 @@ import pandas as pd
 import numpy as np
 
 from tablesalt.common import triptools
+from tablesalt.topology.tools import TakstZones
 
 def load_border_stations(): # put this in TBSTtopology
 
@@ -217,19 +218,12 @@ class ZoneProperties():
 
         return tuple(visited_zones)
 
-
-    @property
-    def property_dict(self):
-        """
-        return the three properties of the zone sequnce
-        in a dictionary.
-        The dictionary contains:
-            'visited_zones' -
-            'total_travelled_zones' -
-            'double_back' -
-        """
+    def _borderless_properties(self):
 
         visited_zones = self.get_visited_zones(self.touched_zone_legs)
+        # must put in alternate visited zones for border stations 
+        # and choose the minimum
+        
         chained_zones = []
         try:
             for x in visited_zones:
@@ -252,9 +246,24 @@ class ZoneProperties():
             'stop_sequence': self.stop_sequence,
             'zone_sequence': self.zone_sequence
             }
+        
+        
+        return prop_dict
+
+    @property
+    def property_dict(self):
+        """
+        return the three properties of the zone sequnce
+        in a dictionary.
+        The dictionary contains:
+            'visited_zones' -
+            'total_travelled_zones' -
+            'double_back' -
+        """
+
 
         if not self.border_trip:
-            return prop_dict
+            return self._borderless_properties()
 
         both = self._border_is_dest() and self._border_is_orig()
         if self._border_is_dest(): #and not double_back:
