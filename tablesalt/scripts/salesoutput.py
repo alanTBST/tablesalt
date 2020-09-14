@@ -161,14 +161,34 @@ def _method_resolution_operator(res, length):
                 
     return mro
 
-def _match_single(record, res, mro, trip_threshhold=0):
+def _method_resolution_any(res, length):
+    
+    
+    return 
+
+
+def _match_single_any():
+    
+    
+    
+    return 
+
+
+def _filter_mro(record, mro):
     
     if record.takstsæt == 'th':
         mro = [x for x in mro if 'Movia_S' not in x and 'Movia_V' not in x]
     elif record.takstsæt == 'tv':
         mro = [x for x in mro if 'Movia_S' not in x and 'Movia_H' not in x]
-    if record.takstsæt == 'ts':
+    elif record.takstsæt == 'ts':
         mro = [x for x in mro if 'Movia_H' not in x and 'Movia_V' not in x]
+    
+    return mro
+
+def _match_single_operator(record, res, mro, trip_threshhold=0):
+    
+    
+    mro = _filter_mro(record, mro)
     
     try:
         ring_ticket = int(record.startzone), int(record.betaltezoner)
@@ -222,9 +242,9 @@ def _location_merge(location_sales, data, single_results):
         out = {}
         for record in sub_tuples:
             if record.betaltezoner <= 8:
-                out[record.NR] = _match_single(record, res, mro_short)
+                out[record.NR] = _match_single_operator(record, res, mro_short)
             else:
-                out[record.NR] = _match_single(record, res, mro_long)
+                out[record.NR] = _match_single_operator(record, res, mro_long)
                 
         out_frame = pd.DataFrame.from_dict(out).T
         out_frame.index.name = 'NR'
@@ -243,7 +263,7 @@ def _location_merge(location_sales, data, single_results):
         final[loc] = test_out
         # test_out.to_csv(f'{loc}_single_new.csv', index=False)
                
-    return test_out
+    return final
 
 
 def main():
