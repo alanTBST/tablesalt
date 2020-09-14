@@ -123,7 +123,7 @@ class ZoneProperties():
         if self.border_trip:
             self.border_positions = self._border_touch_postions()
 
-        self.touched_zones = self.get_touched_zones()
+        self.touched_zones = self.get_touched_zones(self.zone_sequence)
         self.touched_zone_legs = self._to_legs(self.touched_zones)
     
     def _border_touch_postions(self) -> Tuple[int, ...]:
@@ -152,19 +152,19 @@ class ZoneProperties():
         assert self.border_trip
         return self.border_positions[0] == 0
 
-    def get_touched_zones(self) -> Tuple[int, ...]:
+    def get_touched_zones(self, zone_sequence) -> Tuple[int, ...]:
         """
         get the zones in which the card has been checked,
         preserving the order of taps
         """
         touched = []
         seen = set()
-        for i, j in enumerate(self.zone_sequence):
+        for i, j in enumerate(zone_sequence):
             if i == 0:
                 touched.append(j)
                 seen.add(j)
                 continue
-            if not j in seen or not j == self.zone_sequence[i-1]:
+            if not j in seen or not j == zone_sequence[i-1]:
                 touched.append(j)
                 seen.add(j)
         return tuple(touched)
@@ -268,6 +268,8 @@ class ZoneProperties():
             return self._borderless_properties()
 
         both = self._border_is_dest() and self._border_is_orig()
+                
+        
         if self._border_is_dest(): #and not double_back:
 
             stopnum = self.stop_sequence[-1]
@@ -276,7 +278,7 @@ class ZoneProperties():
                 vis_list = list(prop_dict['visited_zones'])
                 rem = vis_list.pop()
                 repl = [x for x in end_stop_border if x != rem][0]
-                repld = {rem:repl}
+                repld = {rem: repl}
                 prop_dict['visited_zones'] = tuple(vis_list)
                 prop_dict['total_travelled_zones'] = len(prop_dict['visited_zones'])
                 prop_dict['touched_zones'] = tuple(repld.get(x, x) for x in prop_dict['touched_zones'])
