@@ -207,8 +207,10 @@ class ZoneProperties():
                 vals.append(self.VISITED_CACHE[x])
 
         lvals = len(vals)
-        visited_zones = tuple(chain(*[j[:-1] if i != lvals - 1 else j
-                                      for i, j in enumerate(vals)]))
+        visited_zones = tuple(
+            chain(*[j[:-1] if i != lvals - 1 else j
+                  for i, j in enumerate(vals)])
+            )
 
         if not visited_zones:
             return tuple(self.touched_zones)
