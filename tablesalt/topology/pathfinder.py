@@ -21,14 +21,14 @@ in which a user taps in or out
 import pkg_resources
 from itertools import chain
 from collections import Counter
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
 
 
 import pandas as pd
 import numpy as np
 
 from tablesalt.common import triptools
-from tablesalt.topology.tools import TakstZones
+
 
 def load_border_stations(): # put this in TBSTtopology
 
@@ -90,7 +90,8 @@ class ZoneProperties():
     def __init__(self, 
                  graph, 
                  zone_sequence: Tuple[int, ...], 
-                 stop_sequence: Tuple[int, ...]) -> None:
+                 stop_sequence: Tuple[int, ...],
+                 region: Optional[str] = 'sjælland') -> None:
         
         """
 
@@ -111,6 +112,7 @@ class ZoneProperties():
         """
 
         self.graph = graph
+        self.ring_dict = self.graph.ring_dict(region)
         self.zone_sequence = zone_sequence
         self.stop_sequence = stop_sequence
         if any(x in BORDER_STATIONS for x in stop_sequence):
