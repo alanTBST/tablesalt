@@ -181,7 +181,7 @@ class ZoneProperties():
                                       for i, j in enumerate(vals)]))
 
         if not visited_zones:
-            return tuple(set(self.touched_zones))
+            return tuple(self.touched_zones)
 
         return tuple(visited_zones)
 
