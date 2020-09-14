@@ -5,10 +5,8 @@ Created on Thu Dec  5 09:51:04 2019
 @author: alkj
 """
 #standard imports
-import glob
-import os
-import sqlite3
-import sys
+
+
 from itertools import groupby, chain
 from operator import itemgetter
 
@@ -81,6 +79,7 @@ def _single_operator_assignment(graph, operators, zones, stops):
     zone_properties = {}
     bad_keys = set()
     for k, v in single_op_zones.items():
+
         try:
             zone_properties[k] = _trip_zone_properties(graph, v, single_op_stops[k])
         except:
@@ -302,7 +301,7 @@ def main():
     zones = TakstZones()
     zonemap = zones.stop_zone_map()
     
-    REGION_CONTRACTORS = {
+    region_contractors= {
         'hovedstaden': ['Movia_H', 'DSB', 'First', 'Stog', 'Metro'],
         'sjælland': ['Movia_H', 'Movia_S', 'Movia_V', 'DSB', 'First', 'Stog', 'Metro']
         }
@@ -311,7 +310,7 @@ def main():
     graph = ZoneGraph(region=region)
 
     for x in tqdm(RK_STORES, total=len(RK_STORES)):
-        r = chunk_shares(graph, x, region, zonemap)
+        r = chunk_shares(graph, x, region, zonemap, region_contractors)
         make_store(r, DB_PATH)
 
 
