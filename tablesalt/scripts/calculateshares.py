@@ -41,21 +41,19 @@ except FileNotFoundError:
         "It appears there are no extracted datasets"
         "Run delrejsersetup.py script"
         )
+parser = TableArgParser('year', 'rabattrin')
+args = parser.parse()
+
+year = args['year']
+
+store_loc = find_datastores(r'H://')
+paths = db_paths(store_loc, year)
+RK_STORES = paths['store_paths']
+db_path = paths['calculated_stores']
 
 YEAR = 2019
 
-YEAR_DIR = os.path.join(
-    STORE_ROOT, 'rejsekortstores',
-    f'{YEAR}DataStores'
-    )
-
-if not os.path.isdir(YEAR_DIR):
-    raise OSError(f"{YEAR_DIR} does not exist")
-
-STORE_DIR = os.path.join(YEAR_DIR, 'hdfstores')
 DB_DIR = os.path.join(YEAR_DIR, 'dbs')
-RK_STORES = glob.glob(os.path.join(STORE_DIR, '*.h5'))
-
 
 ZONES = TakstZones()
 ZONEMAP = ZONES.stop_zone_map()
@@ -314,54 +312,6 @@ def chunk_shares(graph, store, region):
         )
 
     return {**singleops, **multiops}
-
-
-def create_db():
-    """
-    create the sqlite database that will hold the
-    calculated shares
-    """
-    # DB_DIR,
-    sql = ("CREATE TABLE IF NOT EXISTS tripshares("
-           "tripkey INTEGER, "
-           "sharestring TEXT)")
-    dbpath = os.path.join(DB_DIR, f'{YEAR}calculatedshares_sj.db')
-    with sqlite3.connect(dbpath) as conn:
-        cursor = conn.cursor()
-        cursor.execute(sql)
-        conn.commit()
-        cursor.close()
-
-def create_dbindex():
-    """
-    create an index on the tripshares table
-    """
-    dbpath = os.path.join(DB_DIR, f'{YEAR}calculatedshares_sj.db')
-    with sqlite3.connect(dbpath) as conn:
-        cursor = conn.cursor()
-        cursor.execute("""CREATE INDEX "" ON "tripshares" (
-    	                   "tripkey" ASC);""")
-        conn.commit()
-        cursor.close()
-
-
-def write_results(res_dict):
-    """
-    write the results of the operator share assignment to
-    the database
-
-    """
-    # DB_DIR, f{year}
-    res = [(np.int64(k), str(v)) for k, v in res_dict.items()]
-    dbpath = os.path.join(DB_DIR, f'{YEAR}calculatedshares_sj.db')
-    with sqlite3.connect(dbpath) as conn:
-        sqlite3.register_adapter(np.int64, lambda val: int(val))
-        cursor = conn.cursor()
-        cursor.executemany(
-            "INSERT INTO tripshares VALUES (?, ?)", res
-            )
-        conn.commit()
-        cursor.close()
 
 def main():
     """
