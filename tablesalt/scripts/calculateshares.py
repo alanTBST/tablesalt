@@ -49,46 +49,46 @@ def _trip_zone_properties(graph, zone_sequence, stop_sequence):
     return ZoneProperties(
         graph, zone_sequence, stop_sequence).property_dict
 
-def _single_operator_assignment(graph, operators, zones, stops):
+def _single_operator_assignment(graph, op_dict, zone_dict, stop_dict):
 
     """
     assign the zones travelled for single operator trips
 
     parameters
     -----------
-    operators:
+    op_dict:
         the dictionary of tripkeys and operator id tuples
 
-    zones:
+    zone_dict:
         the dictionary of tripkeys and zone numbers
 
-    stops:
+    stop_dict:
         the dicionary of tripkeys and stopids
 
-    stops, zones, usage are returned from _load_stop_store
-    and operators is returned from _load_contractor_pack
+    stop_dict, zone_dict, usage are returned from _load_stop_store
+    and op_dict is returned from _load_contractor_pack
     """
 
-    single_operators = {k:v[0] for k, v in operators.items() if
+    single_op_dict = {k:v[0] for k, v in op_dict.items() if
                         len(set(v)) == 1}
-    single_op_zones = {k:v for k, v in zones.items() if
-                       k in single_operators}
+    single_op_zone_dict = {k:v for k, v in zone_dict.items() if
+                       k in single_op_dict}
 
-    single_op_stops = {k:v for k, v in stops.items() if
-                       k in single_operators}
+    single_op_stop_dict = {k:v for k, v in stop_dict.items() if
+                       k in single_op_dict}
     zone_properties = {}
     bad_keys = set()
-    for k, v in single_op_zones.items():
+    for k, v in single_op_zone_dict.items():
 
         try:
-            zone_properties[k] = _trip_zone_properties(graph, v, single_op_stops[k])
+            zone_properties[k] = _trip_zone_properties(graph, v, single_op_stop_dict[k])
         except:
             bad_keys.add(k)
             continue
 
     shares = {
-        k:(zone_properties[k]['total_travelled_zones'], single_operators[k])
-        for k in single_operators if k in zone_properties
+        k:(zone_properties[k]['total_travelled_zones'], single_op_dict[k])
+        for k in single_op_dict if k in zone_properties
         }
     rev_op_map = {v: k for k, v in mappers['operator_id'].items()}
 
@@ -98,19 +98,19 @@ def _single_operator_assignment(graph, operators, zones, stops):
         }
     return shares
 
-def _multi_operator_assignment(graph, operators, zones, stops, usage):
+def _multi_operator_assignment(graph, op_dict, zone_dict, stop_dict, usage):
     """
     assign zone shares for multi operator trips
 
     parameters
     -----------
-    operators:
+    op_dict:
         the dictionary of tripkeys and operator id tuples
 
-    zones:
+    zone_dict:
         the dictionary of tripkeys and zone numbers
 
-    stops:
+    stop_dict:
         the dicionary of tripkeys and stopids
 
     usage:
@@ -118,36 +118,36 @@ def _multi_operator_assignment(graph, operators, zones, stops, usage):
         'Fi' = 1, 'Co' = 2, 'Su' = 3, 'Tr' = 4
 
     """
-    multi_operators = {k:v for k, v in operators.items() if
+    multi_op_dict = {k:v for k, v in op_dict.items() if
                        len(set(v)) != 1}
-    multi_op_zones = {k:v for k, v in zones.items() if
-                      k in multi_operators}
-    multi_op_stops = {k:v for k, v in stops.items() if
-                      k in multi_operators}
+    multi_op_zone_dict = {k:v for k, v in zone_dict.items() if
+                      k in multi_op_dict}
+    multi_op_stop_dict = {k:v for k, v in stop_dict.items() if
+                      k in multi_op_dict}
     multi_op_usage = {k:v for k, v in usage.items() if
-                      k in multi_operators}
+                      k in multi_op_dict}
 
-    operator_legs = triptools.create_legs(multi_operators)
+    operator_legs = triptools.create_legs(multi_op_dict)
     usage_legs = triptools.create_legs(multi_op_usage)
 
     zone_properties = {}
     bad_keys = set()
-    for k, v in multi_op_zones.items():
+    for k, v in multi_op_zone_dict.items():
         try:
             zone_properties[k] = ZoneProperties(
                 graph,
-                v, multi_op_stops[k]
+                v, multi_op_stop_dict[k]
                 ).property_dict
         except (TypeError, KeyError):
             bad_keys.add(k)
-    bad_keys = {k:v for k, v in multi_op_zones.items() if k in bad_keys}
+    bad_keys = {k:v for k, v in multi_op_zone_dict.items() if k in bad_keys}
 
     return multisharing.share_calculation(
         operator_legs, usage_legs, zone_properties,
         BORDER_STATIONS
         )
 
-def _load_contractor_pack(rkstore, region, region_contractors):
+def _load_contractor_pack(store, region, region_contractors):
     """
     load and process the operator information from
     msgpack file
@@ -162,7 +162,7 @@ def _load_contractor_pack(rkstore, region, region_contractors):
         currenlty only 'hovedstaden' is supported and
         is the default value
     """
-    reader = StoreReader(rkstore)
+    reader = StoreReader(store)
     contractors = reader.get_data('contractors')
 
     operator_ids = mappers['operator_id']
