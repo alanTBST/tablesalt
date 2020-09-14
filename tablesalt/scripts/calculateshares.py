@@ -11,12 +11,9 @@ import sqlite3
 import sys
 from itertools import groupby, chain
 from operator import itemgetter
-from typing import (Dict)
-
 
 #third party imports
 import numpy as np
-import msgpack
 from tqdm import tqdm
 
 # module imports
@@ -44,7 +41,7 @@ except FileNotFoundError:
         "Run delrejsersetup.py script"
         )
 
-YEAR = sys.argv[1]
+YEAR = 2019
 
 YEAR_DIR = os.path.join(
     STORE_ROOT, 'rejsekortstores',
