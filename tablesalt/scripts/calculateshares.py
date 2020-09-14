@@ -43,6 +43,110 @@ def proc_contractors(contrpack):
             arr[i, 3] = record[2]
             i += 1
     return arr
+def _load_contractor_pack(store, region, region_contractors):
+    """
+    load and process the operator information from
+    msgpack file
+
+    parameters
+    ----------
+    rkpack:
+        the msgpack file path corresponding to the rkstore
+
+    filter_type:
+        the region filter for the operators
+        currenlty only 'hovedstaden' is supported and
+        is the default value
+    """
+    reader = StoreReader(store)
+    contractors = reader.get_data('contractors')
+
+    operator_ids = mappers['operator_id']
+
+    contractor_filters = [
+        operator_ids[x] for x in region_contractors[region]
+        ]
+
+    contractors = proc_contractors(contractors)
+    bad_ops = contractors[:, 0][
+        ~np.isin(contractors[:, 2], contractor_filters)
+        ]
+
+    contractors = contractors[~np.isin(contractors[:, 0], bad_ops)]
+    contractors = contractors[
+        np.lexsort((contractors[:, 1], contractors[:, 0]))
+        ]
+
+    op_dict = {key:tuple(x[2] for x in grp) for key, grp in
+               groupby(contractors, key=itemgetter(0))}
+
+    return op_dict
+
+def _load_store_data(store, region, zonemap, region_contractors):
+    """
+    load the stop data from the h5 file and create
+    the stop, zone and usage dicts
+
+    parameters
+    ----------
+    rkstore:
+        the path to the h5 file
+    filter_type:
+        filter the trips in the store by the takstzone region
+        default is 'hovedstaden'
+
+        currently only ['hovedstaden', 'national'] supported;
+        ['sjælland', 'vestsjælland', 'fyn', 'lolland',
+        'nordjylland', 'midtjylland', 'sydjylland']
+        will be implemented at a later date and raise
+        NotImplementedError
+
+    """
+
+    reader = StoreReader(store)
+    stops = reader.get_data('stops')
+
+    stops = stops[np.lexsort((stops[:, 1], stops[:, 0]))]
+
+    usage_dict = {
+        key: tuple(x[3] for x in grp) for key, grp in
+        groupby(stops, key=itemgetter(0))
+        }
+    usage_dict = {
+        k: v for k, v in usage_dict.items() if
+        v[0] == 1 and v[-1] == 2
+        }
+    stop_dict = {
+        key: tuple(x[2] for x in grp) for key, grp in
+        groupby(stops, key=itemgetter(0)) if key in usage_dict
+        }
+    zone_dict = {
+        k: tuple(zonemap.get(x) for x in v) for
+        k, v in stop_dict.items()
+        }
+
+    filter_funcs = {
+        'hovedstaden': lambda v: all(1000 < x < 1100 for x in v if x),
+        'national': lambda v: all(x for x in v if x),
+        'sjælland': lambda v: all(1000 < x < 1300 for x in v if x),
+        'vestsjælland': lambda v: (_ for _ in v).throw(NotImplementedError('vestsjælland')),
+        'fyn': lambda v: (_ for _ in v).throw(NotImplementedError('fyn')),
+        'lolland': lambda v: (_ for _ in v).throw(NotImplementedError('lolland')),
+        'nordjylland': lambda v: (_ for _ in v).throw(NotImplementedError('nordjylland')),
+        'midtjylland': lambda v: (_ for _ in v).throw(NotImplementedError('midtjylland')),
+        'sydjylland': lambda v: (_ for _ in v).throw(NotImplementedError('sydjylland'))
+        }
+
+    zone_dict = {k:v for k, v in zone_dict.items() if filter_funcs[region](v)}
+    
+    op_dict = _load_contractor_pack(store, region, region_contractors)
+    op_dict = {k:v for k, v in op_dict.items() if k in zone_dict}
+
+    stop_dict = {k:v for k, v in stop_dict.items() if k in op_dict}
+    zone_dict = {k:v for k, v in zone_dict.items() if k in op_dict}
+    usage_dict = {k:v for k, v in usage_dict.items() if k in op_dict}
+    
+    return stop_dict, zone_dict, usage_dict, op_dict
 
 def _trip_zone_properties(graph, zone_sequence, stop_sequence):
     """return a dictionary of zone properties"""
@@ -65,7 +169,7 @@ def _single_operator_assignment(graph, op_dict, zone_dict, stop_dict):
     stop_dict:
         the dicionary of tripkeys and stopids
 
-    stop_dict, zone_dict, usage are returned from _load_stop_store
+    stop_dict, zone_dict, usage are returned from _load_store_data
     and op_dict is returned from _load_contractor_pack
     """
 
@@ -147,105 +251,6 @@ def _multi_operator_assignment(graph, op_dict, zone_dict, stop_dict, usage):
         BORDER_STATIONS
         )
 
-def _load_contractor_pack(store, region, region_contractors):
-    """
-    load and process the operator information from
-    msgpack file
-
-    parameters
-    ----------
-    rkpack:
-        the msgpack file path corresponding to the rkstore
-
-    filter_type:
-        the region filter for the operators
-        currenlty only 'hovedstaden' is supported and
-        is the default value
-    """
-    reader = StoreReader(store)
-    contractors = reader.get_data('contractors')
-
-    operator_ids = mappers['operator_id']
-
-    contractor_filters = [
-        operator_ids[x] for x in region_contractors[region]
-        ]
-
-    contractors = proc_contractors(contractors)
-    bad_ops = contractors[:, 0][
-        ~np.isin(contractors[:, 2], contractor_filters)
-        ]
-
-    contractors = contractors[~np.isin(contractors[:, 0], bad_ops)]
-    contractors = contractors[
-        np.lexsort((contractors[:, 1], contractors[:, 0]))
-        ]
-
-    op_dict = {key:tuple(x[2] for x in grp) for key, grp in
-               groupby(contractors, key=itemgetter(0))}
-
-    return op_dict
-
-def _load_stop_store(rkstore, region, zonemap):
-    """
-    load the stop data from the h5 file and create
-    the stop, zone and usage dicts
-
-    parameters
-    ----------
-    rkstore:
-        the path to the h5 file
-    filter_type:
-        filter the trips in the store by the takstzone region
-        default is 'hovedstaden'
-
-        currently only ['hovedstaden', 'national'] supported;
-        ['sjælland', 'vestsjælland', 'fyn', 'lolland',
-        'nordjylland', 'midtjylland', 'sydjylland']
-        will be implemented at a later date and raise
-        NotImplementedError
-
-    """
-
-    reader = StoreReader(rkstore)
-    stops = reader.get_data('stops')
-
-    stops = stops[np.lexsort((stops[:, 1], stops[:, 0]))]
-
-    usage_dict = {
-        key: tuple(x[3] for x in grp) for key, grp in
-        groupby(stops, key=itemgetter(0))
-        }
-    usage_dict = {
-        k: v for k, v in usage_dict.items() if
-        v[0] == 1 and v[-1] == 2
-        }
-    stop_dict = {
-        key: tuple(x[2] for x in grp) for key, grp in
-        groupby(stops, key=itemgetter(0)) if key in usage_dict
-        }
-    zone_dict = {
-        k: tuple(zonemap.get(x) for x in v) for
-        k, v in stop_dict.items()
-        }
-
-    filter_funcs = {
-        'hovedstaden': lambda v: all(1000 < x < 1100 for x in v if x),
-        'national': lambda v: all(x for x in v if x),
-        'sjælland': lambda v: all(1000 < x < 1300 for x in v if x),
-        'vestsjælland': lambda v: (_ for _ in v).throw(NotImplementedError('vestsjælland')),
-        'fyn': lambda v: (_ for _ in v).throw(NotImplementedError('fyn')),
-        'lolland': lambda v: (_ for _ in v).throw(NotImplementedError('lolland')),
-        'nordjylland': lambda v: (_ for _ in v).throw(NotImplementedError('nordjylland')),
-        'midtjylland': lambda v: (_ for _ in v).throw(NotImplementedError('midtjylland')),
-        'sydjylland': lambda v: (_ for _ in v).throw(NotImplementedError('sydjylland'))
-        }
-
-    zone_dict = {k:v for k, v in zone_dict.items() if filter_funcs[region](v)}
-    stop_dict = {k:v for k, v in stop_dict.items() if k in zone_dict}
-    usage_dict = {k:v for k, v in usage_dict.items() if k in zone_dict}
-
-    return stop_dict, zone_dict, usage_dict
 
 def chunk_shares(graph, store, region, zonemap, region_contractors):
 
@@ -262,15 +267,9 @@ def chunk_shares(graph, store, region, zonemap, region_contractors):
         the path to the corresponding msgpack file
     """
 
-    stop_dict, zone_dict, usage_dict = _load_stop_store(
-        store, region, zonemap
+    stop_dict, zone_dict, usage_dict, op_dict = _load_store_data(
+        store, region, zonemap, region_contractors
         )
-    op_dict = _load_contractor_pack(store, region, region_contractors)
-
-
-    stop_dict = {k:v for k, v in stop_dict.items() if k in op_dict}
-    zone_dict = {k:v for k, v in zone_dict.items() if k in op_dict}
-    usage_dict = {k:v for k, v in usage_dict.items() if k in op_dict}
 
     singleops = _single_operator_assignment(
         graph, op_dict, zone_dict, stop_dict
