@@ -148,7 +148,7 @@ def _multi_operator_assignment(graph, operators, zones, stops, usage):
         BORDER_STATIONS
         )
 
-def _load_contractor_pack(rkstore, region):
+def _load_contractor_pack(rkstore, region, region_contractors):
     """
     load and process the operator information from
     msgpack file
@@ -169,7 +169,7 @@ def _load_contractor_pack(rkstore, region):
     operator_ids = mappers['operator_id']
 
     contractor_filters = [
-        operator_ids[x] for x in REGION_CONTRACTORS[region]
+        operator_ids[x] for x in region_contractors[region]
         ]
 
     contractors = proc_contractors(contractors)
@@ -248,7 +248,7 @@ def _load_stop_store(rkstore, region, zonemap):
 
     return stop_dict, zone_dict, usage_dict
 
-def chunk_shares(graph, store, region, zonemap):
+def chunk_shares(graph, store, region, zonemap, region_contractors):
 
     """
     Calculate the operator shares for trips in the
@@ -266,7 +266,7 @@ def chunk_shares(graph, store, region, zonemap):
     stop_dict, zone_dict, usage_dict = _load_stop_store(
         store, region, zonemap
         )
-    op_dict = _load_contractor_pack(store, region)
+    op_dict = _load_contractor_pack(store, region, region_contractors)
 
 
     stop_dict = {k:v for k, v in stop_dict.items() if k in op_dict}
@@ -299,8 +299,8 @@ def main():
     DB_PATH = paths['calculated_stores']
     
     
-    ZONES = TakstZones()
-    ZONEMAP = ZONES.stop_zone_map()
+    zones = TakstZones()
+    zonemap = zones.stop_zone_map()
     
     REGION_CONTRACTORS = {
         'hovedstaden': ['Movia_H', 'DSB', 'First', 'Stog', 'Metro'],
@@ -311,7 +311,7 @@ def main():
     graph = ZoneGraph(region=region)
 
     for x in tqdm(RK_STORES, total=len(RK_STORES)):
-        r = chunk_shares(graph, x, region)
+        r = chunk_shares(graph, x, region, zonemap)
         make_store(r, DB_PATH)
 
 
