@@ -183,7 +183,6 @@ def _single_operator_assignment(graph, op_dict, zone_dict, stop_dict):
     zone_properties = {}
     bad_keys = set()
     for k, v in single_op_zone_dict.items():
-
         try:
             zone_properties[k] = _trip_zone_properties(graph, v, single_op_stop_dict[k])
         except:
