@@ -5,6 +5,7 @@ __pycache__
 /build/
 /__pycache__/
 /gtfs/
+tablesalt/resources/networktopodk/gtfs/
 /.pylint.d/
 tablesalt/.vscode/settings.json
 /.vscode/
