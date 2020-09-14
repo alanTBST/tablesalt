@@ -20,7 +20,8 @@ from tqdm import tqdm
 from tablesalt.running import WindowsInhibitor
 from tablesalt import StoreReader
 from tablesalt.common.io import mappers
-from tablesalt.preprocessing import find_datastores
+from tablesalt.preprocessing.tools import find_datastores, db_paths
+from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.common import triptools, make_store
 from tablesalt.revenue import multisharing
 from tablesalt.topology.tools import TakstZones
