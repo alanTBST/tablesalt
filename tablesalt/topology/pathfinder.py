@@ -191,7 +191,7 @@ class ZoneProperties():
                 visited = all_short_paths[0]
         self.VISITED_CACHE[zone_leg] = visited
 
-    def get_visited_zones(self) -> Tuple[Union[int, Tuple[int, ...]], ...]:
+    def get_visited_zones(self, zone_legs) -> Tuple[Union[int, Tuple[int, ...]], ...]:
         """
         visited zones is a list of the zones visited on a trip,
         in order, but removing adjacent duplicate zones
@@ -199,7 +199,7 @@ class ZoneProperties():
         """
 
         vals = []
-        for x in self.touched_zone_legs:
+        for x in zone_legs:
             try:
                 vals.append(self.VISITED_CACHE[x])
             except KeyError:
@@ -229,7 +229,7 @@ class ZoneProperties():
             'double_back' -
         """
 
-        visited_zones = self.get_visited_zones()
+        visited_zones = self.get_visited_zones(self.touched_zone_legs)
         chained_zones = []
         try:
             for x in visited_zones:
