@@ -108,10 +108,11 @@ def shrink_search(graph, start, goal, ringzones, distance_buffer=2):
 
 class ZoneProperties():
 
-
+    
     VISITED_CACHE = {}
 
     def __init__(self, graph, zone_sequence, stop_sequence):
+        
         """
 
 
