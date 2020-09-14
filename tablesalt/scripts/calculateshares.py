@@ -280,7 +280,7 @@ def _load_stop_store(rkstore, region):
 
     return stop_dict, zone_dict, usage_dict
 
-def chunk_shares(graph, rkstore, region):
+def chunk_shares(graph, store, region):
 
     """
     Calculate the operator shares for trips in the
@@ -296,9 +296,9 @@ def chunk_shares(graph, rkstore, region):
     """
 
     stop_dict, zone_dict, usage_dict = _load_stop_store(
-        rkstore, region
+        store, region
         )
-    op_dict = _load_contractor_pack(rkstore, region)
+    op_dict = _load_contractor_pack(store, region)
 
 
     stop_dict = {k:v for k, v in stop_dict.items() if k in op_dict}
