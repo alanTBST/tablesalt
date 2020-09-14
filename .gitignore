@@ -8,7 +8,7 @@ __pycache__
 /.pylint.d/
 tablesalt/.vscode/settings.json
 /.vscode/
-/.pylint.d/
+tablesalt/scripts/.pylint.d/
 tablesalt/topology/route_shapes.geojson
 environment.yml
 tablesalt/resources/gtfs/
