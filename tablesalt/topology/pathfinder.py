@@ -249,6 +249,7 @@ class ZoneProperties():
         if not self.border_trip:
             return prop_dict
 
+        both = self._border_is_dest() and self._border_is_orig()
         if self._border_is_dest(): #and not double_back:
 
             stopnum = self.stop_sequence[-1]
@@ -271,12 +272,14 @@ class ZoneProperties():
 
         touched = set(prop_dict['touched_zones'])
         visited = set(prop_dict['visited_zones'])
+        
         if touched != touched.intersection(visited):
             if not touched.difference(visited).intersection(visited):
                 prop_dict['touched_zones'] = prop_dict['visited_zones']
             else:
                 prop_dict['touched_zones'] = \
                 tuple(touched - touched.difference(visited))
+       
         if not all(isinstance(x, (np.int64, int)) for x in tuple(prop_dict['touched_zones'])):
             raise TypeError("can't determine touched zones")
 
