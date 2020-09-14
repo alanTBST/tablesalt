@@ -31,17 +31,8 @@ from tablesalt.topology import (
     BORDER_STATIONS
     )
 
-# TODO, change this to
-try:
 
-    STORE_ROOT = find_datastores(start_dir=r'H:\\')
-
-except FileNotFoundError:
-    raise FileNotFoundError(
-        "It appears there are no extracted datasets"
-        "Run delrejsersetup.py script"
-        )
-parser = TableArgParser('year', 'rabattrin')
+parser = TableArgParser('year')
 args = parser.parse()
 
 year = args['year']
@@ -49,11 +40,8 @@ year = args['year']
 store_loc = find_datastores(r'H://')
 paths = db_paths(store_loc, year)
 RK_STORES = paths['store_paths']
-db_path = paths['calculated_stores']
+DB_PATH = paths['calculated_stores']
 
-YEAR = 2019
-
-DB_DIR = os.path.join(YEAR_DIR, 'dbs')
 
 ZONES = TakstZones()
 ZONEMAP = ZONES.stop_zone_map()
@@ -324,16 +312,16 @@ def main():
 
     for x in tqdm(RK_STORES, total=len(RK_STORES)):
         r = chunk_shares(graph, x, region)
-        make_store(r, os.path.join(DB_DIR, 'calculated_stores'))
+        make_store(r, DB_PATH)
 
 
     return r
 
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    INHIBITOR = WindowsInhibitor()
-    INHIBITOR.inhibit()
-    main()
-    INHIBITOR.uninhibit()
+#     INHIBITOR = WindowsInhibitor()
+#     INHIBITOR.inhibit()
+#     main()
+#     INHIBITOR.uninhibit()
