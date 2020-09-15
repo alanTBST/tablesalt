@@ -10,7 +10,7 @@ import os
 import pickle
 from itertools import chain
 from operator import itemgetter
-from typing import AnyStr, Dict, Tuple, Optional
+from typing import AnyStr, Dict, Tuple, Optional, List
 from pathlib import Path
 
 import numpy as np
@@ -40,6 +40,10 @@ def _proc_sales(frame):
         )
 
     frame.loc[:, 'valgtezoner'] = frame.loc[:, 'valgtezoner'].astype(str)
+    
+    frame.loc[:, 'slutzone'] = frame.loc[:, 'slutzone'].fillna('1000')
+    frame.loc[:, 'startzone'] = frame.loc[:, 'startzone'].fillna('1000')
+
     return frame
 
 
@@ -52,7 +56,7 @@ def _load_sales_data(year: int) -> pd.core.frame.DataFrame:
         )
 
     df = pd.read_csv(fp, low_memory=False)
-
+    
     return _proc_sales(df)
 
 def _get_single_results(year):
@@ -124,7 +128,7 @@ def _get_location_results(location: str, results):
     result_keys.add('all')
       
     res_dict = {k: {k1: v1 for k1, v1 in v.items() if k1 in result_keys} 
-                for k, v in results.items()}
+                for k, v in results.copy().items()}
     
     return res_dict
 
@@ -161,19 +165,6 @@ def _method_resolution_operator(res, length):
                 
     return mro
 
-def _method_resolution_any(res, length):
-    
-    
-    return 
-
-
-def _match_single_any():
-    
-    
-    
-    return 
-
-
 def _filter_mro(record, mro):
     
     if record.takstsæt == 'th':
@@ -185,22 +176,61 @@ def _filter_mro(record, mro):
     
     return mro
 
+
+def _join_note(notelist: List[str]) -> str:
+    
+    return ''.join(
+        ('_'.join(j) + r'->' if i!=len(notelist)-1 else '_'.join(j) 
+         for i, j in enumerate(notelist)
+         )
+        )
+
+def _drbyen_location():
+    
+    
+    return 
+
+
+def _resolve_tickets(record):
+    
+    startzone = record.startzone 
+    paid_zones = record.betaltezoner
+    endzone = record.slutzone
+    
+    try: 
+        startzone = int(startzone)
+    except ValueError:
+        if not '1003' in startzone:
+            startzone = int(startzone[:4])
+        else:
+            # byen
+            pass
+    try: 
+        endzone = int(endzone)
+    except ValueError:
+        endzone = int(endzone[:4]) # endzone not needed
+
+ 
+    paid_zones = int(paid_zones)
+
+    ring_ticket = startzone, paid_zones
+    ft_ticket = startzone, endzone
+    return ring_ticket, ft_ticket
+
 def _match_single_operator(record, res, mro, trip_threshhold=0):
     
     
     mro = _filter_mro(record, mro)
+    ring_ticket, ft_ticket = _resolve_tickets(record)
     
-    try:
-        ring_ticket = int(record.startzone), int(record.betaltezoner)
-        ft_ticket = int(record.startzone), int(record.slutzone)
-    except ValueError:
+    if '1001/1003' in ring_ticket or '1001/1003'   in ft_ticket:
         return {}
-    
+ 
     note = []
     for method in mro:
         note.append(method)
         try:
-            d = res[method[0]][method[1]][method[2]]
+            d = res[method[0]][method[1]][method[2]].copy()
         except KeyError:
             continue
         
@@ -213,23 +243,122 @@ def _match_single_operator(record, res, mro, trip_threshhold=0):
                 
         if not r:
             continue
-        if r and r['n_trips'] == trip_threshhold:
+        if r and r['n_trips'] <= trip_threshhold:
             continue
         if r is not None:
             break
-
     else:        
         r = {}   
-    r['note'] = ''.join(
-        ('_'.join(j) + r'->' if i!=len(note)-1 else '_'.join(j) 
-         for i, j in enumerate(note)
-         )
-        )
+    
+    r['note'] = _join_note(note)
     return r
+
+def _match_single_any(record, res, mro, trip_threshhold=0):
+    
+    ring_ticket, ft_ticket = _resolve_tickets(record)
+
+    note = []
+    for method in mro:
+        note.append(method)
+        try:
+            d = res[method[0]][method[1]]
+        except KeyError:
+            continue
+        
+        if 'short_ring' in method or 'long_ring' in method:
+            r = d.get(ring_ticket, {})
+        elif 'long' in method:
+            r = d.get(ft_ticket, {})
+        else:
+            r = d.get(ring_ticket[1], {})            
+                
+        if not r:
+            continue
+        if r and r['n_trips'] <= trip_threshhold:
+            continue
+        if r is not None:
+            break
+    else:        
+        r = {}   
+    
+    r['note'] = _join_note(note)
+    return r
+
+
+def _method_resolution_any(res, length):
+    
+    mro = []
+    paid = []
+    
+    for k, v in res.items():
+        if length == 'short':
+            start_any = (k, 'short_ring')
+            mro.append(start_any)           
+        if length == 'long':
+            start_any = (k, 'long')  
+            mro.append(start_any)                         
+            start_any_ring = (k, 'long_ring')
+            mro.append(start_any_ring)
+            
+        start_any_paid = (k, 'paid_zones')
+        paid.append(start_any_paid)
+
+    if length == 'long':
+        mro = sorted(mro, key=itemgetter(1, 0))
+    mro = mro + paid
+
+    return mro
+
+def _result_frame(rdict, frame):
+
+    out_frame = pd.DataFrame.from_dict(rdict).T
+    out_frame.index.name = 'NR'
+    out_frame = out_frame.reset_index()
+    
+    test_out = pd.merge(frame, out_frame, on='NR', how='left')
+    test_out.note = test_out.note.fillna('')
+    test_out = test_out.fillna(0)
+    
+    main_cols = list(frame.columns)
+    new = [x for x in test_out if x not in main_cols]
+    ops = [x for x in new if x not in ('note', 'n_trips')]
+    
+    out_cols = main_cols + sorted(ops) + ['n_trips', 'note']
+    test_out = test_out[out_cols]
+    
+    return test_out
+    
+    
+def _any_single_merge(sales_idxs, location_sales, data, single_results):
+    
+    sales_nr = set(sales_idxs['enkeltbillet'] + sales_idxs['lang enkeltbillet'])
+    location_nr = set(chain(*location_sales.values()))
+    
+    wanted = sales_nr - location_nr
+    
+    sub_data = data.query("NR in @wanted")
+    sub_tuples = list(sub_data.itertuples(index=False, name='Sale'))
+    
+    res = {k: v['all'] for k, v in single_results.copy().items()}
+
+    mro_short = _method_resolution_any(res, 'short')
+    mro_long = _method_resolution_any(res, 'long')    
+
+    out = {}
+    for record in sub_tuples:
+        if record.betaltezoner <= 8:
+            out[record.NR] = _match_single_any(record, res, mro_short)
+        else:
+            out[record.NR] = _match_single_any(record, res, mro_long)
+
+             
+    outframe = _result_frame(out, sub_data)   
+
+    return outframe
 
 def _location_merge(location_sales, data, single_results):
     
-    final = {}
+    final = []
     for loc in LOCATIONS:
         location_nr = location_sales[loc]
         sub_data = data.query("NR in @location_nr")
@@ -242,28 +371,32 @@ def _location_merge(location_sales, data, single_results):
         out = {}
         for record in sub_tuples:
             if record.betaltezoner <= 8:
-                out[record.NR] = _match_single_operator(record, res, mro_short)
+                out[record.NR] = _match_single_operator(
+                    record, res, mro_short
+                    )
             else:
-                out[record.NR] = _match_single_operator(record, res, mro_long)
-                
-        out_frame = pd.DataFrame.from_dict(out).T
-        out_frame.index.name = 'NR'
-        out_frame = out_frame.reset_index()
-        
-        test_out = pd.merge(sub_data, out_frame, on='NR', how='left')
-        test_out.note = test_out.note.fillna('')
-        test_out = test_out.fillna(0)
-        
-        main_cols = list(sub_data.columns)
-        new = [x for x in test_out if x not in main_cols]
-        ops = [x for x in new if x not in ('note', 'n_trips')]
-        
-        out_cols = main_cols + sorted(ops) + ['n_trips', 'note']
-        test_out = test_out[out_cols]
-        final[loc] = test_out
-        # test_out.to_csv(f'{loc}_single_new.csv', index=False)
+                out[record.NR] = _match_single_operator(
+                    record, res, mro_long
+                    )
+        outframe = _result_frame(out, sub_data)           
+        final.append(outframe)
                
-    return final
+    return pd.concat(final)
+
+
+def _single_tickets(sales_idxs, location_sales, data, single_results):
+    
+    any_start = _any_single_merge(
+        sales_idxs, location_sales, data, single_results
+        )
+    
+    specific_start = _location_merge(
+        location_sales, data, single_results
+        )
+    
+    out = pd.concat([any_start, specific_start])
+
+    return out.sort_values('NR')
 
 
 def main():
@@ -274,10 +407,16 @@ def main():
     
     year = 2019
        
-    sales_data = _load_sales_data(year)
-    sales_idxs = _sales_ref(sales_data)
-    location_idxs = _location_ref(sales_data)
+    data = _load_sales_data(year)
+    sales_idxs = _sales_ref(data)
+    location_idxs = _location_ref(data)
     location_sales = _get_location_sales(location_idxs, sales_idxs)
+    
+    single_results = _get_single_results(year)
+    
+    single_output = _single_tickets(
+        sales_idxs, location_sales, data, single_results
+        )
     
     return 
 # =============================================================================
@@ -311,72 +450,6 @@ def main():
 #             pass
 
 #     return frame
-
-# def _load_ringzone_shares() -> pd.core.frame.DataFrame:
-
-#     filename = r'__result_cache__/2019/single/start_all_short_ring_2019_r0.csv'
-
-#     df = pd.read_csv(filename)
-#     df = _check_names(df)
-#     df = _stringify_merge_cols(df)
-
-#     return df
-
-# def _load_long_shares(ring: Optional[bool] = False):
-
-#     if not ring:
-#         filename = r'__result_cache__/2019/single/start_all_long_2019_r0.csv'
-#     else:
-#         filename = r'__result_cache__/2019/single/start_all_long_ring_2019_r0.csv'
-#     df = pd.read_csv(filename)
-#     df = _check_names(df)
-#     df = _stringify_merge_cols(df)
-
-#     return df
-
-
-# def _load_operator_shares(
-#         operator: str,
-#         length: str,
-#         ring: Optional[bool] = False
-#         ) -> pd.core.frame.DataFrame:
-
-#     operator = operator.lower()
-#     length = length.lower()
-
-#     filedir = os.path.join('__result_cache__', '2019', 'single')
-
-#     files = glob.glob(os.path.join(filedir, '*.csv'))
-#     files = [x for x in files if 'start_' in x and 'all' not in x]
-#     wanted = [x for x in files if operator in x.lower() and length in x.lower()]
-#     wanted = [x for x in wanted if '_r0' in x]
-
-#     if not ring:
-#         wanted = [x for x in wanted if 'ring' not in x.lower()]
-#     else:
-#         wanted = [x for x in wanted if 'ring' in x.lower()]
-
-#     if not wanted:
-#         raise ValueError(
-#             f"no files match {operator} and {length} and ring={ring}"
-#             )
-
-#     frames = []
-#     for f in wanted:
-#         df = pd.read_csv(f)
-#         df = _check_names(df)
-#         if 'Movia_H' in f:
-#             df = df.query("startzone < 1100")
-#         elif 'Movia_S' in f:
-#             df = df.query("startzone > 1200")
-#         else:
-#             df = df.query("1100 < startzone < 1200")
-
-#         df = _stringify_merge_cols(df)
-#         frames.append(df)
-
-#     return pd.concat(frames)
-
 
 
 # =============================================================================
