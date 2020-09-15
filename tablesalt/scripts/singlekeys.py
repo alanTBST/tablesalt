@@ -94,6 +94,7 @@ def _aggregate_zones(shares):
          key, group in groupby(test_out, key=itemgetter(1))}
     t = {k: v/totalzones for k, v in t.items()}
     t['n_trips'] = n_trips
+    
     return t
 
 
@@ -224,6 +225,15 @@ def _filter_operators(ticket_keys, operator_tripkeys: Set[int]):
         out[k] = d
 
     return out
+
+def _get_exception_stations(stops, *uic):
+        
+    tripkeys = stops[
+        (np.isin(stops[:, 2], list(uic))) & 
+        (stops[:, -1] == 1)
+        ][:, 0]
+          
+    return tripkeys
 
 
 def _store_tripkeys(store, stopzone_map, ringzones, rabatkeys):
@@ -521,7 +531,7 @@ def main():
 
 
     _get_all_store_keys(
-        stores,
+        stores[:10],
         stopzone_map,
         ringzones,
         wanted_operators,
@@ -529,46 +539,46 @@ def main():
         year
         )
 
-    nparts = 20
-    out_all, out_operators = \
-        _gather_all_store_keys(wanted_operators, nparts, year)
+    # nparts = 20
+    # out_all, out_operators = \
+    #     _gather_all_store_keys(wanted_operators, nparts, year)
 
-    del rabatkeys
-    print('finding results\n')
-    all_wanted_keys = set()
-    for k, v in out_all.items():
-        for k1, v1 in v.items():
-            all_wanted_keys.update(v1)
+    # del rabatkeys
+    # print('finding results\n')
+    # all_wanted_keys = set()
+    # for k, v in out_all.items():
+    #     for k1, v1 in v.items():
+    #         all_wanted_keys.update(v1)
 
-    result_dict = _get_trips(db_path, all_wanted_keys)
+    # result_dict = _get_trips(db_path, all_wanted_keys)
     
-    print('loaded results\n')
-    del all_wanted_keys
+    # print('loaded results\n')
+    # del all_wanted_keys
 
-    all_results = _map_all(out_all, result_dict)
-    short_all = _nzone_merge(all_results['short_ring'])
-    long_all = _nzone_merge(all_results['long_ring'])
-    all_results_ = agg_nested_dict(all_results)
-    all_results_['paid_zones'] = {**short_all, **long_all}
+    # all_results = _map_all(out_all, result_dict)
+    # short_all = _nzone_merge(all_results['short_ring'])
+    # long_all = _nzone_merge(all_results['long_ring'])
+    # all_results_ = agg_nested_dict(all_results)
+    # all_results_['paid_zones'] = {**short_all, **long_all}
 
-    operator_results = _map_operators(out_operators, result_dict)
-    operator_results_ = agg_nested_dict(operator_results)
-    for k, v in operator_results.items():
-        short_op = _nzone_merge(v['short_ring'])
-        long_op = _nzone_merge(v['long_ring'])
-        operator_results_[k]['paid_zones'] = {**short_op, **long_op}
+    # operator_results = _map_operators(out_operators, result_dict)
+    # operator_results_ = agg_nested_dict(operator_results)
+    # for k, v in operator_results.items():
+    #     short_op = _nzone_merge(v['short_ring'])
+    #     long_op = _nzone_merge(v['long_ring'])
+    #     operator_results_[k]['paid_zones'] = {**short_op, **long_op}
 
-    operator_results_['all'] = all_results_
+    # operator_results_['all'] = all_results_
 
-    fp = os.path.join(
-        '__result_cache__',
-        f'{year}',
-        'preprocessed', 
-        f'single_results_{year}_r{rabat_level}.pickle'
-        )
+    # fp = os.path.join(
+    #     '__result_cache__',
+    #     f'{year}',
+    #     'preprocessed', 
+    #     f'single_results_{year}_r{rabat_level}.pickle'
+    #     )
 
-    with open(fp, 'wb') as f:
-        pickle.dump(operator_results_, f)
+    # with open(fp, 'wb') as f:
+    #     pickle.dump(operator_results_, f)
 
     # _write_results(rabat_level, year)
 
