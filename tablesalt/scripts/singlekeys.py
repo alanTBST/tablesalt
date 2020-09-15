@@ -14,6 +14,7 @@ from functools import partial
 from itertools import groupby, chain
 from multiprocessing import Pool
 from operator import itemgetter
+from pathlib import Path
 from typing import Set
 
 
@@ -31,6 +32,9 @@ from tablesalt.common.triptools import split_list
 from tablesalt.common.connections import make_connection
 from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
+
+
+THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 
 def helrejser_rabattrin(rabattrin, year):
     """
@@ -408,7 +412,10 @@ def _gather_all_store_keys(operators, nparts, year):
 def _get_rabatkeys(rabattrin, year):
 
     fp = os.path.join(
+        THIS_DIR, 
         '__result_cache__', 
+        f'{year}',
+        'preprocessed', 
         f'rabat{rabattrin}trips.pickle'
         )
     try:
@@ -417,7 +424,7 @@ def _get_rabatkeys(rabattrin, year):
     except FileNotFoundError:
         rabatkeys = helrejser_rabattrin(rabattrin, year)
         with open(fp, 'wb') as f:
-            pickle.dump(rabatkeys)
+            pickle.dump(rabatkeys, f)
 
     return rabatkeys
 
