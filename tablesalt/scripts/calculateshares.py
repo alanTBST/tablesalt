@@ -295,7 +295,6 @@ def main():
     RK_STORES = paths['store_paths']
     DB_PATH = paths['calculated_stores']
     
-    
     zones = TakstZones()
     zonemap = zones.stop_zone_map()
     
@@ -316,9 +315,9 @@ def main():
 
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
-#     INHIBITOR = WindowsInhibitor()
-#     INHIBITOR.inhibit()
-#     main()
-#     INHIBITOR.uninhibit()
+    INHIBITOR = WindowsInhibitor()
+    INHIBITOR.inhibit()
+    main()
+    INHIBITOR.uninhibit()
