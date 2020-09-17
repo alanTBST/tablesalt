@@ -39,8 +39,9 @@ def load_border_stations(): # put this in TBSTtopology
         )
     border_frame = pd.read_excel(fp)
     border_frame['Zones'] = list(zip(
-        border_frame['Zone1'], border_frame['Zone2'], border_frame['Zone3']))
-    return {k:tuple(int(x) for x in v if x > 0)
+        border_frame['Zone1'], border_frame['Zone2'], border_frame['Zone3']
+        ))
+    return {k: tuple(int(x) for x in v if x > 0)
         for k, v in border_frame.set_index('UIC')['Zones'].to_dict().items()}
 
 BORDER_STATIONS = load_border_stations()
