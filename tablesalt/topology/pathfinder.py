@@ -81,7 +81,18 @@ def shrink_search(graph, start, goal, ringzones, distance_buffer=2):
     return new_graph
 
 
-
+def _leg_borders(stop_sequence, border_positions):
+    
+    leg_border_dict = {}
+    
+    for i, j in enumerate(stop_sequence):
+        if i == 0:
+            continue    
+        if i in border_positions:
+            leg_border_dict[i-1] = 1
+            leg_border_dict[i] = 0
+               
+    return leg_border_dict
 class ZoneProperties():
 
     
@@ -115,13 +126,17 @@ class ZoneProperties():
         self.ring_dict = self.graph.ring_dict(region)
         self.zone_sequence = zone_sequence
         self.stop_sequence = stop_sequence
+        self.stop_legs = self._to_legs(stop_sequence)
+        self.border_trip = False
+        self.border_positions = None
+        self.border_legs = None
+        
         if any(x in BORDER_STATIONS for x in stop_sequence):
             self.border_trip = True
-        else:
-            self.border_trip = False
 
         if self.border_trip:
             self.border_positions = self._border_touch_postions()
+            self.border_legs = self._border_touch_legs()
 
         self.touched_zones = self.get_touched_zones(self.zone_sequence)
         self.touched_zone_legs = self._to_legs(self.touched_zones)
@@ -134,6 +149,16 @@ class ZoneProperties():
 
         return tuple(i for i, j in enumerate(self.stop_sequence)
                      if j in BORDER_STATIONS)
+    
+    def _border_touch_legs(self) -> Tuple[int, ...]:
+        """
+        return the card touch positions on the trip
+        as a tuple
+        """
+
+        return tuple(i for i, j in enumerate(self.stop_legs)
+                     if any(x in BORDER_STATIONS for x in j))
+    
     def _border_is_dest(self) -> bool:
         """
         test whether a border station check is the
@@ -168,6 +193,7 @@ class ZoneProperties():
                 touched.append(j)
                 seen.add(j)
         return tuple(touched)
+    
     @staticmethod
     def _to_legs(sequence):
 
@@ -246,8 +272,8 @@ class ZoneProperties():
             'double_back': double_back,
             'touched_zones': self.touched_zones,
             'stop_sequence': self.stop_sequence,
-            'zone_sequence': self.zone_sequence
-            }        
+            'zone_sequence': self.zone_sequence,
+            'border_legs': self.border_legs}        
         
         return prop_dict
     
