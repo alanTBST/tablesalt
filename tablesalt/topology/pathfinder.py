@@ -124,12 +124,12 @@ class ZoneProperties():
 
         self.graph = graph
         self.ring_dict = self.graph.ring_dict(region)
-        self.zone_sequence = zone_sequence
-        self.stop_sequence = stop_sequence
-        self.stop_legs = self._to_legs(stop_sequence)
-        self.border_trip = False
-        self.border_positions = None
-        self.border_legs = None
+        self.zone_sequence: Tuple[int, ...] = zone_sequence
+        self.stop_sequence: Tuple[int, ...]  = stop_sequence
+        self.stop_legs: Tuple[Tuple[int, ...], ...] = self._to_legs(stop_sequence)
+        self.border_trip: bool = False
+        self.border_positions: Optional[Tuple[int, ...]] = None
+        self.border_legs: Optional[Tuple[int, ...]] = None
         
         if any(x in BORDER_STATIONS for x in stop_sequence):
             self.border_trip = True
