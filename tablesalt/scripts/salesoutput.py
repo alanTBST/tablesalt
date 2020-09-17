@@ -126,7 +126,8 @@ def _get_location_results(location: str, results):
     operator = LOCATIONS[location]    
     result_keys = set(RESULT_MAP[operator])
     result_keys.add('all')
-      
+    if location.lower() == 'automat':
+        result_keys.add('dr_byen')
     res_dict = {k: {k1: v1 for k1, v1 in v.items() if k1 in result_keys} 
                 for k, v in results.copy().items()}
     
@@ -162,7 +163,8 @@ def _method_resolution_operator(res, length):
     if length == 'long':
         mro = sorted(mro, key=itemgetter(1, 0))
     mro = mro + any_start + paid + paid_any
-                
+    # if any(any(x == 'dr_byen' for x in y) for y in mro):
+    #     mro = [x for x in mro if any(y == 'dr_byen' for y in x)]
     return mro
 
 def _filter_mro(record, mro):
@@ -217,18 +219,25 @@ def _resolve_tickets(record):
     ft_ticket = startzone, endzone
     return ring_ticket, ft_ticket
 
-def _match_single_operator(record, res, mro, trip_threshhold=0):
+def _match_single_operator(record, res, mro, trip_threshhold):
     
     
     mro = _filter_mro(record, mro)
     ring_ticket, ft_ticket = _resolve_tickets(record)
     
-    if '1001/1003' in ring_ticket or '1001/1003'   in ft_ticket:
-        return {}
+    if '1001/1003' in ring_ticket or '1001/1003' in ft_ticket:
+        mro_dr = [x for x in mro if any(y == 'dr_byen' for y in x)]
+        mro_other = [x for x in mro if x not in mro_dr]
+        mro = mro_dr + mro_other
+        
+        ring_ticket = int(ring_ticket[0][:4]), ring_ticket[1]        
+        ft_ticket = int(ft_ticket[0][:4]), ft_ticket[1]        
  
     note = []
     for method in mro:
         note.append(method)
+        
+        
         try:
             d = res[method[0]][method[1]][method[2]].copy()
         except KeyError:
@@ -243,7 +252,7 @@ def _match_single_operator(record, res, mro, trip_threshhold=0):
                 
         if not r:
             continue
-        if r and r['n_trips'] <= trip_threshhold:
+        if r and r['n_trips'] < trip_threshhold:
             continue
         if r is not None:
             break
@@ -253,7 +262,7 @@ def _match_single_operator(record, res, mro, trip_threshhold=0):
     r['note'] = _join_note(note)
     return r
 
-def _match_single_any(record, res, mro, trip_threshhold=0):
+def _match_single_any(record, res, mro, trip_threshhold):
     
     ring_ticket, ft_ticket = _resolve_tickets(record)
 
@@ -274,7 +283,7 @@ def _match_single_any(record, res, mro, trip_threshhold=0):
                 
         if not r:
             continue
-        if r and r['n_trips'] <= trip_threshhold:
+        if r and r['n_trips'] < trip_threshhold:
             continue
         if r is not None:
             break
@@ -329,7 +338,7 @@ def _result_frame(rdict, frame):
     return test_out
     
     
-def _any_single_merge(sales_idxs, location_sales, data, single_results):
+def _any_single_merge(sales_idxs, location_sales, data, single_results, min_trips):
     
     sales_nr = set(sales_idxs['enkeltbillet'] + sales_idxs['lang enkeltbillet'])
     location_nr = set(chain(*location_sales.values()))
@@ -347,16 +356,17 @@ def _any_single_merge(sales_idxs, location_sales, data, single_results):
     out = {}
     for record in sub_tuples:
         if record.betaltezoner <= 8:
-            out[record.NR] = _match_single_any(record, res, mro_short)
+            out[record.NR] = _match_single_any(
+                record, res, mro_short, min_trips)
         else:
-            out[record.NR] = _match_single_any(record, res, mro_long)
+            out[record.NR] = _match_single_any(record, res, mro_long, min_trips)
 
              
     outframe = _result_frame(out, sub_data)   
 
     return outframe
 
-def _location_merge(location_sales, data, single_results):
+def _location_merge(location_sales, data, single_results, min_trips):
     
     final = []
     for loc in LOCATIONS:
@@ -372,11 +382,11 @@ def _location_merge(location_sales, data, single_results):
         for record in sub_tuples:
             if record.betaltezoner <= 8:
                 out[record.NR] = _match_single_operator(
-                    record, res, mro_short
+                    record, res, mro_short, min_trips
                     )
             else:
                 out[record.NR] = _match_single_operator(
-                    record, res, mro_long
+                    record, res, mro_long, min_trips
                     )
         outframe = _result_frame(out, sub_data)           
         final.append(outframe)
@@ -384,14 +394,18 @@ def _location_merge(location_sales, data, single_results):
     return pd.concat(final)
 
 
-def _single_tickets(sales_idxs, location_sales, data, single_results):
+def _single_tickets(sales_idxs, 
+                    location_sales, 
+                    data, 
+                    single_results, 
+                    min_trips):
     
     any_start = _any_single_merge(
-        sales_idxs, location_sales, data, single_results
+        sales_idxs, location_sales, data, single_results, min_trips
         )
     
     specific_start = _location_merge(
-        location_sales, data, single_results
+        location_sales, data, single_results, min_trips
         )
     
     out = pd.concat([any_start, specific_start])
@@ -413,10 +427,25 @@ def main():
     location_sales = _get_location_sales(location_idxs, sales_idxs)
     
     single_results = _get_single_results(year)
+    from collections import Counter
+    for i in [2, 5, 10, 20, 50]:
+        single_output = _single_tickets(
+            sales_idxs, location_sales, data, single_results, i
+            )
+           
+        single_output.to_csv(f"H:/single_ticket_mintrips{i}.csv", index=False)
+            
+        n = len(single_output)
+        counts = Counter(single_output.note.str.count('->'))
+        ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])    
+        counts = {ordinal(k+1) + ' try': (v / n) * 100 for k, v in counts.items()}
+        stats = pd.DataFrame.from_dict(counts, orient='index')
+        stats = stats.reset_index()
+        stats.columns = ['attempts', 'percentage']
+        stats.to_csv(f"H:/single_ticket_mintrips{i}_stats.csv", index=False)
     
-    single_output = _single_tickets(
-        sales_idxs, location_sales, data, single_results
-        )
+    
+    
     
     return 
 # =============================================================================

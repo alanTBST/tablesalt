@@ -560,8 +560,8 @@ def main():
     out_all, out_operators = \
         _gather_all_store_keys(wanted_operators, nparts, year)
 
-    # del rabatkeys
-    # print('finding results\n')
+    del rabatkeys
+    print('finding results\n')
     all_wanted_keys = set()
     for k, v in out_all.items():
         for k1, v1 in v.items():
@@ -569,8 +569,8 @@ def main():
 
     result_dict = _get_trips(db_path, all_wanted_keys)
     
-    # print('loaded results\n')
-    # del all_wanted_keys
+    print('loaded results\n')
+    del all_wanted_keys
 
     all_results = _map_all(out_all, result_dict)
     short_all = _nzone_merge(all_results['short_ring'])
