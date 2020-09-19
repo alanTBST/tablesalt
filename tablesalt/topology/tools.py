@@ -641,7 +641,7 @@ class EdgeMaker(_GTFSloader):
         if mode is not None:
             wanted_routes = self.route_types(str)
             wanted_routes = {k for k, v in wanted_routes.items() if mode in v}
-            shape_frame = wanted_routes.query("route_id in @wanted_routes")
+            shape_frame = shape_frame.query("route_id in @wanted_routes")
         
         joined = gpd.sjoin(zones, shape_frame)
         
