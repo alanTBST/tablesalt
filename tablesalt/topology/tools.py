@@ -634,10 +634,15 @@ class EdgeMaker(_GTFSloader):
         self.zones = TakstZones()
 
 
-    def _shape_proc(self):
+    def _shape_proc(self, mode: Optional[str] = None):
 
         zones = self.zones.load_tariffzones()
         shape_frame = self.shapes_to_gdf()
+        if mode is not None:
+            wanted_routes = self.route_types(str)
+            wanted_routes = {k for k, v in wanted_routes.items() if mode in v}
+            shape_frame = wanted_routes.query("route_id in @wanted_routes")
+        
         joined = gpd.sjoin(zones, shape_frame)
         
         shape_zones = zip(joined.loc[:, 'shape_id'].astype(int), 
@@ -725,10 +730,10 @@ class EdgeMaker(_GTFSloader):
         return edges    
 
 
-    def make_edges(self):
+    def make_edges(self, mode: Optional[str] = None):
 
         neigh_dict = self.zones._neighbour_dict('sjælland') # for now
-        shape_zones, zone_polys = self._shape_proc()
+        shape_zones, zone_polys = self._shape_proc(mode)
 
         all_shape_edges = {}
         for shape_id in shape_zones:
