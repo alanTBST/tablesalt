@@ -94,6 +94,8 @@ def _leg_borders(stop_sequence, border_positions):
             leg_border_dict[i] = 0
                
     return leg_border_dict
+
+
 class ZoneProperties():
 
     
