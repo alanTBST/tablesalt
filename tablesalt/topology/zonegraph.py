@@ -11,6 +11,7 @@ of the tariffzones in Denmark
 from itertools import groupby, chain
 from collections import Counter
 from operator import itemgetter
+from typing import Optional
 import pkg_resources
 
 #third party imports
@@ -166,7 +167,11 @@ class ZoneGraph():
     PATH_CACHE = {}
 
 
-    def __init__(self, region='sjælland') -> None:
+    def __init__(
+            self, 
+            region: Optional[str] = 'sjælland', 
+            mode: Optional[str] = None
+            ) -> None:
 
         """
 
@@ -186,7 +191,7 @@ class ZoneGraph():
 
 
         self.region = region
-        self.data = EdgeMaker().make_edges()
+        self.data = EdgeMaker().make_edges(mode)
 
         self.columns = self.data['idx']
         self.rows = self.data['idx']
