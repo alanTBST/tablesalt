@@ -130,6 +130,8 @@ class ZoneProperties():
         self.zone_sequence: Tuple[int, ...] = zone_sequence
         self.stop_sequence: Tuple[int, ...]  = stop_sequence
         self.stop_legs: Tuple[Tuple[int, ...], ...] = self._to_legs(stop_sequence)
+        self.zone_legs: Tuple[Tuple[int, ...], ...] = self._to_legs(zone_sequence)
+        
         self.border_trip: bool = False
         self.border_positions: Optional[Tuple[int, ...]] = None
         self.border_legs: Optional[Tuple[int, ...]] = None
