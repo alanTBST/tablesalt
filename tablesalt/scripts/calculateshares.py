@@ -204,8 +204,8 @@ def main():
     
     region = 'sjælland'
     graph = ZoneGraph(region=region)
-    rail_graph = ZoneGraph(region=region, mode='rail')
-    bus_graph = ZoneGraph(region=region, mode='bus')
+    # rail_graph = ZoneGraph(region=region, mode='rail')
+    # bus_graph = ZoneGraph(region=region, mode='bus')
 
     for x in tqdm(RK_STORES, total=len(RK_STORES)):
         r = chunk_shares(graph, x, region, zonemap, region_contractors)
