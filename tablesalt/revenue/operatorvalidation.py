@@ -8,7 +8,7 @@ from collections import Counter
 
 from tablesalt.common.io import mappers
 from tablesalt.common import triptools
-from tablesalt.topology import stationoperators
+
 
 def operators_in_touched_(tzones, zonelegs, oplegs, border_zones=None):
     """
@@ -192,11 +192,6 @@ def _with_borders(val, border_stations):
 
     return val
 
-OPGETTER = stationoperators.StationOperators(
-    'kystbanen', 'local', 'metro', 'suburban', 'fjernregional'
-    )
-
-
 def legops(new_legs):
     """
     just legify the output from determin_operator
@@ -209,6 +204,8 @@ def legops(new_legs):
         else:
             out.append((x[0], x[1]))
     return tuple(out)
+
+
 
 def procprop(properties, border_stations):
     """
