@@ -19,7 +19,7 @@ in which a user taps in or out
 
 """
 import pkg_resources
-from itertools import chain
+from itertools import chain, groupby
 from collections import Counter
 from typing import Tuple, Union, Optional
 
@@ -266,10 +266,7 @@ class ZoneProperties():
     
     
     def _bordered_properties(self):
-        
-        # border_count = len({x for x in self.stop_sequence if x in BORDER_STATIONS})
-        
-        
+                       
         zone_seq = []
         seen_zones = set()
         for legnr, zone_leg in enumerate(self.zone_legs):                        
