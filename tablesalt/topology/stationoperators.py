@@ -343,13 +343,14 @@ class StationOperators():
         intersect = set(start_ops).intersection(set(end_ops))
         if len(intersect) == 1:
             return tuple(intersect)
-       
-        if start_uic in M_RANGE:
-            return tuple((self._settings['config']['metro'], ))
         
-        if start_uic in S_RANGE:
-            return tuple((self._settings['config']['suburban'], ))
-        
+        if intersect:
+            if start_uic in M_RANGE:
+                return tuple((self._settings['config']['metro'], ))
+            
+            if start_uic in S_RANGE:
+                return tuple((self._settings['config']['suburban'], ))
+            
         return tuple(intersect)
 
     def _pair_operator_id(
@@ -362,15 +363,17 @@ class StationOperators():
         intersect = set(start_ops).intersection(set(end_ops))
         if len(intersect) == 1:
             return tuple(intersect)
-       
-        if start_uic in M_RANGE:
-            return tuple(
-                (self._settings['operator_ids'][self._settings['config']['metro']], )
-                )   
-        if start_uic in S_RANGE:
-            return tuple(
-                (self._settings['operator_ids'][self._settings['config']['suburban']], )
-                )
+        
+        if intersect:
+            
+            if start_uic in M_RANGE:
+                return tuple(
+                    (self._settings['operator_ids'][self._settings['config']['metro']], )
+                    )   
+            if start_uic in S_RANGE:
+                return tuple(
+                    (self._settings['operator_ids'][self._settings['config']['suburban']], )
+                    )
         
         return tuple(intersect)
 
@@ -384,11 +387,11 @@ class StationOperators():
         intersect = set(start_ops).intersection(set(end_ops))
         if len(intersect) == 1:
             return tuple(intersect)
-       
-        if start_uic in M_RANGE:
-            return tuple(('metro', ))       
-        if start_uic in S_RANGE:
-            return tuple(('suburban', ))
+        if intersect:
+            if start_uic in M_RANGE:
+                return tuple(('metro', ))       
+            if start_uic in S_RANGE:
+                return tuple(('suburban', ))
         
         return tuple(intersect)
 
