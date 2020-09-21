@@ -43,6 +43,7 @@ def proc_contractors(contrpack):
             arr[i, 3] = record[2]
             i += 1
     return arr
+
 def _load_contractor_pack(store, region, region_contractors):
     """
     load and process the operator information from
@@ -148,109 +149,6 @@ def _load_store_data(store, region, zonemap, region_contractors):
     
     return stop_dict, zone_dict, usage_dict, op_dict
 
-def _trip_zone_properties(graph, zone_sequence, stop_sequence):
-    """return a dictionary of zone properties"""
-    return ZoneProperties(
-        graph, zone_sequence, stop_sequence).property_dict
-
-def _single_operator_assignment(graph, op_dict, zone_dict, stop_dict):
-
-    """
-    assign the zones travelled for single operator trips
-
-    parameters
-    -----------
-    op_dict:
-        the dictionary of tripkeys and operator id tuples
-
-    zone_dict:
-        the dictionary of tripkeys and zone numbers
-
-    stop_dict:
-        the dicionary of tripkeys and stopids
-
-    stop_dict, zone_dict, usage are returned from _load_store_data
-    and op_dict is returned from _load_contractor_pack
-    """
-
-    single_op_dict = {k:v[0] for k, v in op_dict.items() if
-                        len(set(v)) == 1}
-    single_op_zone_dict = {k:v for k, v in zone_dict.items() if
-                       k in single_op_dict}
-
-    single_op_stop_dict = {k:v for k, v in stop_dict.items() if
-                       k in single_op_dict}
-    zone_properties = {}
-    bad_keys = set()
-    for k, v in single_op_zone_dict.items():
-        try:
-            zone_properties[k] = _trip_zone_properties(graph, v, single_op_stop_dict[k])
-        except:
-            bad_keys.add(k)
-            continue
-
-    shares = {
-        k:(zone_properties[k]['total_travelled_zones'], single_op_dict[k])
-        for k in single_op_dict if k in zone_properties
-        }
-    rev_op_map = {v: k for k, v in mappers['operator_id'].items()}
-
-    shares = {
-        k: (v[0], rev_op_map[v[1]].split('_')[0].lower()) for
-        k, v in shares.items()
-        }
-    return shares
-
-def _multi_operator_assignment(graph, op_dict, zone_dict, stop_dict, usage):
-    """
-    assign zone shares for multi operator trips
-
-    parameters
-    -----------
-    op_dict:
-        the dictionary of tripkeys and operator id tuples
-
-    zone_dict:
-        the dictionary of tripkeys and zone numbers
-
-    stop_dict:
-        the dicionary of tripkeys and stopids
-
-    usage:
-        the dicionary of tripkeys and usage ids,
-        'Fi' = 1, 'Co' = 2, 'Su' = 3, 'Tr' = 4
-
-    """
-    multi_op_dict = {k:v for k, v in op_dict.items() if
-                       len(set(v)) != 1}
-    multi_op_zone_dict = {k:v for k, v in zone_dict.items() if
-                      k in multi_op_dict}
-    multi_op_stop_dict = {k:v for k, v in stop_dict.items() if
-                      k in multi_op_dict}
-    multi_op_usage = {k:v for k, v in usage.items() if
-                      k in multi_op_dict}
-
-    operator_legs = triptools.create_legs(multi_op_dict)
-    usage_legs = triptools.create_legs(multi_op_usage)
-
-    zone_properties = {}
-    bad_keys = set()
-    for k, v in multi_op_zone_dict.items():
-        try:
-            zone_properties[k] = ZoneProperties(
-                graph,
-                v, multi_op_stop_dict[k]
-                ).property_dict
-        except (TypeError, KeyError):
-            bad_keys.add(k)
-    bad_keys = {k:v for k, v in multi_op_zone_dict.items() if k in bad_keys}
-
-    return multisharing.share_calculation(
-        operator_legs, usage_legs, zone_properties,
-        BORDER_STATIONS
-        )
-
-
 def chunk_shares(graph, store, region, zonemap, region_contractors):
 
     """
@@ -293,6 +191,7 @@ def main():
     store_loc = find_datastores(r'H://')
     paths = db_paths(store_loc, year)
     RK_STORES = paths['store_paths']
+    store = RK_STORES[87]
     DB_PATH = paths['calculated_stores']
     
     zones = TakstZones()
@@ -305,6 +204,8 @@ def main():
     
     region = 'sjælland'
     graph = ZoneGraph(region=region)
+    rail_graph = ZoneGraph(region=region, mode='rail')
+    bus_graph = ZoneGraph(region=region, mode='bus')
 
     for x in tqdm(RK_STORES, total=len(RK_STORES)):
         r = chunk_shares(graph, x, region, zonemap, region_contractors)
@@ -315,9 +216,9 @@ def main():
 
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    INHIBITOR = WindowsInhibitor()
-    INHIBITOR.inhibit()
-    main()
-    INHIBITOR.uninhibit()
+#     INHIBITOR = WindowsInhibitor()
+#     INHIBITOR.inhibit()
+#     main()
+#     INHIBITOR.uninhibit()
