@@ -21,6 +21,7 @@ in which a user taps in or out
 import pkg_resources
 from itertools import chain, groupby
 from collections import Counter
+from functools import lru_cache
 from typing import Tuple, Union, Optional
 
 
@@ -36,6 +37,9 @@ OPGETTER = stationoperators.StationOperators(
     'kystbanen', 'local', 'metro', 'suburban', 'fjernregional'
     )
 
+OP_MAP = {v: k for k, v in mappers['operator_id'].items()}
+rev_model_dict = {v:k for k, v in mappers['model_dict'].items()}
+CO_TR = (rev_model_dict['Co'], rev_model_dict['Tr'])
 
 def load_border_stations(): # put this in TBSTtopology
 
@@ -62,15 +66,15 @@ def load_border_stations(): # put this in TBSTtopology
 
 BORDER_STATIONS = load_border_stations()
 
-
+@lru_cache(2**16)
 def _is_bus(stopid):
     
     
     return (stopid > stationoperators.MAX_RAIL_UIC or 
             stopid < stationoperators.MIN_RAIL_UIC)
 
-
-def impute_leg(zone_leg, vis_zones):
+@lru_cache(2**16)
+def impute_leg(g, zone_leg):
     """
     for the two touched zones on a zone leg,
     fill in the zones that the leg travels through
@@ -84,19 +88,59 @@ def impute_leg(zone_leg, vis_zones):
 
     """
 
-    vis_zones_ = list(vis_zones)
+        
+    return g.shortest_path(*zone_leg)[0]
 
-    visited_idxs = [vis_zones_.index(int(zone)) for zone in zone_leg]
+@lru_cache(2**16)
+def impute_zone_legs(g, trip_zone_legs):
 
-    return vis_zones[visited_idxs[0]: visited_idxs[1] + 1]
-
-
-def impute_zone_legs(trip_zone_legs, visited_zones):
-
-    return tuple(impute_leg(leg, visited_zones)
+    return tuple(impute_leg(g, leg)
                  for leg in trip_zone_legs)
 
+@lru_cache(2**16)
+def get_touched_zones(zone_sequence) -> Tuple[int, ...]:
+    """
+    get the zones in which the card has been checked,
+    preserving the order of taps
+    """
+    touched = []
+    seen = set()
+    for i, j in enumerate(zone_sequence):
+        if i == 0:
+            touched.append(j)
+            seen.add(j)
+            continue
+        if not j in seen or not j == zone_sequence[i-1]:
+            touched.append(j)
+            seen.add(j)
+    return tuple(touched)
 
+@lru_cache(2**16)
+def to_legs(sequence):
+
+    return triptools.sep_legs(sequence)
+
+@lru_cache(2**16)
+def _to_legs_stops(stop_legs):
+    return tuple(
+            (leg[0], OPGETTER.BUS_ID_MAP.get(leg[1])) if 
+            (not _is_bus(leg[0]) and _is_bus(leg[1])) else leg 
+            for leg in stop_legs
+            )     
+
+@lru_cache(2**16)
+def _chain_vals(vals):
+    
+    lvals = len(vals)
+    visited_zones = tuple(
+        chain(*[j[:-1] if i != lvals - 1 else j
+              for i, j in enumerate(vals)])
+        )    
+    return visited_zones
+
+def _border_legs():
+    
+    return 
 
 class ZoneProperties():
 
@@ -128,18 +172,14 @@ class ZoneProperties():
         """
 
         self.graph = graph
-        self.ring_dict = self.graph.ring_dict(region)
+        # self.ring_dict = self.graph.ring_dict(region)
         self.zone_sequence: Tuple[int, ...] = zone_sequence
         self.stop_sequence: Tuple[int, ...]  = stop_sequence
                
-        self.stop_legs: Tuple[Tuple[int, ...], ...] = self._to_legs(stop_sequence)
-        self.stop_legs = tuple(
-            (leg[0], OPGETTER.BUS_ID_MAP.get(leg[1])) if 
-            (not _is_bus(leg[0]) and _is_bus(leg[1])) else leg 
-            for leg in self.stop_legs
-            )
+        self.stop_legs: Tuple[Tuple[int, ...], ...] = to_legs(stop_sequence)
+        self.stop_legs = _to_legs_stops(self.stop_legs)
         
-        self.zone_legs: Tuple[Tuple[int, ...], ...] = self._to_legs(zone_sequence)
+        self.zone_legs: Tuple[Tuple[int, ...], ...] = to_legs(zone_sequence)
         
         self.border_trip: bool = False
         self.border_legs: Union[Tuple[()], Tuple[int, ...]]  = ()
@@ -150,8 +190,8 @@ class ZoneProperties():
         if self.border_trip:
             self.border_legs = self._border_touch_legs()
 
-        self.touched_zones = self.get_touched_zones(self.zone_sequence)
-        self.touched_zone_legs = self._to_legs(self.touched_zones)
+        self.touched_zones = get_touched_zones(self.zone_sequence)
+        self.touched_zone_legs = to_legs(self.touched_zones)
     
     def _border_touch_legs(self) -> Tuple[int, ...]:
         """
@@ -162,27 +202,6 @@ class ZoneProperties():
         return tuple(i for i, j in enumerate(self.stop_legs)
                      if any(x in BORDER_STATIONS for x in j))
 
-    def get_touched_zones(self, zone_sequence) -> Tuple[int, ...]:
-        """
-        get the zones in which the card has been checked,
-        preserving the order of taps
-        """
-        touched = []
-        seen = set()
-        for i, j in enumerate(zone_sequence):
-            if i == 0:
-                touched.append(j)
-                seen.add(j)
-                continue
-            if not j in seen or not j == zone_sequence[i-1]:
-                touched.append(j)
-                seen.add(j)
-        return tuple(touched)
-    
-    @staticmethod
-    def _to_legs(sequence):
-
-        return triptools.sep_legs(sequence)
 
     def _visited_zones_on_leg(self, zone_leg: Tuple[int, int]) -> None:
         """
@@ -219,12 +238,9 @@ class ZoneProperties():
             except KeyError:
                 self._visited_zones_on_leg(leg)
                 vals.append(self.VISITED_CACHE[leg])
+       
+        visited_zones = _chain_vals(tuple(vals))
 
-        lvals = len(vals)
-        visited_zones = tuple(
-            chain(*[j[:-1] if i != lvals - 1 else j
-                  for i, j in enumerate(vals)])
-            )
 
         if not visited_zones:
             return tuple(self.touched_zones)
@@ -247,8 +263,7 @@ class ZoneProperties():
         except TypeError:
             chained_zones = list(visited_zones)
 
-        counts = Counter(chained_zones)
-        double_back = bool(max(counts.values()) > 1)
+        double_back = bool(max(Counter(chained_zones).values()) > 1)
 
         prop_dict = {
             'visited_zones': visited_zones,
@@ -267,9 +282,8 @@ class ZoneProperties():
     
     def _bordered_properties(self):
                        
-        zone_seq = []
-        seen_zones = set()
-        for legnr, zone_leg in enumerate(self.zone_legs):                        
+        zone_legs = []
+        for legnr, zone_leg in enumerate(self.zone_legs):                   
             start_zone = zone_leg[0]
             end_zone = zone_leg[1]
             if legnr in self.border_legs: 
@@ -281,7 +295,7 @@ class ZoneProperties():
                         for x in border_zones
                         ]
                     min_pos = np.argmin(border_distances)
-                    start_zone = border_zones[min_pos]                
+                    start_zone = border_zones[min_pos]
                 if stop_leg[1] in BORDER_STATIONS:
                     border_zones = BORDER_STATIONS[stop_leg[1]] 
                     border_distances = [
@@ -290,60 +304,47 @@ class ZoneProperties():
                             ]
                     min_pos = np.argmin(border_distances)
                     end_zone = border_zones[min_pos]
-                if start_zone not in seen_zones:
-                    zone_seq.append(start_zone)   
-                if end_zone not in seen_zones:         
-                    zone_seq.append(end_zone)
+            
+            leg = (start_zone, end_zone)
+            zone_legs.append(leg)
                 
-            seen_zones.add(start_zone) 
-            seen_zones.add(end_zone)
-        self.zone_sequence = tuple(zone_seq)
-        self.zone_legs = self._to_legs(self.zone_sequence)   
-        self.touched_zones = self.get_touched_zones(self.zone_sequence)
-        self.touched_zone_legs = self._to_legs(self.touched_zones)
+        self.zone_sequence = tuple(
+            [x[0] for x in zone_legs] + [zone_legs[-1][1]]
+            )
+        self.zone_legs = to_legs(self.zone_sequence)   
+        self.touched_zones = get_touched_zones(self.zone_sequence)
+        self.touched_zone_legs = to_legs(self.touched_zones)
                 
         return self._borderless_properties()
-    @property
+
     def property_dict(self):
-        """
-        return the three properties of the zone sequnce
-        in a dictionary.
-        The dictionary contains:
-            'visited_zones' -
-            'total_travelled_zones' -
-            'double_back' -
-        """
+
         if not self.border_trip:
             return self._borderless_properties()
         
         return self._bordered_properties()
 
 
-class ZoneSharer:
-    
-    def __init__(
-            self, 
-            zone_properties,
-            operator_sequence: Tuple[int, ...], 
-            usage_sequence: Tuple[int, ...]
-            ) -> None:
-        
-        self.zone_properties = zone_properties
-        self.operator_sequence = operator_sequence
-        self.usage_sequence = usage_sequence
-        
-        self.single = self._is_single()    
-    
-    def _is_single(self):
-        
-        return len(set(self.operator_sequence)) == 1
-    
-    def share(self):
-        shares = ()
-        return shares
+
+def _remove_idxs(idxs, legs):
     
     
-def operators_in_touched_(tzones, zonelegs, oplegs, border_zones=None):
+    return tuple(j for i, j in enumerate(legs) if i not in idxs) 
+
+def legops(new_legs):
+    """
+    just legify the output from determin_operator
+    """
+
+    out = []
+    for x in new_legs:
+        if len(x) == 1:
+            out.append((x[0], x[0]))
+        else:
+            out.append((x[0], x[1]))
+    return tuple(out)
+
+def operators_in_touched_(tzones, zonelegs, oplegs):
     """
     determine the operators in the zones that are touched
     returns a dictionary:
@@ -369,26 +370,13 @@ def operators_in_touched_(tzones, zonelegs, oplegs, border_zones=None):
         # modulo:  only put in one operator value per leg
         ops_in_touched[tzone] = \
         tuple(j for i, j in enumerate(ops) if i % 2 == 0)
-    if not border_zones:
-        return ops_in_touched
 
-    return {k:v if k not in border_zones else (v[0],)
-            for k, v in ops_in_touched.items()}
+    return ops_in_touched
 
+@lru_cache(2**16)
+def aggregated_zone_operators(v):
 
-def aggregated_zone_operators(vals):
-    """
-
-    perform the aggregation
-
-    parameter
-    ---------
-    vals:
-        a list or tuple of tuples of the form:
-            ((n_zones[0], op_id[0]), (n_zones[1], op_id[1]),....(n_zones[n], op_id[n]))
-    """
-
-    vals = list(vals.values())
+    vals = list(v)
 
     out_list = []
     for x in vals:
@@ -397,160 +385,156 @@ def aggregated_zone_operators(vals):
             continue
         for y in x:
             out_list.append(y)
-
+    out_list = [(x[0], OP_MAP[x[1]]) for x in out_list]
+    # if any(isinstance(x[1], tuple) for x in out_list):
+    #     out_list = [x if isinstance(x[1], int) else (x[0], x[1][0]) for x in out_list]
+    
     out_list = sorted(out_list, key=lambda x: x[1])
 
     return tuple(((sum(x[0] for x in grp), key)) for
                  key, grp in groupby(out_list, key=lambda x: x[1]))
 
-def needs_assignment_check(oplegs):
-    """
-    return boolean
-    True if there needs to be an operator check
-    False otherwise
-    """
-    return any(len(set(leg)) > 1 for leg in oplegs)
-
-def removeCoTr(val, CoTr):
-    """
-    remove the checkout - checkin again (CoTr) legs
-    """
-    # (2, 4) corresponds to (Co, Tr) currently
-    if CoTr not in val['usage_legs']:
-        return val
-    CoTr_idxs = []
-    for i, j in enumerate(val['usage_legs']):
-        if j == CoTr:
-            CoTr_idxs.append(i)
+class ZoneSharer(ZoneProperties):
     
-    new_val = val.copy()
-    for x in ('stop_legs', 'op_legs', 'zone_legs', 'border_legs'):
-        try:
-            new_val[x] = tuple(
-                j for i, j in enumerate(new_val[x]) if i not in CoTr_idxs
+    SHARE_CACHE = {}
+    
+    def __init__(
+            self, 
+            graph, 
+            zone_sequence: Tuple[int, ...],  
+            stop_sequence: Tuple[int, ...],              
+            operator_sequence: Tuple[int, ...], 
+            usage_sequence: Tuple[int, ...]
+            ) -> None:
+        super().__init__(graph, zone_sequence, stop_sequence)
+        
+        self.zone_sequence = zone_sequence
+        self.stop_sequence = stop_sequence
+        self.operator_sequence = operator_sequence
+        self.usage_sequence = usage_sequence        
+        self.operator_legs = to_legs(self.operator_sequence)
+        self.usage_legs = to_legs(self.usage_sequence)
+        
+        self.single = self._is_single()
+
+    
+    def _is_single(self) -> bool:
+        
+        return len(set(chain(*self.operator_legs))) == 1
+    
+    def _remove_cotr(self) -> None:
+        
+        if CO_TR not in self.usage_legs:
+            return 
+        CoTr_idxs = ()
+        for i, j in enumerate(self.usage_legs):
+            if j == CO_TR:
+                CoTr_idxs += (i,)
+        
+        self.stop_legs = _remove_idxs(CoTr_idxs, self.stop_legs)
+        self.operator_legs = _remove_idxs(CoTr_idxs, self.operator_legs)
+        self.zone_legs = _remove_idxs(CoTr_idxs, self.zone_legs)
+        self.usage_legs = _remove_idxs(CoTr_idxs, self.usage_legs)
+
+    def _station_operators(self):
+        
+        oplegs = tuple(
+            OPGETTER.station_pair(*x, format='operator_id') 
+            for x in self.stop_legs
                 )
-        except (KeyError, ValueError, TypeError):
-            pass
-    return new_val
-
-
-def contains_border(stoplegs, border_stations):
-    """
-    parameters
-    ----------
-    stoplegs:
-        tuple of legified stop id legs
-    border_stations:
-        dict of border stations
-    returns boolean
-    True if
-    """
-
-    return any(x in border_stations for x in chain(*stoplegs))
-
-def _no_borders(val):
-
-    val['nlegs_in_touched'] = {
-        tzone: len([x for x in val['zone_legs'] if tzone in x])
-        for tzone in val['touched_zones']
-        }
-    val['ops_in_touched'] = operators_in_touched_(
-        val['touched_zones'], val['zone_legs'], val['new_op_legs']
-        )
-    val['imputed_zone_legs'] = \
-    impute_zone_legs(val['zone_legs'], val['visited_zones'])
-
-    return val
-
-
-def _with_borders(val, border_stations):
-
-    val['imputed_zone_legs'] = \
-    impute_zone_legs(val['zone_legs'], val['visited_zones'])
-
-    nlegs_in_touched = {}
-
-    bstations = set(border_stations)
-    bleg_stops = set(chain(*[j for i, j in enumerate(val['stop_legs'])
-                     if i in val['border_legs']]))
-    try:
-        border_station_zones = \
-        border_stations[list(bstations.intersection(bleg_stops))[0]]
-    except IndexError:
-        border_station_zones = []
-
-    for tzone in val['touched_zones']:
-        tzone_count = 0
-        for i, j in enumerate(val['zone_legs']):
-            if tzone in j:
-                if i not in val['border_legs'] or \
-                tzone not in border_station_zones:
-                    tzone_count += 1
-                elif i in val['border_legs']:
-                    imputed = val['imputed_zone_legs'][i]
-                    if all(x in imputed for x in border_station_zones):
-                        tzone_count += 1
-
-        nlegs_in_touched[tzone] = tzone_count
-    val['nlegs_in_touched'] = nlegs_in_touched
-
-    val['ops_in_touched'] = operators_in_touched_(
-        val['touched_zones'], val['zone_legs'], val['new_op_legs'],
-        border_zones=border_station_zones)
-
-    return val
-
-def legops(new_legs):
-    """
-    just legify the output from determin_operator
-    """
-
-    out = []
-    for x in new_legs:
-        if len(x) == 1:
-            out.append((x[0], x[0]))
-        else:
-            out.append((x[0], x[1]))
-    return tuple(out)
-
-
-
-def procprop(properties, border_stations):
-    """
-    process_properties frim multisharing
-    """
-    rev_model_dict = {v:k for k, v in mappers['model_dict'].items()}
-    co_tr_tuple = (rev_model_dict['Co'], rev_model_dict['Tr'])
-    # missed_check_point = []
-    # output = []
-    # op_erros = []
-    # other_errors = []
-    for val in properties:
+            
+        return oplegs
+    
+    def _share_single(self, val):
+        shares = (
+            self.property_dict()['total_travelled_zones'], 
+            OP_MAP[self.operator_sequence[0]]
+            )
+        self.SHARE_CACHE[val] = shares
+        return shares
+    
+    def share_calculation(self, val):
+        """
+        calculate the shares for
+        """
+      
+        out = {}
+        zone_counts = Counter(val['visited_zones'])
+    
+        for i, imputed_leg in enumerate(val['imputed_zone_legs']):
+            for zone in imputed_leg:
+                if zone in val['nlegs_in_touched']:
+                    if val['nlegs_in_touched'][zone] == 1:
+                        out[zone] = 1, self.operator_legs[i][0]
+                    else:
+                        counts = Counter(val['ops_in_touched'][zone])
+                        
+                        try:
+                            out[zone] = tuple((v/val['nlegs_in_touched'][zone], k) for
+                                              k, v in counts.items())
+                        except ZeroDivisionError:
+                            out[zone] = 1, self.operator_legs[i][0]
+                else:
+                    out[zone] = 1, self.operator_legs[i][0]
+        
+        return aggregated_zone_operators(tuple(out.values()))
+        
+    def share(self):
+        
+        val = tuple(
+            (self.stop_sequence, self.operator_sequence, self.usage_sequence)
+            )
         try:
-            val = removeCoTr(val, co_tr_tuple)
-            bordercheck = contains_border(val['stop_legs'], border_stations)
+            return self.SHARE_CACHE[val] 
+        except KeyError:
+            pass
+        
+        if self.single:
+            return self._share_single(val)
+
+        
+        self._remove_cotr()
+        
+        if not all(len(set(x))== 1 for x in self.operator_legs):
             try:
-                new_legs = tuple(
-                    OPGETTER.station_pair(*x, format='operator') for x in val['stop_legs']
-                    )
-                if not all(x for x in new_legs):
-                    # missed_check_point.append(val)
-                    continue
-                val['new_op_legs'] = legops(new_legs)
-            except (KeyError, ValueError):
-                # op_erros.add(val['tripkey'])
-                continue
- 
-            if bordercheck:
-                val = _with_borders(val, border_stations)
-            else:
-                val = _no_borders(val)
-            yield val
-
-        except Exception:
-            # other_errors.append(val)
-            continue
-
+                new_op_legs = self._station_operators()
+            except (TypeError, KeyError):
+                self.SHARE_CACHE[val] = 'station_map_error'
+                return 'station_map_error'
+            try:
+                self.operator_legs = legops(new_op_legs)
+            except IndexError:
+                self.SHARE_CACHE[val] = 'operator_error'
+                return 'operator_error'
+                
+        
+        if not all(x for x in self.operator_legs):
+            self.SHARE_CACHE[val] = 'operator_error'
+            return 'operator_error'
+                
+        self.operator_sequence = tuple(
+            [x[0] for x in self.operator_legs] + [self.operator_legs[-1][1]]
+            )
+        self.single = self._is_single()
+        if self.single:
+            return self._share_single(val)
+        
+        property_dict = self.property_dict()        
+        property_dict['nlegs_in_touched'] = {
+            tzone: len([x for x in property_dict['zone_legs'] if tzone in x])
+            for tzone in property_dict['touched_zones']
+            }
+        property_dict['ops_in_touched'] = operators_in_touched_(
+            property_dict['touched_zones'],
+            property_dict['zone_legs'], 
+            self.operator_legs
+            )
+        property_dict['imputed_zone_legs'] = \
+        impute_zone_legs(self.graph, property_dict['zone_legs'])
+        
+        shares = self.share_calculation(property_dict)
+        self.SHARE_CACHE[val] = shares
+        return shares 
 
 def shrink_search(graph, start, goal, ringzones, distance_buffer=2):
     """
