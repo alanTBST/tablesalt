@@ -28,7 +28,7 @@ from tablesalt.common.io import mappers
 M_RANGE = set(range(8603301, 8603400))
 S_RANGE = set(range(8690000, 8699999))
 
-MIN_RAIL_UIC = 8600000
+MIN_RAIL_UIC = 7400000
 MAX_RAIL_UIC = 9999999
 
 
@@ -74,7 +74,6 @@ def _load_operator_settings(
     operators = tuple(set(config_dict[x] for x in chosen_lines))
 
     return {
-        'bus_ids': operator_ids[config_dict['bus']], 
         'operator_ids': operator_ids, 
         'operators': operators,
         'config': config_dict
@@ -135,6 +134,8 @@ class StationOperators():
 
     """
     BUS_ID_MAP = load_bus_station_connectors()
+    
+    ID_CACHE = {}
 
     def __init__(self, *lines: str) -> None:
 
@@ -265,12 +266,13 @@ class StationOperators():
 
     def _get_operator_id(self, uic_number: int) -> Tuple[int, ...]:
         try:
+            # 1 is movia_H
             return tuple(
-                self._settings['operator_ids'][x] for x in self._lookup[uic_number]
+                self._settings['operator_ids'].get(x, 1) for x in self._lookup[uic_number]
                 )
         except KeyError:
             if uic_number > MAX_RAIL_UIC or uic_number < MIN_RAIL_UIC:
-                return tuple((self._settings['operator_ids'][self._settings['config']['bus']][0], )) # 0 index gives 1 for movia_H..all sjælland
+                return tuple((1, )) # 0 index gives 1 for movia_H..all sjælland
         raise KeyError("uic number not found")
 
 
@@ -313,9 +315,6 @@ class StationOperators():
         >>> cph_stog_operators
         >>> ('s-tog', 'first', 'dsb', 'metro')
 
-        Notice that the first element of the tuple is s-tog.
-        The first element of the return term is always the dominant
-        operator
 
         """
         if format not in {'operator', 'operator_id', 'line'}:
@@ -420,6 +419,12 @@ class StationOperators():
         --------
 
         """
+        
+        try:
+            return self.ID_CACHE[(start_uic, end_uic)]
+        except KeyError:
+            pass
+        
         start_bus = start_uic > MAX_RAIL_UIC or start_uic < MIN_RAIL_UIC
         end_bus = end_uic > MAX_RAIL_UIC or end_uic < MIN_RAIL_UIC
 
@@ -442,6 +447,9 @@ class StationOperators():
             'operator': self._pair_operator(start_uic, start_ops, end_ops),
             'line': self._pair_line(start_uic, start_ops, end_ops)
             }
-        return fdict[format]
+        returnval = fdict[format]
+        if format == 'operator_id':
+            self.ID_CACHE[(start_uic, end_uic)] = returnval
+        return returnval
         
 
