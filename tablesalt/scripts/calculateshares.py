@@ -6,8 +6,10 @@ Created on Thu Dec  5 09:51:04 2019
 """
 #standard imports
 
-
+import os
 from itertools import groupby, chain
+from functools import partial
+from multiprocessing import Pool
 from operator import itemgetter
 
 #third party imports
@@ -21,15 +23,12 @@ from tablesalt.common.io import mappers
 from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.common import triptools, make_store
-from tablesalt.revenue import multisharing
 from tablesalt.topology.tools import TakstZones
-from tablesalt.topology import (
-    ZoneGraph,
-    ZoneProperties,
-    BORDER_STATIONS
-    )
+from tablesalt.topology import ZoneGraph, ZoneSharer
 
 
+
+# NOTE: SAVE BORDER TRIP STARTZONES
 def proc_contractors(contrpack):
     """return the contractors dict as an array"""
     arr_length = len(tuple(chain(*contrpack.values())))
@@ -108,7 +107,9 @@ def _load_store_data(store, region, zonemap, region_contractors):
     stops = reader.get_data('stops')
 
     stops = stops[np.lexsort((stops[:, 1], stops[:, 0]))]
+    
 
+    
     usage_dict = {
         key: tuple(x[3] for x in grp) for key, grp in
         groupby(stops, key=itemgetter(0))
@@ -124,21 +125,11 @@ def _load_store_data(store, region, zonemap, region_contractors):
     zone_dict = {
         k: tuple(zonemap.get(x) for x in v) for
         k, v in stop_dict.items()
+        }    
+    zone_dict = {
+        k:v for k, v in zone_dict.items() if 
+        all(x for x in v) and all(1000 < y < 1300 for y in v)
         }
-
-    filter_funcs = {
-        'hovedstaden': lambda v: all(1000 < x < 1100 for x in v if x),
-        'national': lambda v: all(x for x in v if x),
-        'sjælland': lambda v: all(1000 < x < 1300 for x in v if x),
-        'vestsjælland': lambda v: (_ for _ in v).throw(NotImplementedError('vestsjælland')),
-        'fyn': lambda v: (_ for _ in v).throw(NotImplementedError('fyn')),
-        'lolland': lambda v: (_ for _ in v).throw(NotImplementedError('lolland')),
-        'nordjylland': lambda v: (_ for _ in v).throw(NotImplementedError('nordjylland')),
-        'midtjylland': lambda v: (_ for _ in v).throw(NotImplementedError('midtjylland')),
-        'sydjylland': lambda v: (_ for _ in v).throw(NotImplementedError('sydjylland'))
-        }
-
-    zone_dict = {k:v for k, v in zone_dict.items() if filter_funcs[region](v)}
     
     op_dict = _load_contractor_pack(store, region, region_contractors)
     op_dict = {k:v for k, v in op_dict.items() if k in zone_dict}
@@ -149,33 +140,35 @@ def _load_store_data(store, region, zonemap, region_contractors):
     
     return stop_dict, zone_dict, usage_dict, op_dict
 
-def chunk_shares(graph, store, region, zonemap, region_contractors):
 
-    """
-    Calculate the operator shares for trips in the
-    rejsekort datastore
+def _get_input(stop_dict, zone_dict, usage_dict, op_dict):
+    
+    for k, zone_sequence in zone_dict.items():
+        yield k, zone_sequence, stop_dict[k], op_dict[k], usage_dict[k]
 
-    parameters
-    ----------
-    rkstore:
-        the path the the rejsekort h5 store
+def chunk_shares(store, graph, region, zonemap, region_contractors):
 
-    :
-        the path to the corresponding msgpack file
-    """
-
-    stop_dict, zone_dict, usage_dict, op_dict = _load_store_data(
+    stopsd, zonesd, usaged, operatorsd = _load_store_data(
         store, region, zonemap, region_contractors
         )
+    
+    gen = _get_input(stopsd, zonesd, usaged, operatorsd)
+    
+    shares = {}
+    for k, stops, zones, usage, operators in gen:    
 
-    singleops = _single_operator_assignment(
-        graph, op_dict, zone_dict, stop_dict
-        )
-    multiops = _multi_operator_assignment(
-        graph, op_dict, zone_dict, stop_dict, usage_dict
-        )
-
-    return {**singleops, **multiops}
+        sharer = ZoneSharer(graph, stops, zones, usage, operators)
+        shares[k] = sharer.share()
+    
+    fixed = {}
+    for k, v in shares.items():
+        if isinstance(v[0], int):
+            fixed[k] = v[0], v[1].lower().split('_')[0]
+        elif isinstance(v[0], tuple):
+            fixed[k] = tuple((x[0], x[1].lower().split('_')[0]) for x in v)
+        else:
+            fixed[k] = v
+    return fixed
 
 def main():
     """
@@ -187,11 +180,10 @@ def main():
     args = parser.parse()
     
     year = args['year']
-    
+
     store_loc = find_datastores(r'H://')
     paths = db_paths(store_loc, year)
     RK_STORES = paths['store_paths']
-    store = RK_STORES[87]
     DB_PATH = paths['calculated_stores']
     
     zones = TakstZones()
@@ -204,21 +196,21 @@ def main():
     
     region = 'sjælland'
     graph = ZoneGraph(region=region)
-    # rail_graph = ZoneGraph(region=region, mode='rail')
-    # bus_graph = ZoneGraph(region=region, mode='bus')
 
-    for x in tqdm(RK_STORES, total=len(RK_STORES)):
-        r = chunk_shares(graph, x, region, zonemap, region_contractors)
-        make_store(r, DB_PATH)
+    pfunc = partial(chunk_shares, 
+                    graph=graph, 
+                    region=region, 
+                    zonemap=zonemap, 
+                    region_contractors=region_contractors)
+    
+    with Pool(os.cpu_count() - 2) as pool:
+        results = pool.imap(pfunc, RK_STORES)
+        for r in tqdm(results, total=len(RK_STORES)):       
+            make_store(r, DB_PATH)
 
+if __name__ == "__main__":
 
-    return r
-
-
-
-# if __name__ == "__main__":
-
-#     INHIBITOR = WindowsInhibitor()
-#     INHIBITOR.inhibit()
-#     main()
-#     INHIBITOR.uninhibit()
+    INHIBITOR = WindowsInhibitor()
+    INHIBITOR.inhibit()
+    main()
+    INHIBITOR.uninhibit()
