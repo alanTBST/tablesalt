@@ -103,11 +103,7 @@ def proc_collection(
     collection['metro_map_rev'] = {
         v: k for k, v in collection['metro_map'].items()
         }
-    collection['operator_id']['Movia'] = (
-        collection['operator_id']['Movia_H'], 
-        collection['operator_id']['Movia_S'],
-        collection['operator_id']['Movia_V']
-    ) 
+
     return collection
 
 
