@@ -8,11 +8,13 @@ import ast
 import glob
 import os
 import pickle
+import pkg_resources
 from itertools import chain
 from operator import itemgetter
 from typing import AnyStr, Dict, Tuple, Optional, List
 from pathlib import Path
 
+import msgpack
 import numpy as np
 import pandas as pd
 
@@ -187,12 +189,6 @@ def _join_note(notelist: List[str]) -> str:
          )
         )
 
-def _drbyen_location():
-    
-    
-    return 
-
-
 def _resolve_tickets(record):
     
     startzone = record.startzone 
@@ -331,7 +327,6 @@ def _result_frame(rdict, frame):
     main_cols = list(frame.columns)
     new = [x for x in test_out if x not in main_cols]
     ops = [x for x in new if x not in ('note', 'n_trips')]
-    
     out_cols = main_cols + sorted(ops) + ['n_trips', 'note']
     test_out = test_out[out_cols]
     
@@ -413,312 +408,214 @@ def _single_tickets(sales_idxs,
     return out.sort_values('NR')
 
 
-def main():
-    
-    parser = TableArgParser('year')
-    args = parser.parse()
-    year = args['year']
-    
-    year = 2019
-       
-    data = _load_sales_data(year)
-    sales_idxs = _sales_ref(data)
-    location_idxs = _location_ref(data)
-    location_sales = _get_location_sales(location_idxs, sales_idxs)
-    
-    single_results = _get_single_results(year)
-    from collections import Counter
-    for i in [2, 5, 10, 20, 50]:
-        single_output = _single_tickets(
-            sales_idxs, location_sales, data, single_results, i
-            )
-           
-        single_output.to_csv(f"H:/single_ticket_mintrips{i}.csv", index=False)
-            
-        n = len(single_output)
-        counts = Counter(single_output.note.str.count('->'))
-        ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])    
-        counts = {ordinal(k+1) + ' try': (v / n) * 100 for k, v in counts.items()}
-        stats = pd.DataFrame.from_dict(counts, orient='index')
-        stats = stats.reset_index()
-        stats.columns = ['attempts', 'percentage']
-        stats.to_csv(f"H:/single_ticket_mintrips{i}_stats.csv", index=False)
-    
-    
-   
-    return 
-
-
-
-
-
-# =============================================================================
-# Loading functions
-# =============================================================================
-# def _check_names(frame):
-
-#     frame.rename(columns={
-#         'start_zone': 'startzone',
-#         'StartZone': 'startzone',
-#         'DestinationZone': 'slutzone',
-#         'n_zones': 'betaltezoner',
-#         'PaidZones': 'betaltezoner',
-#         'end_zone': 'slutzone',
-#         'S-tog': 'stog',
-#         'DSB': 'dsb',
-#         'Movia_H': 'movia',
-#         'Metro': 'metro',
-#         'First': 'first'
-#         }, inplace=True)
-#     return frame
-
-# def _stringify_merge_cols(frame):
-
-#     string_cols = ['betaltezoner', 'slutzone', 'startzone']
-#     for col in string_cols:
-#         try:
-#             frame.loc[:, col] = \
-#                 frame.loc[:, col].astype(str)
-#         except KeyError:
-#             pass
-
-#     return frame
-
-
 # =============================================================================
 # Pendler tickets
 # =============================================================================
 
-def _load_kombi_shares() -> pd.core.frame.DataFrame:
+def _load_kombi_shares(year: int) -> dict:
 
-    filename = r'__result_cache__/2019/pendler/pendlerkeys2019.csv'
 
-    df = pd.read_csv(filename, index_col=0)
-    df.index.name = 'valgtezoner'
-    df = df.reset_index()
+    fp = os.path.join(
+        THIS_DIR, 
+        '__result_cache__', f'{year}', 
+        'pendler', 'pendlerchosenzones.csv'
+        )
+
+    df = pd.read_csv(fp, index_col=0)
     df.rename(columns={'S-tog': 'stog'}, inplace=True)
-
-    return df
-
-def _load_kombi_map_shares() -> pd.core.frame.DataFrame:
-
-    filename = r'__result_cache__/2019/pendler/zone_relation_keys2019.csv'
-    df = pd.read_csv(filename)
-    df = _check_names(df)
-    df.loc[:, 'betaltezoner'] = df.loc[:, 'betaltezoner'].fillna(0)
-    df.loc[:, 'betaltezoner'] = df.loc[:, 'betaltezoner'].astype(int)
-
-    df = df.drop(['ValidityZones', 'ValidZones'], axis=1)
-
-    df = _stringify_merge_cols(df)
-
-    return df
-
-
-def _load_nzone_shares(takst: str, year: int):
     
-    takst_map = {'dsb': 'dsb', 'th': 'hovedstad', 'ts': 'sydsjælland', 'tv': 'vestsjælland'}
-    takst = takst_map[takst]
+    d = df.to_dict(orient='index')
+
+    return {ast.literal_eval(k): v for k, v in d.items()}
+
+
+def _unpack_valid_zones(zonelist):
+
+    return tuple(x['ZoneID'] for x in zonelist)
+
+def _proc_zone_relations(zone_rels: dict):
+
+    wanted_keys = ('StartZone',
+                   'DestinationZone',
+                   'PaidZones',
+                   'ValidityZones',
+                   'Zones')
+
+    zone_rels = {k: {k1: v1 for k1, v1 in v.items() if k1 in wanted_keys}
+                 for k, v in zone_rels.items()}
+    zone_rels = list(zone_rels.values())
+
+    for x in zone_rels:
+        x['ValidZones'] = _unpack_valid_zones(x['Zones'])
+
+    return zone_rels
+
+def _load_zone_relations():
+    """
+    Returns
+    -------
+    zonerelations : TYPE
+        DESCRIPTION.
+
+    """
+    
+    fp = pkg_resources.resource_filename(
+        'tablesalt', 
+        '/resources/revenue/zone_relations.msgpack'
+        )
+        
+    with open(fp, 'rb') as f:
+        zone_relations = msgpack.load(f, strict_map_key=False)
+
+
+    return _proc_zone_relations(zone_relations)
+
+def _load_kombi_map_shares(year: int) -> pd.core.frame.DataFrame:
+
+    fp = os.path.join(
+        THIS_DIR, '__result_cache__', 
+        f'{year}', 'pendler', 
+        'zonerelations.csv'
+        )
+    df = pd.read_csv(
+        fp, 
+        dtype={'PaidZones': int}, 
+        usecols = ['StartZone', 'DestinationZone', 'PaidZones', 
+                   'movia', 'stog', 'first', 'metro', 'dsb', 
+                   'n_users', 'n_period_cards', 'n_trips']
+        )
+    df = df.set_index(['StartZone', 'DestinationZone', 'PaidZones'])
+    d = df.to_dict(orient='index')
+
+    return d
+
+def _load_nzone_shares(year: int):
+    
+    takst_map = {
+        'dsb': 'dsb', 
+        'th': 'hovedstad', 
+        'ts': 'sydsjælland', 
+        'tv': 'vestsjælland'
+        }
     
     filedir = os.path.join(THIS_DIR, '__result_cache__', f'{year}', 'pendler')
     files = glob.glob(os.path.join(filedir, '*.csv'))
-    kombi = [x for x in files if 'kombi_paid' in x]
-    region = [x for x in kombi if takst in x][0]
+    kombi = [x for x in files if 'kombi_paid_zones' in x]
 
-    df = pd.read_csv(region, index_col=0)
-    df.index.name = 'betaltezoner'
-    df = df.reset_index()
-    df = _check_names(df)
-    df = _stringify_merge_cols(df)
-    return df
-
-def _chosen_fallback(nullframe, takst, year):
-
-    nzones = _load_nzone_shares(takst, year)
-
-    nullframe = nullframe.drop([
-        'movia', 'stog', 'metro',
-        'dsb', 'first', 'n_users',
-        'n_period_cards', 'n_trips'], axis=1
-        )
-
-    nzone_output = pd.merge(
-        nullframe, nzones,
-        on=['betaltezoner'],
-        how='left'
-        )
-    nzone_output.loc[nzone_output.loc[:, 'valgtezoner'].apply(
-        lambda x: '1002' in x and '1001' not in x), 'Note'] = \
-        nzone_output.loc[nzone_output.loc[:, 'valgtezoner'].apply(
-            lambda x: '1002' in x and '1001' not in x), 'Note'].apply(
-                lambda x: x + r'/kombi_not_allowed')
-
-    nzone_output = _extend_note(
-        nzone_output, 'kombi_nzones',
-        'kombi_nzones/no_trips')
-
-    return nzone_output
-
-
-def _mappable_fallback():
-
-    return
-
-def _sub_kombi(sub_frame, takst, year):
-
-    cols = ['movia', 'stog', 'metro',
-            'dsb', 'first', 'n_users',
-            'n_period_cards', 'n_trips']
-
-    if any(x in sub_frame.columns for x in cols):
-        sub_frame = sub_frame.drop(cols, axis=1)
-
-    chosen_frame = sub_frame.loc[sub_frame.loc[:, 'valgtezoner'] != '()']
-    kombi_results = _load_kombi_shares()
-    chosen_merge = pd.merge(
-        chosen_frame, kombi_results,
-        on='valgtezoner',
-        how='left'
-        )
-
-    chosen_merge = _extend_note(chosen_merge, 'kombi_match', 'no_kombi_match')
-    missed = chosen_merge[chosen_merge.n_trips.isnull() |
-                          (chosen_merge.n_trips == 0)]
-    if not missed.empty:
-        chosenfall =  _chosen_fallback(missed, takst, year)
-        chosen_merge = pd.concat(
-            [chosen_merge[chosen_merge.n_trips.notnull()], chosenfall]
-            )
-
-    return chosen_merge
-
-def _kombi_mappable_pendler(sale_id, frame, takst, year):
-
-    sub_frame = frame.query("NR in @sale_id")
-    sub_frame = sub_frame.query("takstsæt == @takst")
-    # sub_frame = sub_frame.query("betaltezoner < 90") # ensure not all zones
-    sub_frame = _stringify_merge_cols(sub_frame)
-
-    chosen_frame = sub_frame.loc[sub_frame.loc[:, 'valgtezoner'] != '()']
-    kombi_results = _load_kombi_shares()
-    chosen_merge = pd.merge(
-        chosen_frame, kombi_results,
-        on='valgtezoner',
-        how='left'
-        )
-
-    chosen_merge = _add_note(chosen_merge, 'kombi_match', 'no_kombi_match')
-    missed = chosen_merge[chosen_merge.n_trips.isnull() |
-                          (chosen_merge.n_trips == 0)]
-
-    try:
-        if not missed.empty:
-            chosenfall =  _chosen_fallback(missed, takst, year)
-            chosen_merge = pd.concat(
-                [chosen_merge[chosen_merge.n_trips.notnull()], chosenfall]
-                )
-    except FileNotFoundError:
-        pass
-
-    mappable_frame = sub_frame.loc[sub_frame.loc[:, 'valgtezoner'] == '()']
-    mappable_frame = mappable_frame.loc[
-        mappable_frame.loc[:, 'startzone'].apply(lambda x: str(x)[1:]) != '000'
-        ]
-
-    mappable_frame = _stringify_merge_cols(mappable_frame)
-
-    zone_rel = _load_kombi_map_shares()
-    mappable_merge = pd.merge(
-        mappable_frame, zone_rel,
-        on=['startzone', 'slutzone', 'betaltezoner'],
-        how='left'
-        )
-
-    mappable_merge = _add_note(
-        mappable_merge,
-        'zone_relation_match',
-        'no_zone_relation_match'
-        )
-    missed = mappable_merge[(mappable_merge.n_trips.isnull()) |
-                            (mappable_merge.n_trips == 0)]
-
-    try:
-        if not missed.empty:
-            missed.loc[:, 'valgtezoner'] = missed.loc[
-                :, ('startzone', 'slutzone')
-                ].astype(int).apply(tuple, axis=1)
-            missed.loc[:, 'valgtezoner'] = missed.loc[:, 'valgtezoner'].apply(
-                lambda x: str(tuple(sorted(x)))
-                )
-            recursive_fallback = _sub_kombi(missed, takst, year)
-            mappable_merge = pd.concat(
-                [mappable_merge[
-                    mappable_merge.n_trips.notnull()], recursive_fallback
-                    ]
-                )
-    except FileNotFoundError:
-        pass
-
-    out = pd.concat([chosen_merge, mappable_merge])
-    out = out.sort_values(['NR', 'n_trips'])
-    out = out.drop_duplicates('NR', keep='last')
+    out = {}
+    for file in kombi:
+        
+        df = pd.read_csv(file, index_col=0)
+        d = df.to_dict(orient='index')
+        for k, v in takst_map.items():
+            if v in file:
+                out[k] = d
+                break
+               
     return out
 
 
+def _kombimatch(valgt, kombi_results):
+    
+    return kombi_results.get(valgt, {})
+    
+  
+def _kombi_paid():
+    
+    return 
 
-def _nzone_pendler(
-        sale_id: Dict,
-        frame: pd.core.frame.DataFrame,
-        takst: str,
-        year: int
+
+def _join_note_p(notelist: List[str]) -> str:
+    
+    return ''.join(
+        (''.join(j) + r'->' if i!=len(notelist)-1 else ''.join(j) 
+         for i, j in enumerate(notelist)
+         )
+        )
+
+
+def _match_pendler_record(
+        record, kombi_results, 
+        zone_relation_results, 
+        paid_zones_results, 
+        min_trips
+        ):
+    
+    valgt = ast.literal_eval(record.valgtezoner)
+    takst = record.takstsæt
+    try:
+        start = int(record.startzone)
+    except ValueError:
+        if '/' in record.startzone:
+            start = int(record.startzone.split('/')[1])
+        else:
+            raise ValueError("Can't determine startzone")
+    
+    end = int(record.slutzone)
+    paid = int(record.betaltezoner)
+      
+    note = []
+    if valgt:  
+        if 1002 in valgt and 1001 not in valgt:
+            note.append('INVALID_KOMBI')
+        mro = ['kombimatch', f'kombi_paid_zones_{takst}']       
+        for method in mro:           
+            note.append(method)
+            r = kombi_results.get(valgt, {})
+            if r and r['n_trips'] >= min_trips:
+                break
+            else:
+                r = paid_zones_results[takst].get(paid, {})
+            
+    else:
+        mro = ['zonerelation_match', f'kombi_paid_zones_{takst}']
+        for method in mro:
+            note.append(method)            
+            r = zone_relation_results.get((start, end, paid), {})
+            if r and r['n_trips'] >= min_trips:
+                break
+            else:
+                r = paid_zones_results[takst].get(paid, {})
+
+   
+    if r['n_trips'] < min_trips:
+        note.append(f'kombi_paid_all_zones_{takst}')
+        r = paid_zones_results[takst].get(99, {})
+    
+    out = r.copy()
+    out['note'] = _join_note_p(note)    
+    return out
+   
+def _get_zone_relation_results(kombi_results):
+    zone_relations = _load_zone_relations()
+
+    test = {}
+    for x in zone_relations:
+        try:
+            rel = (x['StartZone'], x['DestinationZone'], x['PaidZones'])
+            validzones = x['ValidZones']
+        except Exception as e:
+            continue       
+        test[rel] = validzones
+    
+    zone_relation_results = {}   
+    for k, v in test.items():
+        try:
+            zone_relation_results[k] = kombi_results[v]
+        except KeyError:
+            pass
+    return zone_relation_results 
+    
+    
+def _pendler_tickets(
+        sales_idxs: Dict,
+        data: pd.core.frame.DataFrame,
+        year: int, 
+        min_trips: int
         ) -> pd.core.frame.DataFrame:
 
-    sub_frame = frame.query("NR in @sale_id")
-    sub_frame = sub_frame.query("takstsæt == @takst")
-    sub_frame = sub_frame.loc[
-        (sub_frame.loc[:, 'startzone'].apply(lambda x: str(x)[1:]) == '000') |
-        (sub_frame.loc[:, 'slutzone'].apply(lambda x: str(x)[1:]) == '000')
-        ]
-    sub_frame = _stringify_merge_cols(sub_frame)
-
-    nzone_shares = _load_nzone_shares(takst, year)
-
-    nzone_output = pd.merge(
-        sub_frame, nzone_shares,
-        on=['betaltezoner'],
-        how='left'
-        )
-
-    return nzone_output
-
-def _process_pendler(
-        sales_idxs: Dict,
-        frame: pd.core.frame.DataFrame,
-        takst: str,
-        year:int) -> pd.core.frame.DataFrame:
-
-    # TODO make these a user input option
-
-    kombi_pendler_ids = \
-        sales_idxs.get('pendlerkort', ())  + \
-            sales_idxs.get('pensionistkort', ())  + \
-                sales_idxs.get('ungdomskort vu', ())  + \
-                    sales_idxs.get('ungdomskort uu', ()) + \
-                        sales_idxs.get('flexcard', ())
-    kombi_pendler = _kombi_mappable_pendler(
-        kombi_pendler_ids, frame, takst, year
-        )
-    kombi_ids = set(kombi_pendler.loc[:, 'NR'])
-
-    # TODO make these a user input option
-
-
-    # default_options = {
-    # 'pendlerkort', 'erhvervskort', 'virksomhedskort', 'pensionistkort',
-    # 'ungdomskort xu','flexcard 7 dage', 'ungdomskort vu',
-    # 'flexcard', 'ungdomskort uu',}
-
-    general_pendler_ids = \
+    
+    pendler_ids = \
         sales_idxs.get('pendlerkort', ()) + \
             sales_idxs.get('erhvervskort', ())  + \
                 sales_idxs.get('virksomhedskort', ())  + \
@@ -727,188 +624,188 @@ def _process_pendler(
                             sales_idxs.get('flexcard 7 dage', ()) + \
                                 sales_idxs.get('flexcard', ()) + \
                                     sales_idxs.get('ungdomskort vu', ())  + \
-                                    sales_idxs.get('ungdomskort uu', ())
+                                        sales_idxs.get('ungdomskort uu', ())
+
+    sub_data = data.query("NR in @pendler_ids")
+    sub_tuples = list(sub_data.itertuples(index=False, name='Sale'))
+    kombi_results = _load_kombi_shares(year)    
+    zone_relation_results = _get_zone_relation_results(kombi_results)
+    paid_zones_results = _load_nzone_shares(year)
+       
+    bad = set()
+    out = {}
+    for record in sub_tuples:
+        try:
+            out[record.NR] = _match_pendler_record(
+                record, kombi_results, 
+                zone_relation_results, 
+                paid_zones_results, 
+                min_trips
+                )                
+        except:
+            bad.add(record.NR)
+    # merge into _result_frame func
+    out_frame = pd.DataFrame.from_dict(out).T
+    out_frame.index.name = 'NR'
+    out_frame = out_frame.reset_index()
+    
+    test_out = pd.merge(sub_data, out_frame, on='NR', how='left')
+    test_out.note = test_out.note.fillna('')
+    test_out = test_out.fillna(0)
+    
+    main_cols = list(data.columns)
+    new = [x for x in test_out if x not in main_cols]
+    ops = [x for x in new if x not in ('note', 'n_trips', 'n_users', 'n_period_cards')]
+    out_cols = main_cols + sorted(ops) + ['n_trips', 'n_period_cards', 'n_users', 'note']
+    test_out = test_out[out_cols]
+    
+    return test_out
 
 
-    general_pendler_ids = tuple(
-        x for x in general_pendler_ids if x not in kombi_ids
+    
+def _load_other_results(year: int) -> Dict:
+
+    fp = os.path.join(
+        THIS_DIR, '__result_cache__', 
+        f'{year}', 'preprocessed', 
+        'subtakst.pickle'
         )
+    
+    with open(fp, 'rb') as f:
+        d = pickle.load(f)
+    return d
+    
 
-    try:
-        gen_pendler = _nzone_pendler(general_pendler_ids, frame, takst, year)
-        gen_pendler = _add_note(
-            gen_pendler,
-            'kombi_any_nzone',
-            'kombi_any_nzone/no_match'
-            )
-        return pd.concat([kombi_pendler, gen_pendler])
-    except FileNotFoundError:
-        return kombi_pendler
-
-    # fallback all kombi TH
-
-def _load_rabatzero_shares():
-
-    filename = r'__result_cache__/2019/other/citypass_shares.csv'
-    df = pd.read_csv(filename, index_col=0)
-    df.index.name = 'betaltezoner'
-    df = df.reset_index()
-
-    # TODO change this output format
-    df.loc[:, 'betaltezoner'] = df.loc[:, 'betaltezoner'].replace(
-        {'citypass_large': '99',
-         'citypass_small': '4'}
-        )
-    df = _check_names(df)
-    df = _stringify_merge_cols(df)
-
-    return df
-
-def _inner_city(sales_idxs: Dict,
-                frame: pd.core.frame.DataFrame,
-                takst: str):
-
-    # default values
-    th = {'city pass small',
-          'citypass small 24 timer',
-          'citypass small 120 timer',
-          'citypass small 48 timer',
-          'citypass small 72 timer',
-          'citypass small 96 timer',
-          'mobilklippekort'}
-
-    th_ids = set().union(*[set(sales_idxs.get(x, set())) for x in th])
-    sub_frame = frame.query("NR in @th_ids")
-    sub_frame = sub_frame.query("takstsæt == @takst")
-    sub_frame = sub_frame.loc[
-        ~((sub_frame.loc[:, 'produktnavn'] == 'mobilklippekort') &
-         (sub_frame.loc[:, 'betaltezoner'] != 4)) ]
-
-    th_shares = _load_rabatzero_shares()
-    th_shares = th_shares[th_shares.loc[:, 'betaltezoner'] != '99']
-
-    length = len(sub_frame)
-    merge_frame = pd.concat([th_shares]*length, ignore_index=True)
-    merge_frame = merge_frame.drop('betaltezoner', axis=1)
-    merge_frame['NR'] = list(sub_frame['NR'])
-    out = pd.merge(sub_frame, merge_frame, on='NR')
-    out = _add_note(out, 'all trips 01-04', 'all trips 01-04/no_trips')
-
+def _match_other_record(
+        record, other_results, 
+        small_ids, big_ids
+        ):
+    takst = record.takstsæt
+    product = record.produktnavn
+    
+    
+    note = None
+    if record.NR in small_ids:
+        r =  other_results['city']
+        note = 'all_inner_city_rabat0'
+    elif record.NR in big_ids:
+        if 'city' in product or 'copenhagen' in product:
+            r = other_results['th']
+            note = 'all_th_rabat0'
+        else:
+            r = other_results[f'{takst}']
+            note = f'all_{takst}_rabat0'
+    
+    out = r.copy()
+    out['note'] = note
     return out
 
-
-def _all_sub_takst(
+def _other_tickets(
         sales_idxs: Dict,
-        frame: pd.core.frame.DataFrame,
-        takst: str):
+        data: pd.core.frame.DataFrame,
+        year: int
+        ):
 
-    # default values
-    th = {'institutionskort, 20 børn', 'travel pass',
-          'kulturnatten', 'citypass large 120 timer',
-          'citypass large 24 timer',
-          'børnealderskompensation', 'city pass large',
-          'citypass large 96 timer',
-          'citypass large 72 timer',
-          'copenhagen card',
-          'citypass large 48 timer', 'skoleklassekort',
-          'institutionskort, 15 børn',
-          'blindekort',
-          'off peak-kompensation',
-          'mobilklippekort',
-          'turistbillet',
-          'print-selv-billet',
-          'enkeltbillet refusion'}
+    
+    results = _load_other_results(year)
+    
+    small_tickets = {
+        'city pass small',
+        'citypass small 24 timer',
+        'citypass small 120 timer',
+        'citypass small 48 timer',
+        'citypass small 72 timer',
+        'citypass small 96 timer',
+        'mobilklippekort'
+        }
 
-    th_ids = set().union(*[set(sales_idxs.get(x, set())) for x in th])
-
-    sub_frame = frame.query("NR in @th_ids")
-    sub_frame = sub_frame.loc[
-        (sub_frame.loc[:, 'takstsæt'] == takst) |
-        (sub_frame.loc[:, 'produktnavn'].str.contains('city'))
-        ]
-    sub_frame = sub_frame.loc[
-        ~((sub_frame.loc[:, 'produktnavn'] == 'mobilklippekort') &
-         (sub_frame.loc[:, 'betaltezoner'] == 4))
-        ]
-    sub_frame = sub_frame.loc[
-        ~((sub_frame.loc[:, 'produktnavn'] == 'turistbillet') &
-         (sub_frame.loc[:, 'betaltezoner'] != 99))
-        ]
-    sub_frame = sub_frame.loc[
-        ~((sub_frame.loc[:, 'produktnavn'] == 'print-selv-billet') &
-         (sub_frame.loc[:, 'betaltezoner'] != 99))
-        ]
-
-    length = len(sub_frame)
-
-    th_shares = _load_rabatzero_shares()
-    th_shares = th_shares[th_shares.loc[:, 'betaltezoner'] == '99']
-    merge_frame = pd.concat([th_shares]*length, ignore_index=True)
-    merge_frame = merge_frame.drop('betaltezoner', axis=1)
-    merge_frame['NR'] = list(sub_frame['NR'])
-    out = pd.merge(sub_frame, merge_frame, on='NR')
-    out = _add_note(
-        out, 'all rabat0trips TH',
-        'all  rabat0trips TH/no_trips'
-        )
-
-    return out
+    big_tickets = {
+        'institutionskort, 20 børn', 'travel pass',
+        'kulturnatten', 'citypass large 120 timer',
+        'citypass large 24 timer',
+        'børnealderskompensation', 'city pass large',
+        'citypass large 96 timer',
+        'citypass large 72 timer',
+        'copenhagen card',
+        'citypass large 48 timer', 'skoleklassekort',
+        'institutionskort, 15 børn',
+        'blindekort',
+        'off peak-kompensation',
+        'mobilklippekort',
+        'turistbillet',
+        'print-selv-billet',
+        'enkeltbillet refusion'
+        }
+      
+    small_ids = set().union(*[set(sales_idxs.get(x, set())) for x in small_tickets])
+    big_ids = set().union(*[set(sales_idxs.get(x, set())) for x in big_tickets])
+    
+    sub_data = data.query("NR in @small_ids or NR in @big_ids")
+    
+    records = list(sub_data.itertuples(index=False, name='Sale'))
 
 
-def _process_other(sales_idxs, frame, takst):
+    bad = set()
+    out = {}
+    for record in records:
+        try:
+            out[record.NR] = _match_other_record(
+                record, results, 
+                small_ids, 
+                big_ids, 
+                )                
+        except:
+            bad.add(record.NR)
+    
+    out_frame = _result_frame(out, sub_data)
+    
+    return out_frame
 
-    # all_zones = _all_sub_takst(sales_idxs, frame, takst)
-    cph = _inner_city(sales_idxs, frame, takst)
-    return cph
-    # return pd.concat([all_zones, cph])
 
 def main():
-    """main function"""
+    
     parser = TableArgParser('year')
     args = parser.parse()
     year = args['year']
+           
+    data = _load_sales_data(year)
+    sales_idxs = _sales_ref(data)
+    location_idxs = _location_ref(data)
+    location_sales = _get_location_sales(location_idxs, sales_idxs)
     
-    year = 2019
+    single_results = _get_single_results(year)
+    single_output = _single_tickets(
+        sales_idxs, location_sales, data, single_results, 1
+        )
+    
+    pendler_output = _pendler_tickets(sales_idxs, data, year, 1)
+    other_output = _other_tickets(sales_idxs, data, year)
+    
+    output = pd.concat([single_output, pendler_output, other_output])
+    output = output.sort_values('NR')
+    
+    
+    # from collections import Counter
+    # for i in [1, 2, 5, 10, 20, 50]:
+    #     single_output = _single_tickets(
+    #         sales_idxs, location_sales, data, single_results, i
+    #         )
+           
+    #     single_output.to_csv(f"H:/single_ticket_mintrips{i}.csv", index=False)
+            
+    #     n = len(single_output)
+    #     counts = Counter(single_output.note.str.count('->'))
+    #     ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])    
+    #     counts = {ordinal(k+1) + ' try': (v / n) * 100 for k, v in counts.items()}
+    #     stats = pd.DataFrame.from_dict(counts, orient='index')
+    #     stats = stats.reset_index()
+    #     stats.columns = ['attempts', 'percentage']
+    #     stats.to_csv(f"H:/single_ticket_mintrips{i}_stats.csv", index=False)
        
-  
-    sales_data = _load_sales_data(year)
-    sales_idxs = _sales_ref(sales_data)
-
-# =============================================================================
-    single_output = []
-    for takst in ['th', 'ts', 'dsb', 'tv']:
-        single = _process_single(sales_idxs, sales_data, takst)
-        single_output.append(single)
-    single_output = pd.concat(single_output)
-# =============================================================================
-
-    pendler_output = []
-    for takst in ['th', 'ts', 'dsb', 'tv']:
-        pendler = _process_pendler(sales_idxs, sales_data, takst, year)
-        pendler_output.append(pendler)
-    pendler_output = pd.concat(pendler_output)
-# =============================================================================
-    other_output_h = _process_other(sales_idxs, sales_data, 'th')
-# =============================================================================
+   
+    return output
 
 
-    found = set(single_output.NR).union(set(pendler_output.NR)).union(
-        set(other_output_h.NR))
-    missing = sales_data.query("NR not in @found")
 
-    final = pd.concat([single_output, pendler_output, other_output_h, missing])
-    final = final.sort_values(['NR'])
-
-    cols = [
-        x for x in final.columns if
-        'Unnamed' not in x and x not in ('tup', 'ringdist')
-        ]
-    final = final[cols]
-    final = final.drop_duplicates()
-# =============================================================================
-
-    return final
-
-
-# if __name__ == "__main__":
-#       out = main()
+if __name__ == "__main__":
+      out = main()
