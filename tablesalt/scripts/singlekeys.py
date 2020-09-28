@@ -287,8 +287,11 @@ def _get_trips(db, tripkeys):
             for k in tqdm(tripkeys_, 'loadimg trip results'):
                 shares = txn.get(k)
                 if shares:
-                    shares = shares.decode('utf-8')
-                    out[int(k.decode('utf-8'))] = ast.literal_eval(shares)
+                    try:
+                        shares = shares.decode('utf-8')
+                        out[int(k.decode('utf-8'))] = ast.literal_eval(shares)
+                    except ValueError:
+                        continue 
 
     return out
 
@@ -522,6 +525,11 @@ def _nzone_merge(resultdict):
     
     return agg_nested_dict(nzone)
 
+
+def _city_pass():
+    
+    
+    return 
 def main():
 
     parser = TableArgParser('year', 'rabattrin')
