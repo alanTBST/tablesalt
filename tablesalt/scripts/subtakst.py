@@ -60,7 +60,21 @@ def _load_data(store, rabatkeys, stopzone_map):
     
     return mapped_zones
     
- 
+
+def _load_pensioners(store, stopzone_map):
+    
+    reader = StoreReader(store)
+    stops = reader.get_data('stops', passenger_type='pensioner')
+    peak_trips = reader.get_data(
+        'stops', passenger_type='pensioner', 
+        day=[0, 1, 2, 3, 4], hour=[7, 8, 15, 16]
+        )
+    
+    stops = stops[~np.isin(stops[:, 0], peak_trips[:, 0])]
+    mapped_zones = _map_zones(stops, stopzone_map)
+    
+    return mapped_zones
+
 def _get_trips(db, tripkeys):
 
     tripkeys_ = {bytes(str(x), 'utf-8') for x in tripkeys}
