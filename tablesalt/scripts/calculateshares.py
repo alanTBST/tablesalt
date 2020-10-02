@@ -7,11 +7,12 @@ Created on Thu Dec  5 09:51:04 2019
 #standard imports
 
 import os
+import pickle
 from itertools import groupby, chain
 from functools import partial
 from multiprocessing import Pool
 from operator import itemgetter
-
+from pathlib import Path
 #third party imports
 import numpy as np
 from tqdm import tqdm
@@ -26,6 +27,9 @@ from tablesalt.common import triptools, make_store
 from tablesalt.topology.tools import TakstZones
 from tablesalt.topology import ZoneGraph, ZoneSharer
 
+
+
+THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 
 
 # NOTE: SAVE BORDER TRIP STARTZONES
@@ -146,7 +150,15 @@ def _get_input(stop_dict, zone_dict, usage_dict, op_dict):
     for k, zone_sequence in zone_dict.items():
         yield k, zone_sequence, stop_dict[k], op_dict[k], usage_dict[k]
 
-def chunk_shares(store, graph, region, zonemap, region_contractors):
+def _get_store_num(store):
+
+    st = store.split('.')[0]
+    st = st.split('rkfile')[1]
+
+    return st
+
+
+def chunk_shares(store, year, graph, region, zonemap, region_contractors):
 
     stopsd, zonesd, usaged, operatorsd = _load_store_data(
         store, region, zonemap, region_contractors
@@ -154,12 +166,33 @@ def chunk_shares(store, graph, region, zonemap, region_contractors):
     
     gen = _get_input(stopsd, zonesd, usaged, operatorsd)
     
+    border_changes = {}
     shares = {}
     for k, stops, zones, usage, operators in gen:    
 
         sharer = ZoneSharer(graph, stops, zones, usage, operators)
-        shares[k] = sharer.share()
-    
+        if sharer.border_trip:
+            initial_zone_sequence = sharer.zone_sequence
+            trip_shares = sharer.share()
+            shares[k] = trip_shares
+            final_zone_sequence = sharer.zone_sequence
+            if initial_zone_sequence != final_zone_sequence:
+                border_changes[k] = final_zone_sequence
+        else:
+            shares[k] = sharer.share()
+
+    num = _get_store_num(store)
+    fp = os.path.join(
+        THIS_DIR, 
+        '__result_cache__',
+        f'{year}',
+        'borderzones',
+        f'bzones{num}.pickle'
+        )
+    with open(fp, 'wb') as f:
+        pickle.dump(border_changes, f)
+        
+    # just converts Movia_H, _V_S to movia
     fixed = {}
     for k, v in shares.items():
         if isinstance(v[0], int):
@@ -198,6 +231,7 @@ def main():
     graph = ZoneGraph(region=region)
 
     pfunc = partial(chunk_shares, 
+                    year=year,
                     graph=graph, 
                     region=region, 
                     zonemap=zonemap, 
@@ -208,9 +242,9 @@ def main():
         for r in tqdm(results, total=len(RK_STORES)):       
             make_store(r, DB_PATH)
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    INHIBITOR = WindowsInhibitor()
-    INHIBITOR.inhibit()
-    main()
-    INHIBITOR.uninhibit()
+#     INHIBITOR = WindowsInhibitor()
+#     INHIBITOR.inhibit()
+#     main()
+#     INHIBITOR.uninhibit()
