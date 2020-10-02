@@ -16,11 +16,14 @@ from pathlib import Path
 
 import lmdb
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 
 from tablesalt import StoreReader
 from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.topology.tools import TakstZones
+from tablesalt.topology import ZoneGraph
+
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 
@@ -52,47 +55,67 @@ def _map_zones(stop_arr, zonemap):
 
     return mapped_zones
 
-def _load_data(store, rabatkeys, stopzone_map):
-    
-    stops = StoreReader(store).get_data('stops')
-    stops = stops[np.isin(stops[:, 0], rabatkeys)]
-    mapped_zones = _map_zones(stops, stopzone_map)
-    
-    return mapped_zones
-    
+# Put this in tools...it's in singlekeys
+def _max_zones(operator_zones, ringdict):
 
-def _load_pensioners(store, stopzone_map):
+    out = {}
+    for k, v in operator_zones.items():
+        current_max = 1
+        start_zone = v[0]
+        for zone in v[1:]:
+            try:
+                distance = ringdict[(start_zone, zone)]
+                if distance > current_max:
+                    current_max = distance
+            except KeyError:
+                break
+        out[k] = current_max
+    return out
+
+def _load_data(store, rabatkeys, stopzone_map, ringzones):
     
     reader = StoreReader(store)
-    stops = reader.get_data('stops', passenger_type='pensioner')
+    allstops = reader.get_data('stops')
+    allstops_rabat_zero = allstops[
+        np.isin(allstops[:, 0], rabatkeys)
+        ]
+    allstops_mapped_zones = _map_zones(
+        allstops_rabat_zero, stopzone_map
+        )
+    
+    pensionstops = reader.get_data(
+        'stops', passenger_type='pensioner'
+        )
     peak_trips = reader.get_data(
         'stops', passenger_type='pensioner', 
         day=[0, 1, 2, 3, 4], hour=[7, 8, 15, 16]
+        )    
+    pensionstops = pensionstops[
+        ~np.isin(pensionstops[:, 0], peak_trips[:, 0])
+        ]
+    
+    pensionstops_mapped_zones = _map_zones(pensionstops, stopzone_map)
+    pension_max_zones = _max_zones(pensionstops_mapped_zones, ringzones)
+    threezones = {k for k, v in pension_max_zones.items() if v <= 3}
+    pension_mapped_zones_three = {
+        k: v for k, v in pensionstops_mapped_zones.items() if k in threezones
+        }
+
+
+    youthstops = reader.get_data(
+        'stops', passenger_type='youth'
+        )
+    youth_mapped_zones = _map_zones(
+        youthstops, stopzone_map
         )
     
-    stops = stops[~np.isin(stops[:, 0], peak_trips[:, 0])]
-    mapped_zones = _map_zones(stops, stopzone_map)
-    
-    return mapped_zones
-
-def _get_trips(db, tripkeys):
-
-    tripkeys_ = {bytes(str(x), 'utf-8') for x in tripkeys}
-
-    out = {}
-    with lmdb.open(db) as env:
-        with env.begin() as txn:
-            for k in tqdm(tripkeys_, 'loading trip results'):
-                shares = txn.get(k)
-                if shares:
-                    try:
-                        shares = shares.decode('utf-8')
-                        out[int(k.decode('utf-8'))] = ast.literal_eval(shares)
-                    except ValueError:
-                        continue 
-
-    return out
-
+    return (
+        allstops_mapped_zones, 
+        pensionstops_mapped_zones, 
+        pension_mapped_zones_three,
+        youth_mapped_zones
+        )
+        
 def _aggregate_zones(shares):
     """
     aggregate the individual operator
@@ -119,13 +142,13 @@ def get_user_shares(all_trips):
 
     return user_shares
 
-def _get_trips(trips, calculated_stores):
+def _get_trips(calculated_stores, tripkeys):
 
-    with lmdb.open(calculated_stores) as env:
+    with lmdb.open(calculated_stores, readahead=False) as env:
         out = {}
         with env.begin() as txn:
-            for trip in trips:
-                t = bytes(trip, 'utf-8')
+            for trip in tqdm(tripkeys):
+                t = bytes(str(trip), 'utf-8')
                 res = txn.get(t)
                 if not res:
                     continue
@@ -135,46 +158,117 @@ def _get_trips(trips, calculated_stores):
     return out
    
 def main():
+    
+    
     year = 2019
+    
     store_loc = find_datastores(r'H://')
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
-    rabatkeys = tuple(_get_rabatkeys(0, 2019))
+    
+    ringzones = ZoneGraph.ring_dict('sjælland')
+    
+    rabatkeys = tuple(_get_rabatkeys(0, year))
     
     stopzone_map = TakstZones().stop_zone_map()
-    trips = {'th': set(), 
-             'ts': set(), 
-             'tv': set(), 
-             'city': set(), 
-             'dsb': set()}
     
-    pfunc = partial(_load_data, 
-                    rabatkeys=rabatkeys, 
-                    stopzone_map=stopzone_map)
+    
+    trips = {
+        'alltrips': {
+            'th': set(), 
+            'ts': set(), 
+            'tv': set(), 
+            'city': set(), 
+            'dsb': set()
+             }, 
+        'pension': {
+            'th': set(), 
+            'ts': set(), 
+            'tv': set(), 
+             }, 
+        'pension_three': {
+            'th': set(), 
+            'ts': set(), 
+            'tv': set(), 
+             }, 
+        'youth': {
+            'th': set(), 
+            'ts': set(), 
+            'tv': set(), 
+             }
+        }
+    
+    pfunc = partial(
+        _load_data, 
+        rabatkeys=rabatkeys, 
+        stopzone_map=stopzone_map, 
+        ringzones=ringzones
+        )
     
     with Pool(7) as pool:
-        results = pool.imap(pfunc, stores)
-        
+        results = pool.imap(pfunc, stores)       
         for res in tqdm(results, total=len(stores)):       
-            for k, v in res.items():       
+            alltrips, pension, pension_three, youth = res                
+            for k, v in alltrips.items():       
                 if all(x < 1100 for x in v):
-                    trips["th"].add(k)
+                    trips['alltrips']["th"].add(k)
                     if all(x in (1002, 1002, 1003, 1004) for x in v):
-                        trips["city"].add(k)             
+                        trips['alltrips']["city"].add(k)             
                 elif all(1100 < x <= 1200 for x in v):
-                    trips["tv"].add(k)
+                    trips['alltrips']["tv"].add(k)
                 elif all(1200 < x < 1300 for x in v):
-                    trips["ts"].add(k)
+                    trips['alltrips']["ts"].add(k)
                 else:
-                    trips["dsb"].add(k)
+                    trips['alltrips']["dsb"].add(k)
+            for k, v in pension.items():       
+                if all(x < 1100 for x in v):
+                    trips['pension']["th"].add(k)       
+                elif all(1100 < x <= 1200 for x in v):
+                    trips['pension']["tv"].add(k)
+                elif all(1200 < x < 1300 for x in v):
+                    trips['pension']["ts"].add(k)
+                else:
+                    pass
+            for k, v in pension.items():       
+                if all(x < 1100 for x in v):
+                    trips['pension']["th"].add(k)       
+                elif all(1100 < x <= 1200 for x in v):
+                    trips['pension']["tv"].add(k)
+                elif all(1200 < x < 1300 for x in v):
+                    trips['pension']["ts"].add(k)
+                else:
+                    pass
+            for k, v in pension_three.items():       
+                if all(x < 1100 for x in v):
+                    trips['pension_three']["th"].add(k)       
+                elif all(1100 < x <= 1200 for x in v):
+                    trips['pension_three']["tv"].add(k)
+                elif all(1200 < x < 1300 for x in v):
+                    trips['pension_three']["ts"].add(k)
+                else:
+                    pass
+            for k, v in youth.items():       
+                if all(x < 1100 for x in v):
+                    trips['youth']["th"].add(k)       
+                elif all(1100 < x <= 1200 for x in v):
+                    trips['youth']["tv"].add(k)
+                elif all(1200 < x < 1300 for x in v):
+                    trips['youth']["ts"].add(k)
+                else:
+                    pass
     
     out = {}
-    for k, v in trips.items():
-        out[k] = _get_trips(db_path, v)
+    for k1, v1 in trips.items():
+        sub = {}
+        for k2, v2 in v1.items():
+            sub[k2] = _get_trips(db_path, v2)
+        out[k1] = sub
     
-    out = {k:get_user_shares(v.values()) for k, v in trips.items()}
-    return out
+    test = {k1: {k2: get_user_shares(v2.values()) for k2, v2 in v1.items()} for k1, v1 in out.items() }
+    test = {(i,j): test[i][j] for i in test.keys() for j in test[i].keys()}
+
+    return pd.DataFrame.from_dict(test, orient='index')
             
 if __name__ == "__main__":
-    trips = main()            
+    results = main()            
