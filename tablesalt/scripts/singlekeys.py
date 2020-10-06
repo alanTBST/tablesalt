@@ -36,6 +36,25 @@ from tablesalt.preprocessing.parsing import TableArgParser
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 
+
+def _load_border_trips(year):
+    
+    filedir = os.path.join(
+        THIS_DIR, 
+        '__result_cache__', 
+        f'{year}', 
+        'borderzones'
+        )
+
+    files = glob.glob(os.path.join(filedir, '*.pickle'))
+    borders = {}
+    for file in tqdm(files, 'merging border trips'):
+        with open(file, 'rb') as f:
+            border = pickle.load(f)
+            borders = {**borders, **border}
+    return borders
+
+
 def helrejser_rabattrin(rabattrin, year):
     """
     return a set of the tripkeys from the helrejser data in
@@ -178,9 +197,11 @@ def _separate_keys(short, long, _max, ringzones):
 
     return analysis_tripkeys
 
-def _determine_keys(read_stops, stopzone_map, ringzones):
+def _determine_keys(read_stops, stopzone_map, ringzones, bordertrips):
 
     zones = _map_zones(read_stops, stopzone_map)
+    zones.update(bordertrips)
+    
     _max = _max_zones(zones, ringzones)
     short = {k: v for k, v in zones.items() if _max[k] <= 8}
     long = {k: v for k, v in zones.items() if _max[k] >= 9}
@@ -240,7 +261,7 @@ def _get_exception_stations(stops, *uic):
     return tripkeys
 
 
-def _store_tripkeys(store, stopzone_map, ringzones, rabatkeys):
+def _store_tripkeys(store, stopzone_map, ringzones, rabatkeys, bordertrips):
 
     reader = StoreReader(store)
     all_stops = reader.get_data('stops')
@@ -252,11 +273,11 @@ def _store_tripkeys(store, stopzone_map, ringzones, rabatkeys):
     dr_byen = _get_exception_stations(all_stops, 8603311)
     dr_byen = all_stops[np.isin(all_stops[:, 0], dr_byen)]
     tick_keys = _determine_keys(
-        all_stops, stopzone_map, ringzones
+        all_stops, stopzone_map, ringzones, bordertrips
         )
     
     dr_keys = _determine_keys(
-        dr_byen, stopzone_map, ringzones
+        dr_byen, stopzone_map, ringzones, bordertrips
         )
     
     return tick_keys, dr_keys
@@ -284,7 +305,7 @@ def _get_trips(db, tripkeys):
     out = {}
     with lmdb.open(db) as env:
         with env.begin() as txn:
-            for k in tqdm(tripkeys_, 'loadimg trip results'):
+            for k in tqdm(tripkeys_, 'loading trip results'):
                 shares = txn.get(k)
                 if shares:
                     try:
@@ -304,10 +325,10 @@ def _get_store_num(store):
     return st
 
 
-def _get_store_keys(store, stopzone_map, ringzones, operators, rabatkeys, year):
+def _get_store_keys(store, stopzone_map, ringzones, operators, rabatkeys, year, bordertrips):
 
     tripkeys, dr_keys = _store_tripkeys(
-        store, stopzone_map, ringzones, rabatkeys
+        store, stopzone_map, ringzones, rabatkeys, bordertrips
         )
     op_tripkeys = _store_operator_tripkeys(
         store, tripkeys, operators
@@ -327,15 +348,19 @@ def _get_store_keys(store, stopzone_map, ringzones, operators, rabatkeys, year):
 
 def _get_all_store_keys(stores, stopzone_map, ringzones, operators, rabatkeys, year):
 
+    
+    borders = _load_border_trips(year)
+    
 
     pfunc = partial(_get_store_keys,
                     stopzone_map=stopzone_map,
                     ringzones=ringzones,
                     operators=operators,
                     rabatkeys=rabatkeys,
-                    year=year)
+                    year=year, 
+                    bordertrips=borders)
 
-    with Pool(os.cpu_count() - 2) as pool:
+    with Pool(os.cpu_count() - 1) as pool:
         pool.map(pfunc, stores)
 
 
@@ -380,6 +405,7 @@ def _gather_all_store_keys(operators, nparts, year):
 
     lst_of_temp = glob.glob(
         os.path.join(
+            THIS_DIR, 
             '__result_cache__', 
             f'{year}', 
             '*.pickle'
@@ -596,6 +622,7 @@ def main():
     operator_results_['all'] = all_results_
 
     fp = os.path.join(
+        THIS_DIR,
         '__result_cache__',
         f'{year}',
         'preprocessed', 
