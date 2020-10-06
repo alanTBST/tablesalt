@@ -23,6 +23,7 @@ from tablesalt import StoreReader
 from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.topology.tools import TakstZones
 from tablesalt.topology import ZoneGraph
+from tablesalt.preprocessing.parsing import TableArgParser
 
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
@@ -159,21 +160,21 @@ def _get_trips(calculated_stores, tripkeys):
    
 def main():
     
-    
-    year = 2019
+    parser = TableArgParser('year', 'rabattrin')
+    args = parser.parse()
+    rabat_level = args['rabattrin']
+
+    year = args['year']
     
     store_loc = find_datastores(r'H://')
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
     
-    ringzones = ZoneGraph.ring_dict('sjælland')
-    
-    rabatkeys = tuple(_get_rabatkeys(0, year))
-    
+    ringzones = ZoneGraph.ring_dict('sjælland')   
+    rabatkeys = tuple(_get_rabatkeys(rabat_level, year))   
     stopzone_map = TakstZones().stop_zone_map()
-    
-    
+       
     trips = {
         'alltrips': {
             'th': set(), 
@@ -193,9 +194,9 @@ def main():
             'tv': set(), 
              }, 
         'youth': {
-            'th': set(), 
-            'ts': set(), 
-            'tv': set(), 
+            'th': set(),
+            'ts': set(),
+            'tv': set(),
              }
         }
     
@@ -265,7 +266,11 @@ def main():
             sub[k2] = _get_trips(db_path, v2)
         out[k1] = sub
     
-    test = {k1: {k2: get_user_shares(v2.values()) for k2, v2 in v1.items()} for k1, v1 in out.items() }
+    test = {
+        k1: {
+            k2: get_user_shares(v2.values()) for k2, v2 in v1.items()
+            } for k1, v1 in out.items() 
+        }
     test = {(i,j): test[i][j] for i in test.keys() for j in test[i].keys()}
 
     return pd.DataFrame.from_dict(test, orient='index')
