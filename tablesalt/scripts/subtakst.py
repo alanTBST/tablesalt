@@ -73,15 +73,15 @@ def _max_zones(operator_zones, ringdict):
         out[k] = current_max
     return out
 
-def _load_data(store, rabatkeys, stopzone_map, ringzones):
+def _load_data(store, stopzone_map, ringzones):
     
     reader = StoreReader(store)
     allstops = reader.get_data('stops')
-    allstops_rabat_zero = allstops[
-        np.isin(allstops[:, 0], rabatkeys)
-        ]
+    # allstops_rabat_zero = allstops[
+    #     np.isin(allstops[:, 0], rabatkeys)
+    #     ]
     allstops_mapped_zones = _map_zones(
-        allstops_rabat_zero, stopzone_map
+        allstops, stopzone_map
         )
     
     pensionstops = reader.get_data(
@@ -172,7 +172,7 @@ def main():
     db_path = paths['calculated_stores']
     
     ringzones = ZoneGraph.ring_dict('sjælland')   
-    rabatkeys = tuple(_get_rabatkeys(rabat_level, year))   
+    # rabatkeys = tuple(_get_rabatkeys(rabat_level, year))   
     stopzone_map = TakstZones().stop_zone_map()
        
     trips = {
@@ -202,7 +202,6 @@ def main():
     
     pfunc = partial(
         _load_data, 
-        rabatkeys=rabatkeys, 
         stopzone_map=stopzone_map, 
         ringzones=ringzones
         )

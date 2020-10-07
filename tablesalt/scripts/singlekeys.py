@@ -351,7 +351,6 @@ def _get_all_store_keys(stores, stopzone_map, ringzones, operators, rabatkeys, y
     
     borders = _load_border_trips(year)
     
-
     pfunc = partial(_get_store_keys,
                     stopzone_map=stopzone_map,
                     ringzones=ringzones,
@@ -552,10 +551,7 @@ def _nzone_merge(resultdict):
     return agg_nested_dict(nzone)
 
 
-def _city_pass():
-    
-    
-    return 
+
 def main():
 
     parser = TableArgParser('year', 'rabattrin')
@@ -634,16 +630,16 @@ def main():
 
     # _write_results(rabat_level, year)
 
-if __name__ == "__main__":
-    from datetime import datetime
-    dt = datetime.now()
+# if __name__ == "__main__":
+#     from datetime import datetime
+#     dt = datetime.now()
 
-    if os.name == 'nt':
-        INHIBITOR = WindowsInhibitor()
-        INHIBITOR.inhibit()
-        main()
-        INHIBITOR.uninhibit()
-    else:
-        main()
+#     if os.name == 'nt':
+#         INHIBITOR = WindowsInhibitor()
+#         INHIBITOR.inhibit()
+#         main()
+#         INHIBITOR.uninhibit()
+#     else:
+#         main()
 
-    print(datetime.now() - dt)
+#     print(datetime.now() - dt)
