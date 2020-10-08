@@ -197,11 +197,27 @@ def _separate_keys(short, long, _max, ringzones):
 
     return analysis_tripkeys
 
-def _determine_keys(read_stops, stopzone_map, ringzones, bordertrips):
+def _determine_keys(stop_arr, stopzone_map, ringzones, bordertrips):
 
-    zones = _map_zones(read_stops, stopzone_map)
+    zones = _map_zones(stop_arr, stopzone_map)
     zones.update(bordertrips)
+    regions = {
+        'th': set(), 
+        'ts': set(), 
+        'tv': set(), 
+        'dsb': set()
+        }
     
+    for k, v in zones.items():
+        if all(x < 1100 for x in v):
+            regions["th"].add(k)           
+        elif all(1100 < x <= 1200 for x in v):
+            regions["tv"].add(k)
+        elif all(1200 < x < 1300 for x in v):
+            regions["ts"].add(k)
+        else:
+            regions["dsb"].add(k)
+
     _max = _max_zones(zones, ringzones)
     short = {k: v for k, v in zones.items() if _max[k] <= 8}
     long = {k: v for k, v in zones.items() if _max[k] >= 9}
@@ -466,7 +482,9 @@ def _map_all(out_all, result_dict):
 
     new = {}
     for k, v in out_all.items():
-        new[k] = {k1: _map_one_value(v1, result_dict) for k1, v1 in v.items()}
+        new[k] = {
+            k1: _map_one_value(v1, result_dict) for k1, v1 in v.items()
+            }
 
     return new
 
@@ -585,12 +603,14 @@ def main():
         rabatkeys,
         year
         )
-
+    
+    del rabatkeys
+    
     nparts = 20
     out_all, out_operators = \
         _gather_all_store_keys(wanted_operators, nparts, year)
 
-    del rabatkeys
+    
     print('finding results\n')
     all_wanted_keys = set()
     for k, v in out_all.items():
@@ -630,16 +650,16 @@ def main():
 
     # _write_results(rabat_level, year)
 
-if __name__ == "__main__":
-    from datetime import datetime
-    dt = datetime.now()
+# if __name__ == "__main__":
+#     from datetime import datetime
+#     dt = datetime.now()
 
-    if os.name == 'nt':
-        INHIBITOR = WindowsInhibitor()
-        INHIBITOR.inhibit()
-        main()
-        INHIBITOR.uninhibit()
-    else:
-        main()
+#     if os.name == 'nt':
+#         INHIBITOR = WindowsInhibitor()
+#         INHIBITOR.inhibit()
+#         main()
+#         INHIBITOR.uninhibit()
+#     else:
+#         main()
 
-    print(datetime.now() - dt)
+#     print(datetime.now() - dt)
