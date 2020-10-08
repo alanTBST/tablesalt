@@ -476,8 +476,12 @@ class TakstZones:
 
         """
         fp = self.DEFAULT_STOPS_LOC
-        with open(fp, 'r') as f:
-            date = f.readline()
+        try:
+            with open(fp, 'r') as f:
+                date = f.readline()
+        except UnicodeDecodeError:
+            with open(fp, 'r', encoding='iso-8859-1') as f:
+                date = f.readline()
         if 'period' in date.lower() or 'export' in date.lower():
             skiprows = 1
         else:
