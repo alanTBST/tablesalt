@@ -494,7 +494,7 @@ def main():
 
     args = parser.parse()
 
-    paths = db_paths(find_datastores('H:/'), args['year'])
+    paths = db_paths(find_datastores(), args['year'])
     stores = paths['store_paths']
 
     year = args['year']
