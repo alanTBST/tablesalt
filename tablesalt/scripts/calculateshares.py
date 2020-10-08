@@ -182,6 +182,7 @@ def chunk_shares(store, year, graph, region, zonemap, region_contractors):
             shares[k] = sharer.share()
 
     num = _get_store_num(store)
+    #TODO ensure fp dir is created
     fp = os.path.join(
         THIS_DIR, 
         '__result_cache__',
@@ -189,6 +190,9 @@ def chunk_shares(store, year, graph, region, zonemap, region_contractors):
         'borderzones',
         f'bzones{num}.pickle'
         )
+    parent_dir = Path(fp).parent
+    if not os.path.exists(parent_dir):
+        os.makedirs(parent_dir)
     with open(fp, 'wb') as f:
         pickle.dump(border_changes, f)
         
@@ -214,10 +218,10 @@ def main():
     
     year = args['year']
 
-    store_loc = find_datastores(r'H://')
+    store_loc = find_datastores()
     paths = db_paths(store_loc, year)
-    RK_STORES = paths['store_paths']
-    DB_PATH = paths['calculated_stores']
+    stores = paths['store_paths']
+    db_path = paths['calculated_stores']
     
     zones = TakstZones()
     zonemap = zones.stop_zone_map()
@@ -237,14 +241,18 @@ def main():
                     zonemap=zonemap, 
                     region_contractors=region_contractors)
     
-    with Pool(os.cpu_count() - 2) as pool:
-        results = pool.imap(pfunc, RK_STORES)
-        for r in tqdm(results, total=len(RK_STORES)):       
-            make_store(r, DB_PATH)
+    with Pool(os.cpu_count() // 2) as pool:
+        results = pool.imap(pfunc, stores)
+        for r in tqdm(results, total=len(stores)):
+            make_store(r, db_path, start_size=8)
 
-# if __name__ == "__main__":
 
-#     INHIBITOR = WindowsInhibitor()
-#     INHIBITOR.inhibit()
-#     main()
-#     INHIBITOR.uninhibit()
+if __name__ == "__main__":
+    if os.name == 'nt':
+        INHIBITOR = WindowsInhibitor()
+        INHIBITOR.inhibit()
+        main()
+        INHIBITOR.uninhibit()
+    else:
+        main()
+        
