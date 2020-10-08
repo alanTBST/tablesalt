@@ -560,7 +560,7 @@ def main():
     year = args['year']
     rabat_level = args['rabattrin']
 
-    store_loc = find_datastores(r'H://')
+    store_loc = find_datastores()
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
@@ -630,16 +630,16 @@ def main():
 
     # _write_results(rabat_level, year)
 
-# if __name__ == "__main__":
-#     from datetime import datetime
-#     dt = datetime.now()
+if __name__ == "__main__":
+    from datetime import datetime
+    dt = datetime.now()
 
-#     if os.name == 'nt':
-#         INHIBITOR = WindowsInhibitor()
-#         INHIBITOR.inhibit()
-#         main()
-#         INHIBITOR.uninhibit()
-#     else:
-#         main()
+    if os.name == 'nt':
+        INHIBITOR = WindowsInhibitor()
+        INHIBITOR.inhibit()
+        main()
+        INHIBITOR.uninhibit()
+    else:
+        main()
 
-#     print(datetime.now() - dt)
+    print(datetime.now() - dt)
