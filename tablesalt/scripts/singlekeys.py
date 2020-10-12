@@ -200,8 +200,10 @@ def _separate_keys(short, long, _max, ringzones):
 def _determine_keys(stop_arr, stopzone_map, ringzones, bordertrips):
 
     zones = _map_zones(stop_arr, stopzone_map)
-    zones.update(bordertrips)
-    regions = {
+    
+    borders = {k: v for k, v in bordertrips.items() if k in zones}
+    zones.update(borders)
+    region_trips = {
         'th': set(), 
         'ts': set(), 
         'tv': set(), 
@@ -210,20 +212,20 @@ def _determine_keys(stop_arr, stopzone_map, ringzones, bordertrips):
     
     for k, v in zones.items():
         if all(x < 1100 for x in v):
-            regions["th"].add(k)           
+            region_trips["th"].add(k)           
         elif all(1100 < x <= 1200 for x in v):
-            regions["tv"].add(k)
+            region_trips["tv"].add(k)
         elif all(1200 < x < 1300 for x in v):
-            regions["ts"].add(k)
+            region_trips["ts"].add(k)
         else:
-            regions["dsb"].add(k)
+            region_trips["dsb"].add(k)
 
     _max = _max_zones(zones, ringzones)
     short = {k: v for k, v in zones.items() if _max[k] <= 8}
     long = {k: v for k, v in zones.items() if _max[k] >= 9}
     tripkeys = _separate_keys(short, long, _max, ringzones)
 
-    return tripkeys
+    return tripkeys, region_trips
 
 def _add_dicts_of_sets(dict1, dict2):
 
@@ -288,14 +290,19 @@ def _store_tripkeys(store, stopzone_map, ringzones, rabatkeys, bordertrips):
 
     dr_byen = _get_exception_stations(all_stops, 8603311)
     dr_byen = all_stops[np.isin(all_stops[:, 0], dr_byen)]
-    tick_keys = _determine_keys(
+    
+    
+    tick_keys, region_keys = _determine_keys(
         all_stops, stopzone_map, ringzones, bordertrips
         )
     
-    dr_keys = _determine_keys(
+    dr_keys, dr_region_keys = _determine_keys(
         dr_byen, stopzone_map, ringzones, bordertrips
         )
     
+    dr_keys['regions'] = dr_region_keys
+    tick_keys['regions'] = region_keys
+  
     return tick_keys, dr_keys
 
 def _store_operator_tripkeys(store, ticket_keys, operators):
@@ -352,6 +359,8 @@ def _get_store_keys(store, stopzone_map, ringzones, operators, rabatkeys, year, 
 
     op_tripkeys['all'] = tripkeys
     op_tripkeys['dr_byen'] = dr_keys
+    
+    
     num = _get_store_num(store)
     fp = os.path.join(
         '__result_cache__',
@@ -397,21 +406,22 @@ def _merge_dicts(old, new, old_op, new_op, operators):
 
     return out_all, out_operators
 
-def _gather_store_keys(lst_of_temp, operators, nparts):
+def _gather_store_keys(lst_of_files, operators, nparts):
 
-    initial = _load_store_keys(lst_of_temp[0])
+    initial = _load_store_keys(lst_of_files[0])
     out_all = initial['all']
-    out_operators = {k: v for k, v in initial.items() if k != 'all'}
+    out_operators = {
+        k: v for k, v in initial.items() if k != 'all'
+        }
 
-    count = 1
-    for p in tqdm(lst_of_temp[1:], f'merging store keys {count}/{nparts} parts'):
+    for p in tqdm(lst_of_files[1:], f'merging store keys {nparts} parts'):
         keys = _load_store_keys(p)
         out = keys['all']
         opkeys = {k: v for k, v in keys.items() if k != 'all'}
         out_all, out_operators = _merge_dicts(
             out_all, out, out_operators, opkeys, operators
             )
-        count += 1
+
 
     return out_all, out_operators
 
@@ -447,8 +457,8 @@ def _gather_all_store_keys(operators, nparts, year):
             out_all, out, out_operators, opkeys, operators
             )
 
-    for p in lst_of_temp:
-        os.remove(p)
+    # for p in lst_of_temp:
+    #     os.remove(p)
 
     return out_all, out_operators
 
@@ -604,7 +614,7 @@ def main():
         year
         )
     
-    del rabatkeys
+    # del rabatkeys
     
     nparts = 20
     out_all, out_operators = \
@@ -619,34 +629,34 @@ def main():
 
     result_dict = _get_trips(db_path, all_wanted_keys)
     
-    print('loaded results\n')
-    del all_wanted_keys
+    # print('loaded results\n')
+    # del all_wanted_keys
 
-    all_results = _map_all(out_all, result_dict)
-    short_all = _nzone_merge(all_results['short_ring'])
-    long_all = _nzone_merge(all_results['long_ring'])
-    all_results_ = agg_nested_dict(all_results)
-    all_results_['paid_zones'] = {**short_all, **long_all}
+    # all_results = _map_all(out_all, result_dict)
+    # short_all = _nzone_merge(all_results['short_ring'])
+    # long_all = _nzone_merge(all_results['long_ring'])
+    # all_results_ = agg_nested_dict(all_results)
+    # all_results_['paid_zones'] = {**short_all, **long_all}
 
-    operator_results = _map_operators(out_operators, result_dict)
-    operator_results_ = agg_nested_dict(operator_results)
-    for k, v in operator_results.items():
-        short_op = _nzone_merge(v['short_ring'])
-        long_op = _nzone_merge(v['long_ring'])
-        operator_results_[k]['paid_zones'] = {**short_op, **long_op}
+    # operator_results = _map_operators(out_operators, result_dict)
+    # operator_results_ = agg_nested_dict(operator_results)
+    # for k, v in operator_results.items():
+    #     short_op = _nzone_merge(v['short_ring'])
+    #     long_op = _nzone_merge(v['long_ring'])
+    #     operator_results_[k]['paid_zones'] = {**short_op, **long_op}
 
-    operator_results_['all'] = all_results_
+    # operator_results_['all'] = all_results_
 
-    fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__',
-        f'{year}',
-        'preprocessed', 
-        f'single_results_{year}_r{rabat_level}.pickle'
-        )
+    # fp = os.path.join(
+    #     THIS_DIR,
+    #     '__result_cache__',
+    #     f'{year}',
+    #     'preprocessed', 
+    #     f'single_results_{year}_r{rabat_level}.pickle'
+    #     )
 
-    with open(fp, 'wb') as f:
-        pickle.dump(operator_results_, f)
+    # with open(fp, 'wb') as f:
+    #     pickle.dump(operator_results_, f)
 
     # _write_results(rabat_level, year)
 
