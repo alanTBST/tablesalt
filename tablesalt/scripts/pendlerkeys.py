@@ -490,12 +490,17 @@ def _zonerelations(year):
 
 def main():
 
-    parser = TableArgParser('year', 'products', 'zones')
+    parser = TableArgParser('year', 'products', 'zones', 'model')
 
     args = parser.parse()
 
     paths = db_paths(find_datastores(), args['year'])
     stores = paths['store_paths']
+    db_path = paths['calculated_stores']
+    model = args['model']
+    if model != 1:
+        db_path = db_path + f'_model_{model}'
+        
 
     year = args['year']
     zone_path = args['zones']

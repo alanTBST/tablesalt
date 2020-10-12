@@ -8,11 +8,13 @@ Class to create an undirected graph
 of the tariffzones in Denmark
 """
 #standard imports
+import os
+import pkg_resources
 from itertools import groupby, chain
 from collections import Counter
 from operator import itemgetter
 from typing import Optional
-import pkg_resources
+
 
 #third party imports
 import pandas as pd
@@ -65,6 +67,7 @@ REGION_ZONES = {
     # 'bornholm': (6000, 6100) # 240
     }
 
+
 def _legify(v):
     # TODO : put legify in TBSTtrips? TBSTtools TBSTutils?
     return tuple((v[i], v[i+1]) for i in range(len(v)-1))
@@ -74,7 +77,7 @@ def _neighbour_dict(region):
     """Load and convert neighbours dset to dict (adj list)"""
 
     fp = pkg_resources.resource_filename(
-        'tablesalt', 'resources/networktopodk/national_neighbours.csv'
+        'tablesalt', os.path.join('resources', 'networktopodk', 'national_neighbours.csv')
         )
     neighbours = pd.read_csv(
         fp,

@@ -41,6 +41,51 @@ OP_MAP = {v: k for k, v in mappers['operator_id'].items()}
 rev_model_dict = {v:k for k, v in mappers['model_dict'].items()}
 CO_TR = (rev_model_dict['Co'], rev_model_dict['Tr'])
 
+
+
+# TODO load from config
+SOLO_ZONE_PRIS = {
+    'th': {
+        'dsb': 6.38, 
+        'movia': 9.18, 
+        'first': 6.42, 
+        'stog': 7.12, 
+        'metro': 9.44
+        }, 
+    'ts': {
+        'dsb': 6.55, 
+        'movia': 7.94, 
+        'first': 6.42, 
+        'stog': 7.12, 
+        'metro': 9.44
+        }, 
+    'tv': {
+        'dsb': 6.38, 
+        'movia': 8.43, 
+        'first': 6.42, 
+        'stog': 7.12, 
+        'metro': 9.44
+        },
+    'dsb': {
+        'dsb': 6.57, 
+        'movia': 6.36, 
+        'first': 6.42, 
+        'stog': 7.12, 
+        'metro': 9.44
+        }
+    }
+
+def _determine_region(zone_sequence: Tuple[int, ...]) -> str:
+    
+    if all(x < 1100 for x in zone_sequence):
+        return "th"       
+    if all(1100 < x <= 1200 for x in zone_sequence):
+        return "tv"
+    if all(1200 < x < 1300 for x in zone_sequence):
+        return "ts"
+    return "dsb"
+
+
 def load_border_stations(): # put this in TBSTtopology
 
 
@@ -416,6 +461,8 @@ class ZoneSharer(ZoneProperties):
         self.usage_legs = to_legs(self.usage_sequence)
         
         self.single = self._is_single()
+        
+        self.region: str = _determine_region(self.zone_sequence)
 
     
     def _is_single(self) -> bool:
@@ -459,7 +506,7 @@ class ZoneSharer(ZoneProperties):
         """
       
         out = {}
-        zone_counts = Counter(val['visited_zones'])
+        # zone_counts = Counter(val['visited_zones'])
     
         for i, imputed_leg in enumerate(val['imputed_zone_legs']):
             for zone in imputed_leg:
@@ -478,19 +525,29 @@ class ZoneSharer(ZoneProperties):
                     out[zone] = 1, self.operator_legs[i][0]
         
         return aggregated_zone_operators(tuple(out.values()))
+    
+    @staticmethod
+    def _standardise(share):
         
+        if isinstance(share[0], int):
+            return share[0], share[1].lower().split('_')[0]
+        if isinstance(share[0], tuple):
+            return tuple((x[0], x[1].lower().split('_')[0]) for x in share)
+     
+        return share
+    
     def share(self):
         
         val = tuple(
             (self.stop_sequence, self.operator_sequence, self.usage_sequence)
             )
         try:
-            return self.SHARE_CACHE[val] 
+            return self._standardise(self.SHARE_CACHE[val]) 
         except KeyError:
             pass
         
         if self.single:
-            return self._share_single(val)
+            return self._standardise(self._share_single(val))
 
         
         self._remove_cotr()
@@ -517,7 +574,7 @@ class ZoneSharer(ZoneProperties):
             )
         self.single = self._is_single()
         if self.single:
-            return self._share_single(val)
+            return self._standardise(self._share_single(val))
         
         property_dict = self.property_dict()        
         property_dict['nlegs_in_touched'] = {
@@ -534,7 +591,46 @@ class ZoneSharer(ZoneProperties):
         
         shares = self.share_calculation(property_dict)
         self.SHARE_CACHE[val] = shares
-        return shares 
+        return self._standardise(shares)
+    
+    
+    @staticmethod
+    def _weight_solo(share_tuple, solo_price_map):
+        
+        if not isinstance(share_tuple[0], tuple):
+            share_tuple = (share_tuple, )            
+        total_zones = round(sum(x[0] for x in share_tuple))
+        original_share = tuple(
+            (x[0] / total_zones, x[1]) 
+            for x in share_tuple)
+        
+        operator_prices = tuple(
+            (x[0] * solo_price_map[x[1]], x[1]) 
+            for x in share_tuple
+            )
+        total_price = sum(x[0] for x in operator_prices)
+        solo_share = tuple(
+            (x[0] / total_price, x[1]) 
+            for x in operator_prices
+            )
+        
+        weighted_solo = tuple(
+            (j[0] * (solo_share[i][0] / original_share[i][0]), j[1]) 
+            for i, j in enumerate(share_tuple)
+            )
+        
+        return weighted_solo
+    
+    def solo_zone_price(self):
+        
+        shares = self.share()
+        
+        solo_prices = SOLO_ZONE_PRIS[self.region]
+        
+        try:           
+            return self._weight_solo(shares, solo_prices)
+        except TypeError:
+            return shares
 
 def shrink_search(graph, start, goal, ringzones, distance_buffer=2):
     """

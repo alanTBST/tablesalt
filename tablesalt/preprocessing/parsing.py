@@ -82,7 +82,16 @@ class TableArgParser:
            False,
            str,
            None
+           ),
+        'model': ArgTuple(
+           '-m',
+           '--model',
+           'the model number',
+           False,
+           int,
+           1
            )
+
         }
 
     def __init__(self, *args: str, description: AnyStr = None) -> None:
