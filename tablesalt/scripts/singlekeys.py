@@ -384,7 +384,7 @@ def _get_all_store_keys(stores, stopzone_map, ringzones, operators, rabatkeys, y
                     year=year, 
                     bordertrips=borders)
 
-    with Pool(os.cpu_count() - 1) as pool:
+    with Pool(round(os.cpu_count() * 0.75)) as pool:
         pool.map(pfunc, stores)
 
 
@@ -577,12 +577,11 @@ def _nzone_merge(resultdict):
         nzone[k[1]] = nzone[k[1]] + v
     
     return agg_nested_dict(nzone)
-
-
+    
 
 def main():
 
-    parser = TableArgParser('year', 'rabattrin')
+    parser = TableArgParser('year', 'rabattrin', 'model')
     args = parser.parse()
 
     year = args['year']
@@ -592,6 +591,9 @@ def main():
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
+    model = args['model']
+    if model != 1:
+        db_path = db_path + f'_model_{model}'
 
 
     ringzones = ZoneGraph.ring_dict('sjælland')
@@ -614,7 +616,7 @@ def main():
         year
         )
     
-    # del rabatkeys
+    del rabatkeys
     
     nparts = 20
     out_all, out_operators = \
@@ -629,47 +631,47 @@ def main():
 
     result_dict = _get_trips(db_path, all_wanted_keys)
     
-    # print('loaded results\n')
-    # del all_wanted_keys
+    print('loaded results\n')
+    del all_wanted_keys
 
-    # all_results = _map_all(out_all, result_dict)
-    # short_all = _nzone_merge(all_results['short_ring'])
-    # long_all = _nzone_merge(all_results['long_ring'])
-    # all_results_ = agg_nested_dict(all_results)
-    # all_results_['paid_zones'] = {**short_all, **long_all}
+    all_results = _map_all(out_all, result_dict)
+    short_all = _nzone_merge(all_results['short_ring'])
+    long_all = _nzone_merge(all_results['long_ring'])
+    all_results_ = agg_nested_dict(all_results)
+    all_results_['paid_zones'] = {**short_all, **long_all}
 
-    # operator_results = _map_operators(out_operators, result_dict)
-    # operator_results_ = agg_nested_dict(operator_results)
-    # for k, v in operator_results.items():
-    #     short_op = _nzone_merge(v['short_ring'])
-    #     long_op = _nzone_merge(v['long_ring'])
-    #     operator_results_[k]['paid_zones'] = {**short_op, **long_op}
+    operator_results = _map_operators(out_operators, result_dict)
+    operator_results_ = agg_nested_dict(operator_results)
+    for k, v in operator_results.items():
+        short_op = _nzone_merge(v['short_ring'])
+        long_op = _nzone_merge(v['long_ring'])
+        operator_results_[k]['paid_zones'] = {**short_op, **long_op}
 
-    # operator_results_['all'] = all_results_
+    operator_results_['all'] = all_results_
 
-    # fp = os.path.join(
-    #     THIS_DIR,
-    #     '__result_cache__',
-    #     f'{year}',
-    #     'preprocessed', 
-    #     f'single_results_{year}_r{rabat_level}.pickle'
-    #     )
+    fp = os.path.join(
+        THIS_DIR,
+        '__result_cache__',
+        f'{year}',
+        'preprocessed', 
+        f'single_results_{year}_r{rabat_level}.pickle'
+        )
 
-    # with open(fp, 'wb') as f:
-    #     pickle.dump(operator_results_, f)
+    with open(fp, 'wb') as f:
+        pickle.dump(operator_results_, f)
 
     # _write_results(rabat_level, year)
 
-# if __name__ == "__main__":
-#     from datetime import datetime
-#     dt = datetime.now()
+if __name__ == "__main__":
+    from datetime import datetime
+    dt = datetime.now()
 
-#     if os.name == 'nt':
-#         INHIBITOR = WindowsInhibitor()
-#         INHIBITOR.inhibit()
-#         main()
-#         INHIBITOR.uninhibit()
-#     else:
-#         main()
+    if os.name == 'nt':
+        INHIBITOR = WindowsInhibitor()
+        INHIBITOR.inhibit()
+        main()
+        INHIBITOR.uninhibit()
+    else:
+        main()
 
-#     print(datetime.now() - dt)
+    print(datetime.now() - dt)

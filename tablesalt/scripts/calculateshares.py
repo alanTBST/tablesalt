@@ -16,21 +16,20 @@ from pathlib import Path
 #third party imports
 import numpy as np
 from tqdm import tqdm
-
+	
 # module imports
 from tablesalt.running import WindowsInhibitor
 from tablesalt import StoreReader
 from tablesalt.common.io import mappers
 from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
-from tablesalt.common import triptools, make_store
+from tablesalt.common import make_store
 from tablesalt.topology.tools import TakstZones
 from tablesalt.topology import ZoneGraph, ZoneSharer
 
-
-
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
-
+CPU_USAGE = 0.5 # %
+DB_START_SIZE = 8 # gb
 
 # NOTE: SAVE BORDER TRIP STARTZONES
 def proc_contractors(contrpack):
@@ -111,9 +110,7 @@ def _load_store_data(store, region, zonemap, region_contractors):
     stops = reader.get_data('stops')
 
     stops = stops[np.lexsort((stops[:, 1], stops[:, 0]))]
-    
-
-    
+       
     usage_dict = {
         key: tuple(x[3] for x in grp) for key, grp in
         groupby(stops, key=itemgetter(0))
@@ -158,6 +155,9 @@ def _get_store_num(store):
     return st
 
 
+def _convert_regional_to_sjælland():
+    
+    return 
 def chunk_shares(store, year, graph, region, zonemap, region_contractors):
 
     stopsd, zonesd, usaged, operatorsd = _load_store_data(
@@ -167,20 +167,24 @@ def chunk_shares(store, year, graph, region, zonemap, region_contractors):
     gen = _get_input(stopsd, zonesd, usaged, operatorsd)
     
     border_changes = {}
-    shares = {}
+    model_one_shares = {}
+    model_two_shares = {} # solo_zone_price
+    
     for k, stops, zones, usage, operators in gen:    
 
         sharer = ZoneSharer(graph, stops, zones, usage, operators)
         if sharer.border_trip:
             initial_zone_sequence = sharer.zone_sequence
             trip_shares = sharer.share()
-            shares[k] = trip_shares
+            model_one_shares[k] = trip_shares
             final_zone_sequence = sharer.zone_sequence
             if initial_zone_sequence != final_zone_sequence:
                 border_changes[k] = final_zone_sequence
+            model_two_shares[k] = sharer.solo_zone_price()
         else:
-            shares[k] = sharer.share()
-
+            model_one_shares[k] = sharer.share()
+            model_two_shares[k] = sharer.solo_zone_price()
+    
     num = _get_store_num(store)
     #TODO ensure fp dir is created
     fp = os.path.join(
@@ -195,17 +199,8 @@ def chunk_shares(store, year, graph, region, zonemap, region_contractors):
         os.makedirs(parent_dir)
     with open(fp, 'wb') as f:
         pickle.dump(border_changes, f)
-        
-    # just converts Movia_H, _V_S to movia
-    fixed = {}
-    for k, v in shares.items():
-        if isinstance(v[0], int):
-            fixed[k] = v[0], v[1].lower().split('_')[0]
-        elif isinstance(v[0], tuple):
-            fixed[k] = tuple((x[0], x[1].lower().split('_')[0]) for x in v)
-        else:
-            fixed[k] = v
-    return fixed
+    
+    return model_one_shares, model_two_shares
 
 def main():
     """
@@ -226,6 +221,7 @@ def main():
     zones = TakstZones()
     zonemap = zones.stop_zone_map()
     
+    # TODO into config
     region_contractors= {
         'hovedstaden': ['Movia_H', 'DSB', 'First', 'Stog', 'Metro'],
         'sjælland': ['Movia_H', 'Movia_S', 'Movia_V', 'DSB', 'First', 'Stog', 'Metro']
@@ -241,11 +237,11 @@ def main():
                     zonemap=zonemap, 
                     region_contractors=region_contractors)
     
-    with Pool(os.cpu_count() // 2) as pool:
+    with Pool(round(os.cpu_count() * CPU_USAGE)) as pool:
         results = pool.imap(pfunc, stores)
-        for r in tqdm(results, total=len(stores)):
-            make_store(r, db_path, start_size=8)
-
+        for model_one, model_two in tqdm(results, total=len(stores)):
+            make_store(model_one, db_path, start_size=DB_START_SIZE)
+            make_store(model_two, db_path + '_model_2', start_size=DB_START_SIZE)
 
 if __name__ == "__main__":
     if os.name == 'nt':
