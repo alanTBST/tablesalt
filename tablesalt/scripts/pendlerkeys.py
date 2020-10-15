@@ -523,7 +523,7 @@ def main():
         year
         )
     
-    # _zonerelations(year)
+    _zonerelations(year)
 
 
 if __name__ == "__main__":
