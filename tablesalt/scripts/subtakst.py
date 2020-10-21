@@ -73,15 +73,15 @@ def _max_zones(operator_zones, ringdict):
         out[k] = current_max
     return out
 
-def _load_data(store, stopzone_map, ringzones):
+def _load_data(store, stopzone_map, ringzones, rabatkeys):
     
     reader = StoreReader(store)
     allstops = reader.get_data('stops')
-    # allstops_rabat_zero = allstops[
-    #     np.isin(allstops[:, 0], rabatkeys)
-    #     ]
+    allstops_rabat_zero = allstops[
+        np.isin(allstops[:, 0], rabatkeys)
+        ]
     allstops_mapped_zones = _map_zones(
-        allstops, stopzone_map
+        allstops_rabat_zero, stopzone_map
         )
     
     pensionstops = reader.get_data(
@@ -101,7 +101,6 @@ def _load_data(store, stopzone_map, ringzones):
     pension_mapped_zones_three = {
         k: v for k, v in pensionstops_mapped_zones.items() if k in threezones
         }
-
 
     youthstops = reader.get_data(
         'stops', passenger_type='youth'
@@ -160,19 +159,21 @@ def _get_trips(calculated_stores, tripkeys):
    
 def main():
     
-    parser = TableArgParser('year', 'rabattrin')
+    parser = TableArgParser('year', 'rabattrin', 'model')
     args = parser.parse()
     rabat_level = args['rabattrin']
-
+    model = args['model']
     year = args['year']
     
     store_loc = find_datastores(r'H://')
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
+    if model != 1:
+        db_path = db_path + f'_model_{model}'    
     
     ringzones = ZoneGraph.ring_dict('sjælland')   
-    # rabatkeys = tuple(_get_rabatkeys(rabat_level, year))   
+    rabatkeys = tuple(_get_rabatkeys(rabat_level, year))   
     stopzone_map = TakstZones().stop_zone_map()
        
     trips = {
@@ -203,7 +204,8 @@ def main():
     pfunc = partial(
         _load_data, 
         stopzone_map=stopzone_map, 
-        ringzones=ringzones
+        ringzones=ringzones, 
+        rabatkeys=rabatkeys
         )
     
     with Pool(7) as pool:
@@ -270,9 +272,12 @@ def main():
             k2: get_user_shares(v2.values()) for k2, v2 in v1.items()
             } for k1, v1 in out.items() 
         }
-    test = {(i,j): test[i][j] for i in test.keys() for j in test[i].keys()}
+    # test = {(i,j): test[i][j] for i in test.keys() for j in test[i].keys()}
 
-    return pd.DataFrame.from_dict(test, orient='index')
+    # return pd.DataFrame.from_dict(test, orient='index')
+    return test
             
 if __name__ == "__main__":
-    results = main()            
+    results = main()       
+        
+        
