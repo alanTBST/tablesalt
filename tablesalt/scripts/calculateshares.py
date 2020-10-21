@@ -31,7 +31,7 @@ THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 CPU_USAGE = 0.5 # %
 DB_START_SIZE = 8 # gb
 
-# NOTE: SAVE BORDER TRIP STARTZONES
+
 def proc_contractors(contrpack):
     """return the contractors dict as an array"""
     arr_length = len(tuple(chain(*contrpack.values())))
@@ -158,6 +158,7 @@ def _get_store_num(store):
 def _convert_regional_to_sjælland():
     
     return 
+
 def chunk_shares(store, year, graph, region, zonemap, region_contractors):
 
     stopsd, zonesd, usaged, operatorsd = _load_store_data(
