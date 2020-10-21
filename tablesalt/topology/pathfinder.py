@@ -599,6 +599,7 @@ class ZoneSharer(ZoneProperties):
         
         if not isinstance(share_tuple[0], tuple):
             share_tuple = (share_tuple, )            
+        
         total_zones = round(sum(x[0] for x in share_tuple))
         original_share = tuple(
             (x[0] / total_zones, x[1]) 
