@@ -460,7 +460,7 @@ class ZoneSharer(ZoneProperties):
         self.operator_legs = to_legs(self.operator_sequence)
         self.usage_legs = to_legs(self.usage_sequence)
         
-        self.single = self._is_single()
+        self.single: bool = self._is_single()
         
         self.region: str = _determine_region(self.zone_sequence)
 
@@ -603,13 +603,15 @@ class ZoneSharer(ZoneProperties):
         total_zones = round(sum(x[0] for x in share_tuple))
         original_share = tuple(
             (x[0] / total_zones, x[1]) 
-            for x in share_tuple)
+            for x in share_tuple
+            )
         
         operator_prices = tuple(
             (x[0] * solo_price_map[x[1]], x[1]) 
             for x in share_tuple
             )
         total_price = sum(x[0] for x in operator_prices)
+        
         solo_share = tuple(
             (x[0] / total_price, x[1]) 
             for x in operator_prices
@@ -629,9 +631,30 @@ class ZoneSharer(ZoneProperties):
         solo_prices = SOLO_ZONE_PRIS[self.region]
         
         try:           
-            return self._weight_solo(shares, solo_prices)
+            return self._standardise(self._weight_solo(shares, solo_prices))
         except TypeError:
+
             return shares
+    
+    # def solo_zone_price(self):
+    #     shares = self.share()
+        
+    #     if isinstance(shares, str):
+    #         return shares
+        
+    #     if not isinstance(shares[0], tuple):
+    #         shares = (shares, )            
+        
+    #     solo_prices = SOLO_ZONE_PRIS[self.region]
+        
+    #     operator_prices = tuple(
+    #         (x[0] * solo_prices[x[1]], x[1]) 
+    #         for x in shares
+    #         )
+        
+    #     return operator_prices
+        
+        
 
 def shrink_search(graph, start, goal, ringzones, distance_buffer=2):
     """
