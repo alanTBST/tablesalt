@@ -28,7 +28,7 @@ from tablesalt.topology.tools import TakstZones
 from tablesalt.topology import ZoneGraph, ZoneSharer
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
-CPU_USAGE = 0.5 # %
+CPU_USAGE = 0.75 # %
 DB_START_SIZE = 8 # gb
 
 
@@ -92,8 +92,9 @@ def _load_store_data(store, region, zonemap, region_contractors):
 
     parameters
     ----------
-    rkstore:
+    store:
         the path to the h5 file
+    region:
     filter_type:
         filter the trips in the store by the takstzone region
         default is 'hovedstaden'
@@ -159,7 +160,11 @@ def _convert_regional_to_sjælland():
     
     return 
 
-def chunk_shares(store, year, graph, region, zonemap, region_contractors):
+def chunk_shares(
+        store, year, graph, 
+        region, zonemap, 
+        region_contractors
+        ):
 
     stopsd, zonesd, usaged, operatorsd = _load_store_data(
         store, region, zonemap, region_contractors
@@ -171,9 +176,10 @@ def chunk_shares(store, year, graph, region, zonemap, region_contractors):
     model_one_shares = {}
     model_two_shares = {} # solo_zone_price
     
-    for k, stops, zones, usage, operators in gen:    
+    # k, zones, stops, operators, usage = next(gen)
+    for k, zones, stops, operators, usage in gen:    
 
-        sharer = ZoneSharer(graph, stops, zones, usage, operators)
+        sharer = ZoneSharer(graph, zones, stops, operators, usage)
         if sharer.border_trip:
             initial_zone_sequence = sharer.zone_sequence
             trip_shares = sharer.share()
