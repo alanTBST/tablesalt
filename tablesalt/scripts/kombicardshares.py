@@ -26,12 +26,14 @@ from datetime import datetime
 
 import lmdb
 import numpy as np
-import tqdm
+from tqdm import tqdm
 import pandas as pd
 
 from tablesalt.season.users import PendlerKombiUsers
 from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
+
+THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 
 def _aggregate_zones(shares):
     """
@@ -78,8 +80,7 @@ def match_trip_to_season(kombi_trips, userdata, kombi_dates_store):
     out = {}
     env = lmdb.open(kombi_dates_store)
     with env.begin() as txn:
-        i = 0
-        for k, v in kombi_trips.items():
+        for k, v in tqdm(kombi_trips.items()):
             v = (bytes(str(x), 'utf-8') for x in v)
             utripdates = {x: txn.get(x) for x in v}
             utripdates = {
@@ -98,9 +99,6 @@ def match_trip_to_season(kombi_trips, userdata, kombi_dates_store):
                 if cur is not None:
                     cur.append(key)
                 out[season] = cur
-            if i % 100 == 0:
-                print(i)
-            i+=1
     env.close()
 
     return out
@@ -108,9 +106,9 @@ def match_trip_to_season(kombi_trips, userdata, kombi_dates_store):
 
 def make_output(usershares, product_path):
 
-    cardnum = {x[0] for x in usershares}
+    # cardnum = {x[0] for x in usershares}
     prods = pd.read_csv(product_path, sep=';', encoding='iso-8859-1')
-    prods = prods.query("EncryptedCardEngravedID in @cardnum")
+    # prods = prods.query("EncryptedCardEngravedID in @cardnum")
 
 
     ushares = pd.DataFrame.from_dict(usershares, orient='index')
@@ -118,7 +116,11 @@ def make_output(usershares, product_path):
     ushares.rename(columns={'level_0':'EncryptedCardEngravedID',
                             'level_1':'SeasonPassID'}, inplace=True)
     ushares = ushares.fillna(0)
-    out = pd.merge(prods, ushares, on=['EncryptedCardEngravedID', 'SeasonPassID'])
+    out = pd.merge(
+        prods, ushares, 
+        on=['EncryptedCardEngravedID', 'SeasonPassID'], 
+        how='left'
+        )
 
     return out
 
@@ -163,15 +165,19 @@ def get_user_shares(all_trips):
 
 def main():
 
-    parser = TableArgParser('year', 'zones', 'products')
+    parser = TableArgParser('year', 'zones', 'products', 'model')
     args = parser.parse()
 
     year = args['year']
+    model = args['model']
     zone_path = args['zones']
     product_path = args['products']
+    
 
     paths = db_paths(find_datastores('H:/'), year)
-    calc_store = paths['calculated_stores']
+    db_path = paths['calculated_stores']
+    if model != 1:
+        db_path = db_path + f'_model_{model}'
     valid_kombi_store = paths['kombi_valid_trips']
     kombi_dates =  paths['kombi_dates_db']
 
@@ -187,16 +193,19 @@ def main():
         kombi_trips, userdata, kombi_dates
         )
 
-    with lmdb.open(calc_store) as env:
+    with lmdb.open(db_path) as env:
         final = {}
         with env.begin() as txn:
-            for k, v in tofetch.items():
+            for k, v in tqdm(tofetch.items()):
                 all_trips = []
                 for trip in v:
-                    t = txn.get(trip.encode('utf-8'))
+                    t = txn.get(bytes(trip, 'utf-8'))
                     if t:
-                        all_trips.append(t.decode('utf-8'))
-                all_trips = tuple(ast.literal_eval(x) for x in all_trips)
+                        all_trips.append(t.decode('utf-8'))                    
+                all_trips = tuple(
+                    ast.literal_eval(x) for x in all_trips 
+                    if x not in ('station_map_error', 'operator_error')
+                    )
                 final[k] = get_user_shares(all_trips)
 
     out = make_output(final, product_path)
@@ -205,6 +214,117 @@ def main():
     out = out[colorder]
     
     fp = os.path.join(
-        '__result_cache__', f'{year}', 'pendler', 'kombiusershares.csv'
+        THIS_DIR,
+        '__result_cache__', f'{year}', 'pendler', f'kombiusershares{year}_model_{model}.csv'
         )
     out.to_csv(fp, index=False)
+    
+    
+    
+    
+    period_products_fp = r'H:/revenue/inputdata/2019/PeriodeProdukt.csv'
+    period_zones_fp = r'H:/revenue/inputdata/2019/Zoner.csv'
+    
+    
+    period_products = pd.read_csv(period_products_fp, sep=';', encoding='iso-8859-1')
+    pendler_product_zones = pd.read_csv(period_zones_fp, sep=';', encoding='iso-8859-1')
+
+    pendler_product_zones['key'] = list(zip(
+        pendler_product_zones['EncryptedCardEngravedID'],
+        pendler_product_zones['SeasonPassID']
+        ))
+
+    pendler_product_zones = \
+    pendler_product_zones.sort_values(
+        ['EncryptedCardEngravedID', 'SeasonPassID']
+        )
+    pendler_product_zones = \
+    pendler_product_zones.itertuples(name=None, index=False)
+    
+    pendler_product_zones = {
+        key: tuple(x[2] for x in group) 
+        for key, group in groupby(
+                pendler_product_zones, key=itemgetter(0, 1)
+                )
+        }
+    pendler_product_zones = [
+        (k[0], k[1], str(v))
+        for k, v in pendler_product_zones.items()
+        ]
+    pp_zones = pd.DataFrame(pendler_product_zones)
+    pp_zones.columns = [
+        'EncryptedCardEngravedID', 
+        'SeasonPassID', 
+        'ValidZones'
+        ]
+    
+    period_products = pd.merge(
+        period_products, pp_zones, 
+        on=['EncryptedCardEngravedID', 'SeasonPassID'], 
+        how='left'
+        )
+    
+    pendler = period_products.loc[~
+        period_products.loc[:, 'SeasonPassName'].str.lower().str.contains('kombi')
+        ]
+
+    fp = os.path.join(
+        THIS_DIR,
+        '__result_cache__', f'{year}', 'pendler', f'pendlerchosenzones{year}_model_{model}.csv'
+        )
+    
+    pendler_kombi = pd.read_csv(fp, index_col=0)
+    pendler_kombi.index.name = 'ValidZones'
+    pendler_kombi = pendler_kombi.reset_index()
+    pendler_kombi.loc[:, 'ValidZones'] = pendler_kombi.loc[:, 'ValidZones'].astype(str)
+    
+    test = pd.merge(pendler, pendler_kombi, on='ValidZones', how='left')
+   
+    rpl = {'Sjælland': 'dsb', 
+            'Vestsjælland': 'vestsjælland', 
+            'Hovedstaden': 'hovedstad', 
+            'Sydsjælland': 'sydsjælland'}
+    
+    test.loc[:, 'PsedoFareset'] = test.loc[:, 'PsedoFareset'].replace(rpl) 
+    
+    missed = test[test.n_trips.isnull()]    
+    good = test[~test.n_trips.isnull()]
+    good.loc[:, 'note'] = 'kombi_match'
+    
+    fp = os.path.join(
+        THIS_DIR,
+        '__result_cache__', f'{year}', 'pendler', f'zonerelations{year}_model_{model}.csv'
+        )
+    
+    
+    relations = pd.read_csv(fp)
+
+    missed = missed[['EncryptedCardEngravedID', 'SeasonPassID', 'SeasonPassTemplateID',
+        'SeasonPassName', 'Fareset', 'PsedoFareset', 'SeasonPassType',
+        'PassengerGroupType1', 'SeasonPassStatus', 'ValidityStartDT',
+        'ValidityEndDT', 'ValidDays', 'FromZoneNr', 'ToZoneNr', 'ViaZoneNr',
+        'SeasonPassZones', 'PassagerType', 'TpurseRequired',
+        'SeasonPassCategory', 'Pris', 'RefundType', 'productdate', 'ValidZones']]
+    
+    relations = relations[['StartZone', 'DestinationZone', 
+        'movia', 'stog', 'first', 'metro', 'dsb', 'n_users',
+        'n_period_cards', 'n_trips']]  
+    relations.rename(columns={
+        'StartZone': 'FromZoneNr', 
+        'DestinationZone': 'ToZoneNr'}, inplace=True)
+
+    merge = pd.merge(missed, relations, on=['FromZoneNr', 'ToZoneNr'], how='left')
+    merge.loc[:, 'note'] = 'from_to'
+    
+    out = pd.concat([good, merge])
+    out.to_csv(f'rejsekort_pendler{year}_model_{model}.csv', index=False)
+    
+    
+# if __name__ == "__main__":
+#     main()    
+    
+    
+    
+    
+    
+    
