@@ -35,9 +35,9 @@ from tablesalt.preprocessing.parsing import TableArgParser
 
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
+CPU_USAGE = 0.75
 
-
-def _load_border_trips(year):
+def _load_border_trips(year: int):
     
     filedir = os.path.join(
         THIS_DIR, 
@@ -384,7 +384,7 @@ def _get_all_store_keys(stores, stopzone_map, ringzones, operators, rabatkeys, y
                     year=year, 
                     bordertrips=borders)
 
-    with Pool(round(os.cpu_count() * 0.75)) as pool:
+    with Pool(round(os.cpu_count() * CPU_USAGE)) as pool:
         pool.map(pfunc, stores)
 
 
@@ -457,8 +457,8 @@ def _gather_all_store_keys(operators, nparts, year):
             out_all, out, out_operators, opkeys, operators
             )
 
-    # for p in lst_of_temp:
-    #     os.remove(p)
+    for p in lst_of_temp:
+        os.remove(p)
 
     return out_all, out_operators
 
@@ -586,12 +586,13 @@ def main():
 
     year = args['year']
     rabat_level = args['rabattrin']
+    model = args['model']
 
     store_loc = find_datastores()
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
-    model = args['model']
+   
     if model != 1:
         db_path = db_path + f'_model_{model}'
 
@@ -618,7 +619,7 @@ def main():
     
     del rabatkeys
     
-    nparts = 20
+    nparts = 10
     out_all, out_operators = \
         _gather_all_store_keys(wanted_operators, nparts, year)
 
@@ -654,12 +655,11 @@ def main():
         '__result_cache__',
         f'{year}',
         'preprocessed', 
-        f'single_results_{year}_r{rabat_level}.pickle'
+        f'single_results_{year}_r{rabat_level}_model_{model}.pickle'
         )
 
     with open(fp, 'wb') as f:
         pickle.dump(operator_results_, f)
-
     # _write_results(rabat_level, year)
 
 if __name__ == "__main__":
