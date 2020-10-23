@@ -305,7 +305,7 @@ def _get_trips(share_db, tripkeys):
                     out[int(k.decode('utf-8'))] = ast.literal_eval(res)
     return out
 
-def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, calc_store, year):
+def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, calc_store, year, model):
     
     zero_travel_price = {int(x) for x in zero_travel_price}
     takstsets = ["vestsjælland", "sydsjælland", "hovedstad", "dsb"]
@@ -339,13 +339,13 @@ def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, calc_store, yea
             '__result_cache__', 
             f'{year}', 
             'pendler', 
-            f'kombi_paid_zones_region_{takst}.csv'
+            f'kombi_paid_zones_region_{takst}_model_{model}.csv'
             )
         frame.to_csv(fp, index=False)
 
 
 # aggregated by chosenzones
-def _chosen_zones(userdict, paths, zero_travel_price, year):
+def _chosen_zones(userdict, paths, zero_travel_price, year, model):
     
     
     userdata = userdict.get_data()
@@ -390,7 +390,7 @@ def _chosen_zones(userdict, paths, zero_travel_price, year):
     fp = os.path.join(
         THIS_DIR, 
         '__result_cache__', f'{year}', 
-        'pendler', 'pendlerchosenzones.csv'
+        'pendler', f'pendlerchosenzones{year}_model_{model}.csv'
         )
     out.to_csv(fp)
     
@@ -440,12 +440,13 @@ def _proc_zone_relations(zone_rels: dict):
 
     return zone_rels
 
-def _load_kombi_results(year):
+def _load_kombi_results(year, model):
 
     fp = os.path.join(
         THIS_DIR, 
         '__result_cache__', f'{year}', 
-        'pendler', 'pendlerchosenzones.csv'
+        'pendler', 
+        f'pendlerchosenzones{year}_model_{model}.csv'
         )
     
     results = pd.read_csv(fp, index_col=0)
@@ -454,11 +455,11 @@ def _load_kombi_results(year):
     return {ast.literal_eval(k): v for k, v in results.items()}
 
     
-def _zonerelations(year):
+def _zonerelations(year, model):
 
     zone_rels = _load_zone_relations()
     zone_rels = _proc_zone_relations(zone_rels)
-    results = _load_kombi_results(year)
+    results = _load_kombi_results(year, model)
 
     out = {}
     for i, x in enumerate(zone_rels):
@@ -482,7 +483,7 @@ def _zonerelations(year):
     fp = os.path.join(
         THIS_DIR, 
         '__result_cache__', f'{year}', 
-        'pendler', 'zonerelations.csv'
+        'pendler', f'zonerelations{year}_model_{model}.csv'
         )
        
     df.to_csv(fp, index=False)
@@ -515,18 +516,18 @@ def main():
     zero_travel_price = find_no_pay(stores)
     zero_travel_price = {str(x) for x in zero_travel_price}
 
-    _chosen_zones(userdict, paths, zero_travel_price, year)
+    _chosen_zones(userdict, paths, zero_travel_price, year, model)
    
     _npaid_zones(
         userdict, paths['kombi_valid_trips'], 
         zero_travel_price, paths['calculated_stores'],
-        year
+        year, model
         )
     
-    _zonerelations(year)
+    _zonerelations(year, model)
 
 
-if __name__ == "__main__":
-    st = datetime.now()
-    main()
-    print(datetime.now() - st)
+# if __name__ == "__main__":
+#     st = datetime.now()
+#     main()
+#     print(datetime.now() - st)
