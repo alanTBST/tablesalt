@@ -61,16 +61,17 @@ def _load_sales_data(year: int) -> pd.core.frame.DataFrame:
     
     return _proc_sales(df)
 
-def _get_single_results(year):
+def _get_single_results(year: int,  model: int):
     
     fp = os.path.join(
         THIS_DIR, '__result_cache__', 
         f'{year}', 'preprocessed'
         )
     singles = glob.glob(os.path.join(fp, 'single*'))
+    singles = [x for x in singles if f'model_{model}' in x]
     
     out = {}
-    for i in range(3):
+    for i in range(3): # using r0, r1, r2
         fmatch = [x for x in singles if f'r{i}' in x]
         times = [os.path.getmtime(x) for x in fmatch]
         min_id = np.argmin(times) # find latest entry
@@ -412,13 +413,13 @@ def _single_tickets(sales_idxs,
 # Pendler tickets
 # =============================================================================
 
-def _load_kombi_shares(year: int) -> dict:
+def _load_kombi_shares(year: int, model: int) -> dict:
 
 
     fp = os.path.join(
         THIS_DIR, 
         '__result_cache__', f'{year}', 
-        'pendler', 'pendlerchosenzones.csv'
+        'pendler', f'pendlerchosenzones{year}_model_{model}.csv'
         )
 
     df = pd.read_csv(fp, index_col=0)
@@ -470,12 +471,12 @@ def _load_zone_relations():
 
     return _proc_zone_relations(zone_relations)
 
-def _load_kombi_map_shares(year: int) -> pd.core.frame.DataFrame:
+def _load_kombi_map_shares(year: int, model: int) -> pd.core.frame.DataFrame:
 
     fp = os.path.join(
         THIS_DIR, '__result_cache__', 
         f'{year}', 'pendler', 
-        'zonerelations.csv'
+        f'zonerelations{year}_model_{model}.csv'
         )
     df = pd.read_csv(
         fp, 
@@ -489,7 +490,7 @@ def _load_kombi_map_shares(year: int) -> pd.core.frame.DataFrame:
 
     return d
 
-def _load_nzone_shares(year: int):
+def _load_nzone_shares(year: int, model: int):
     
     takst_map = {
         'dsb': 'dsb', 
@@ -500,7 +501,7 @@ def _load_nzone_shares(year: int):
     
     filedir = os.path.join(THIS_DIR, '__result_cache__', f'{year}', 'pendler')
     files = glob.glob(os.path.join(filedir, '*.csv'))
-    kombi = [x for x in files if 'kombi_paid_zones' in x]
+    kombi = [x for x in files if 'kombi_paid_zones' in x and f'model_{model}' in x]
 
     out = {}
     for file in kombi:
@@ -611,7 +612,8 @@ def _pendler_tickets(
         sales_idxs: Dict,
         data: pd.core.frame.DataFrame,
         year: int, 
-        min_trips: int
+        min_trips: int,
+        model: int
         ) -> pd.core.frame.DataFrame:
 
     
@@ -628,9 +630,10 @@ def _pendler_tickets(
 
     sub_data = data.query("NR in @pendler_ids")
     sub_tuples = list(sub_data.itertuples(index=False, name='Sale'))
-    kombi_results = _load_kombi_shares(year)    
+    
+    kombi_results = _load_kombi_shares(year, model)    
     zone_relation_results = _get_zone_relation_results(kombi_results)
-    paid_zones_results = _load_nzone_shares(year)
+    paid_zones_results = _load_nzone_shares(year, model)
        
     bad = set()
     out = {}
@@ -663,12 +666,12 @@ def _pendler_tickets(
 
 
     
-def _load_other_results(year: int) -> Dict:
+def _load_other_results(year: int, model: int) -> Dict:
 
     fp = os.path.join(
         THIS_DIR, '__result_cache__', 
         f'{year}', 'preprocessed', 
-        'subtakst.pickle'
+        f'subtakst_model_{model}.pickle'
         )
     
     with open(fp, 'rb') as f:
@@ -703,11 +706,12 @@ def _match_other_record(
 def _other_tickets(
         sales_idxs: Dict,
         data: pd.core.frame.DataFrame,
-        year: int
+        year: int, 
+        model: int
         ):
 
     
-    results = _load_other_results(year)
+    results = _load_other_results(year, model)
     
     small_tickets = {
         'city pass small',
@@ -764,35 +768,38 @@ def _other_tickets(
 
 def main():
     
-    parser = TableArgParser('year')
+    parser = TableArgParser('year', 'model')
+    
     args = parser.parse()
     year = args['year']
+    model = args['model']
            
     data = _load_sales_data(year)
     sales_idxs = _sales_ref(data)
     location_idxs = _location_ref(data)
     location_sales = _get_location_sales(location_idxs, sales_idxs)
     
-    single_results = _get_single_results(year)
+    single_results = _get_single_results(year, model)
+    
+    minimum_trips = 1
     single_output = _single_tickets(
-        sales_idxs, location_sales, data, single_results, 1
+        sales_idxs, location_sales, data, single_results, minimum_trips
         )
     
-    pendler_output = _pendler_tickets(sales_idxs, data, year, 1)
-    other_output = _other_tickets(sales_idxs, data, year)
+    pendler_output = _pendler_tickets(sales_idxs, data, year, minimum_trips, model)
+    other_output = _other_tickets(sales_idxs, data, year, model)
     
     output = pd.concat([single_output, pendler_output, other_output])
     output = output.sort_values('NR')
     
-    
+    output.to_csv(f'takst_sjælland{year}_model_{model}.csv', index=False)
+  
     # from collections import Counter
     # for i in [1, 2, 5, 10, 20, 50]:
     #     single_output = _single_tickets(
     #         sales_idxs, location_sales, data, single_results, i
-    #         )
-           
-    #     single_output.to_csv(f"H:/single_ticket_mintrips{i}.csv", index=False)
-            
+    #         )           
+    #     single_output.to_csv(f"H:/single_ticket_mintrips{i}.csv", index=False)           
     #     n = len(single_output)
     #     counts = Counter(single_output.note.str.count('->'))
     #     ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])    
@@ -802,10 +809,5 @@ def main():
     #     stats.columns = ['attempts', 'percentage']
     #     stats.to_csv(f"H:/single_ticket_mintrips{i}_stats.csv", index=False)
        
-   
-    return output
-
-
-
 if __name__ == "__main__":
-      out = main()
+     main()
