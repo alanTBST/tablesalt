@@ -38,6 +38,7 @@ THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 CPU_USAGE = 0.75
 
 def _load_border_trips(year: int):
+
     
     filedir = os.path.join(
         THIS_DIR, 
@@ -588,11 +589,12 @@ def main():
     rabat_level = args['rabattrin']
     model = args['model']
 
+
     store_loc = find_datastores()
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
-   
+
     if model != 1:
         db_path = db_path + f'_model_{model}'
 
@@ -619,7 +621,9 @@ def main():
     
     del rabatkeys
     
+
     nparts = 10
+
     out_all, out_operators = \
         _gather_all_store_keys(wanted_operators, nparts, year)
 
@@ -656,10 +660,12 @@ def main():
         f'{year}',
         'preprocessed', 
         f'single_results_{year}_r{rabat_level}_model_{model}.pickle'
+
         )
 
     with open(fp, 'wb') as f:
         pickle.dump(operator_results_, f)
+
     # _write_results(rabat_level, year)
 
 if __name__ == "__main__":

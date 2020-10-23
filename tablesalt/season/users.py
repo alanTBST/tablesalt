@@ -144,7 +144,9 @@ def _process_cards(prodzones: Dict,
     return _process_dynamic_cards(dates)
 
 def count_trues(zones: Iterable, num: int) -> bool:
+
     return all(map(any, repeat(iter(zones), num)))
+
 
 class _PendlerInput():
     """

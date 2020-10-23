@@ -305,7 +305,9 @@ def _get_trips(share_db, tripkeys):
                     out[int(k.decode('utf-8'))] = ast.literal_eval(res)
     return out
 
+
 def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, calc_store, year, model):
+
     
     zero_travel_price = {int(x) for x in zero_travel_price}
     takstsets = ["vestsjælland", "sydsjælland", "hovedstad", "dsb"]
@@ -340,12 +342,15 @@ def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, calc_store, yea
             f'{year}', 
             'pendler', 
             f'kombi_paid_zones_region_{takst}_model_{model}.csv'
+
             )
         frame.to_csv(fp, index=False)
 
 
 # aggregated by chosenzones
+
 def _chosen_zones(userdict, paths, zero_travel_price, year, model):
+
     
     
     userdata = userdict.get_data()
@@ -442,6 +447,7 @@ def _proc_zone_relations(zone_rels: dict):
 
 def _load_kombi_results(year, model):
 
+
     fp = os.path.join(
         THIS_DIR, 
         '__result_cache__', f'{year}', 
@@ -483,7 +489,8 @@ def _zonerelations(year, model):
     fp = os.path.join(
         THIS_DIR, 
         '__result_cache__', f'{year}', 
-        'pendler', f'zonerelations{year}_model_{model}.csv'
+        'pendler', 
+        f'zonerelations{year}_model_{model}.csv'
         )
        
     df.to_csv(fp, index=False)
@@ -516,18 +523,21 @@ def main():
     zero_travel_price = find_no_pay(stores)
     zero_travel_price = {str(x) for x in zero_travel_price}
 
+
     _chosen_zones(userdict, paths, zero_travel_price, year, model)
-   
+  
     _npaid_zones(
         userdict, paths['kombi_valid_trips'], 
         zero_travel_price, paths['calculated_stores'],
+
         year, model
         )
     
     _zonerelations(year, model)
 
 
-# if __name__ == "__main__":
-#     st = datetime.now()
-#     main()
-#     print(datetime.now() - st)
+if __name__ == "__main__":
+    st = datetime.now()
+    main()
+    print(datetime.now() - st)
+

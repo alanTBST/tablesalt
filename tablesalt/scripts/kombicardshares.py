@@ -33,6 +33,7 @@ from tablesalt.season.users import PendlerKombiUsers
 from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
 
+
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 
 def _aggregate_zones(shares):
@@ -81,6 +82,7 @@ def match_trip_to_season(kombi_trips, userdata, kombi_dates_store):
     env = lmdb.open(kombi_dates_store)
     with env.begin() as txn:
         for k, v in tqdm(kombi_trips.items()):
+
             v = (bytes(str(x), 'utf-8') for x in v)
             utripdates = {x: txn.get(x) for x in v}
             utripdates = {
@@ -99,6 +101,7 @@ def match_trip_to_season(kombi_trips, userdata, kombi_dates_store):
                 if cur is not None:
                     cur.append(key)
                 out[season] = cur
+
     env.close()
 
     return out
@@ -116,11 +119,13 @@ def make_output(usershares, product_path):
     ushares.rename(columns={'level_0':'EncryptedCardEngravedID',
                             'level_1':'SeasonPassID'}, inplace=True)
     ushares = ushares.fillna(0)
+
     out = pd.merge(
         prods, ushares, 
         on=['EncryptedCardEngravedID', 'SeasonPassID'], 
         how='left'
         )
+
 
     return out
 
@@ -178,6 +183,7 @@ def main():
     db_path = paths['calculated_stores']
     if model != 1:
         db_path = db_path + f'_model_{model}'
+
     valid_kombi_store = paths['kombi_valid_trips']
     kombi_dates =  paths['kombi_dates_db']
 
@@ -218,9 +224,7 @@ def main():
         '__result_cache__', f'{year}', 'pendler', f'kombiusershares{year}_model_{model}.csv'
         )
     out.to_csv(fp, index=False)
-    
-    
-    
+      
     
     period_products_fp = r'H:/revenue/inputdata/2019/PeriodeProdukt.csv'
     period_zones_fp = r'H:/revenue/inputdata/2019/Zoner.csv'
@@ -325,6 +329,4 @@ def main():
     
     
     
-    
-    
-    
+ 

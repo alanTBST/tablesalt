@@ -163,6 +163,7 @@ def main():
     args = parser.parse()
     rabat_level = args['rabattrin']
     model = args['model']
+
     year = args['year']
     
     store_loc = find_datastores(r'H://')
@@ -174,6 +175,7 @@ def main():
     
     ringzones = ZoneGraph.ring_dict('sjælland')   
     rabatkeys = tuple(_get_rabatkeys(rabat_level, year))   
+
     stopzone_map = TakstZones().stop_zone_map()
        
     trips = {
@@ -280,4 +282,4 @@ def main():
 if __name__ == "__main__":
     results = main()       
         
-        
+    

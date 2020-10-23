@@ -461,7 +461,8 @@ class ZoneSharer(ZoneProperties):
         self.usage_legs = to_legs(self.usage_sequence)
         
         self.single: bool = self._is_single()
-        
+
+      
         self.region: str = _determine_region(self.zone_sequence)
 
     
@@ -611,7 +612,7 @@ class ZoneSharer(ZoneProperties):
             for x in share_tuple
             )
         total_price = sum(x[0] for x in operator_prices)
-        
+
         solo_share = tuple(
             (x[0] / total_price, x[1]) 
             for x in operator_prices
@@ -653,7 +654,6 @@ class ZoneSharer(ZoneProperties):
     #         )
         
     #     return operator_prices
-        
         
 
 def shrink_search(graph, start, goal, ringzones, distance_buffer=2):
