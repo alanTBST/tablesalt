@@ -620,7 +620,7 @@ def _pendler_tickets(
         model: int
         ) -> pd.core.frame.DataFrame:
 
-    
+    # TODO - set this in config
     pendler_ids = \
         sales_idxs.get('pendlerkort', ()) + \
             sales_idxs.get('erhvervskort', ())  + \
@@ -716,8 +716,8 @@ def _other_tickets(
         model: int
         ):
 
-    
     results = _load_other_results(year, model)
+    results = results['alltrips']
 
     
     small_tickets = {
@@ -780,6 +780,12 @@ def main():
     args = parser.parse()
     year = args['year']
     model = args['model']
+    
+    single_model = model
+    
+    if model == 3:
+        single_model = 1
+        
 
            
     data = _load_sales_data(year)
@@ -787,17 +793,21 @@ def main():
     location_idxs = _location_ref(data)
     location_sales = _get_location_sales(location_idxs, sales_idxs)
 
-    single_results = _get_single_results(year, model)
+    single_results = _get_single_results(year, single_model)
     
     minimum_trips = 1
+    
     single_output = _single_tickets(
-        sales_idxs, location_sales, data, single_results, minimum_trips
+        sales_idxs, location_sales, data, 
+        single_results, minimum_trips
         )
     
-    pendler_output = _pendler_tickets(sales_idxs, data, year, minimum_trips, model)
-    other_output = _other_tickets(sales_idxs, data, year, model)
-
-    
+    pendler_output = _pendler_tickets(
+        sales_idxs, data, year, minimum_trips, model
+        )
+  
+    other_output = _other_tickets(sales_idxs, data, year, single_model)
+ 
     output = pd.concat([single_output, pendler_output, other_output])
     output = output.sort_values('NR')
 
