@@ -8,26 +8,30 @@ Created on Wed Oct 21 14:26:56 2020
 import pandas as pd
 
 
-model1 = pd.read_csv(r'takst_sjælland2019_model_1.csv', low_memory=False)
-model1 = model1.sort_values('NR')
+year = 2019
 
-model2 = pd.read_csv('takst_sjælland2019_model_2.csv', low_memory=False)
-model2 = model2.sort_values('NR')
-
-model2 = model2[['NR', 'dsb', 'first', 'metro', 'movia', 'stog']]
-
+frames = []
 
 res_cols = ['dsb', 'first', 'stog', 'movia', 'metro']
-df = pd.merge(model1, model2, on='NR', suffixes=('_model_1', '_model_2'))
+stats_cols = ['n_trips', 'n_period_cards', 'n_users', 'note']
 
-df = df[['NR', 'salgsvirksomhed', 'indtægtsgruppe', 'salgsår', 'salgsmåned',
-       'takstsæt', 'produktgruppe', 'produktnavn', 'kundetype', 'salgsmedie',
-       'betaltezoner', 'startzone', 'slutzone', 'valgtezoner', 'omsætning',
-       'antal', 'n_trips', 'n_period_cards', 'n_users', 'note', 
-       'dsb_model_1', 'first_model_1', 'stog_model_1',
-       'metro_model_1', 'movia_model_1',
-       'dsb_model_2', 'first_model_2', 
-       'stog_model_2', 'movia_model_2','metro_model_2',
-        ]]
-
-df.to_csv('kildefordeling_1_2.csv', index=False)
+for m in [1, 2, 3]:
+    name_dict = {k:k+f'_model_{m}' for k in res_cols}
+    model = pd.read_csv(f'takst_sjælland{year}_model_{m}.csv', low_memory=False)
+    model = model.sort_values('NR')
+    
+    model.rename(columns=name_dict, inplace=True)
+    
+    if m > 1:
+        model = model[name_dict.values()]
+    else:
+        new_order = \
+            [x for x in model.columns if x 
+             not in name_dict.values() and x not in stats_cols] + \
+                stats_cols + list(name_dict.values())
+        model = model[new_order]
+    
+    frames.append(model)
+        
+out = pd.concat(frames, axis=1)    
+out.to_csv('kildefordeling_1_2_3.csv', index=False)
