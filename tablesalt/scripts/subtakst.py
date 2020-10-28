@@ -5,7 +5,6 @@ Created on Sun Sep 27 23:17:45 2020
 @author: alkj
 """
 import ast
-import glob
 import os
 import pickle
 from operator import itemgetter
@@ -236,7 +235,7 @@ def main():
                     pass
             for k, v in pension.items():       
                 if all(x < 1100 for x in v):
-                    trips['pension']["th"].add(k)       
+                    trips['pension']["th"].add(k)
                 elif all(1100 < x <= 1200 for x in v):
                     trips['pension']["tv"].add(k)
                 elif all(1200 < x < 1300 for x in v):
@@ -274,12 +273,17 @@ def main():
             k2: get_user_shares(v2.values()) for k2, v2 in v1.items()
             } for k1, v1 in out.items() 
         }
-    # test = {(i,j): test[i][j] for i in test.keys() for j in test[i].keys()}
+    fp = os.path.join(
+        THIS_DIR, '__result_cache__', 
+        f'{year}', 'preprocessed', 
+        f'subtakst_model_{model}.pickle'
+        )
+    
+    with open(fp, 'wb') as f:
+        pickle.dump(test, f)
 
-    # return pd.DataFrame.from_dict(test, orient='index')
-    return test
             
 if __name__ == "__main__":
-    results = main()       
+    main()       
         
     
