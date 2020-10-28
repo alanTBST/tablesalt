@@ -9,15 +9,8 @@ TBST - Trafik, Bygge, og Bolig -styrelsen
 """
 
 import ast
-import glob
 import os
-import sys
 from pathlib import Path
-from argparse import (
-    ArgumentParser,
-    RawTextHelpFormatter
-    )
-
 
 from operator import itemgetter
 from itertools import groupby, chain
@@ -125,8 +118,13 @@ def make_output(usershares, product_path):
         on=['EncryptedCardEngravedID', 'SeasonPassID'], 
         how='left'
         )
+    
+    cols = [x for x in out.columns if x != 'n_trips']
+    colorder = cols + ['n_trips']
+    out = out[colorder]
+    out = out.loc[out.loc[:, 'SeasonPassName'].str.lower().str.contains('kombi')]
 
-
+    out = out.fillna(0)
     return out
 
 def divide_dict(dictionary, chunk_size):
@@ -168,6 +166,17 @@ def get_user_shares(all_trips):
 
     return user_shares
 
+def n_operators(share_tuple):
+    
+    return len({x[1] for x in share_tuple})
+
+def pendler_reshare(share_tuple):
+        
+    n_ops = n_operators(share_tuple)
+    
+    return tuple((1/n_ops, x[1]) for x in share_tuple)
+
+
 def main():
 
     parser = TableArgParser('year', 'zones', 'products', 'model')
@@ -179,10 +188,10 @@ def main():
     product_path = args['products']
     
 
-    paths = db_paths(find_datastores('H:/'), year)
+    paths = db_paths(find_datastores(), year)
     db_path = paths['calculated_stores']
     if model != 1:
-        db_path = db_path + f'_model_{model}'
+        db_path = db_path + '_model_2'
 
     valid_kombi_store = paths['kombi_valid_trips']
     kombi_dates =  paths['kombi_dates_db']
@@ -207,31 +216,30 @@ def main():
                 for trip in v:
                     t = txn.get(bytes(trip, 'utf-8'))
                     if t:
-                        all_trips.append(t.decode('utf-8'))                    
+                        all_trips.append(t.decode('utf-8'))                 
                 all_trips = tuple(
                     ast.literal_eval(x) for x in all_trips 
                     if x not in ('station_map_error', 'operator_error')
                     )
+                if model == 3:
+                    all_trips = tuple(pendler_reshare(x) for x in all_trips)
+                    
                 final[k] = get_user_shares(all_trips)
 
     out = make_output(final, product_path)
-    cols = [x for x in out.columns if x != 'n_trips']
-    colorder = cols + ['n_trips']
-    out = out[colorder]
     
     fp = os.path.join(
         THIS_DIR,
-        '__result_cache__', f'{year}', 'pendler', f'kombiusershares{year}_model_{model}.csv'
+        '__result_cache__', 
+        f'{year}', 
+        'pendler', 
+        f'kombiusershares{year}_model_{model}.csv'
         )
     out.to_csv(fp, index=False)
-      
+
     
-    period_products_fp = r'H:/revenue/inputdata/2019/PeriodeProdukt.csv'
-    period_zones_fp = r'H:/revenue/inputdata/2019/Zoner.csv'
-    
-    
-    period_products = pd.read_csv(period_products_fp, sep=';', encoding='iso-8859-1')
-    pendler_product_zones = pd.read_csv(period_zones_fp, sep=';', encoding='iso-8859-1')
+    period_products = pd.read_csv(product_path, sep=';', encoding='iso-8859-1')
+    pendler_product_zones = pd.read_csv(zone_path, sep=';', encoding='iso-8859-1')
 
     pendler_product_zones['key'] = list(zip(
         pendler_product_zones['EncryptedCardEngravedID'],
@@ -274,7 +282,10 @@ def main():
 
     fp = os.path.join(
         THIS_DIR,
-        '__result_cache__', f'{year}', 'pendler', f'pendlerchosenzones{year}_model_{model}.csv'
+        '__result_cache__', 
+        f'{year}', 
+        'pendler', 
+        f'pendlerchosenzones{year}_model_{model}.csv'
         )
     
     pendler_kombi = pd.read_csv(fp, index_col=0)
@@ -297,7 +308,10 @@ def main():
     
     fp = os.path.join(
         THIS_DIR,
-        '__result_cache__', f'{year}', 'pendler', f'zonerelations{year}_model_{model}.csv'
+        '__result_cache__', 
+        f'{year}', 
+        'pendler', 
+        f'zonerelations{year}_model_{model}.csv'
         )
     
     
@@ -324,8 +338,8 @@ def main():
     out.to_csv(f'rejsekort_pendler{year}_model_{model}.csv', index=False)
     
     
-# if __name__ == "__main__":
-#     main()    
+if __name__ == "__main__":
+    main()    
     
     
     
