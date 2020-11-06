@@ -17,6 +17,8 @@ from typing import List, Dict, AnyStr, Tuple, Set, Any
 import pandas as pd
 import numpy as np
 
+THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
+
 SUPPORTED_FILES = {
     'csv',
     'xlsx',
@@ -560,7 +562,7 @@ def clean_frame(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
 def main():
     """main function"""
     
-    d = r'..\salesdata'
+    d = r'H:\revenue\salesdata'
     year = 2019
     contents = directory_contents(d)
     operators = identify_operator(contents)
@@ -569,8 +571,10 @@ def main():
     df = read_and_merge(operators, columns_matched)
     df = clean_frame(df)
     fp = os.path.join(
+        THIS_DIR, 
         '__result_cache__', 
         f'{year}', 
+        'preprocessed',
         'mergedsales.csv'
         )
     df.to_csv(fp, index=False)
