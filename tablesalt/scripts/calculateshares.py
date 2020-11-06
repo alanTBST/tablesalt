@@ -29,7 +29,7 @@ from tablesalt.topology import ZoneGraph, ZoneSharer
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 
-CPU_USAGE = 0.75 # %
+CPU_USAGE = 0.4# %
 DB_START_SIZE = 8 # gb
 
 
@@ -97,15 +97,6 @@ def _load_store_data(store, region, zonemap, region_contractors):
     store:
         the path to the h5 file
     region:
-    filter_type:
-        filter the trips in the store by the takstzone region
-        default is 'hovedstaden'
-
-        currently only ['hovedstaden', 'national'] supported;
-        ['sjælland', 'vestsjælland', 'fyn', 'lolland',
-        'nordjylland', 'midtjylland', 'sydjylland']
-        will be implemented at a later date and raise
-        NotImplementedError
 
     """
 
@@ -113,7 +104,8 @@ def _load_store_data(store, region, zonemap, region_contractors):
     stops = reader.get_data('stops')
 
     stops = stops[np.lexsort((stops[:, 1], stops[:, 0]))]
-       
+    # stops = stops[np.isin(stops[:, 0], list(ticket_tripkeys))]   
+    # print(len(set(stops[:, 0])))
     usage_dict = {
         key: tuple(x[3] for x in grp) for key, grp in
         groupby(stops, key=itemgetter(0))
@@ -144,11 +136,6 @@ def _load_store_data(store, region, zonemap, region_contractors):
     
     return stop_dict, zone_dict, usage_dict, op_dict
 
-
-def _get_input(stop_dict, zone_dict, usage_dict, op_dict):
-    
-    for k, zone_sequence in zone_dict.items():
-        yield k, zone_sequence, stop_dict[k], op_dict[k], usage_dict[k]
 
 def _get_store_num(store):
 
@@ -249,7 +236,7 @@ def main():
     zonemap = zones.stop_zone_map()
     
     # TODO into config
-    region_contractors= {
+    region_contractors = {
         'hovedstaden': ['Movia_H', 'DSB', 'First', 'Stog', 'Metro'],
         'sjælland': ['Movia_H', 'Movia_S', 'Movia_V', 'DSB', 'First', 'Stog', 'Metro']
         }
