@@ -35,7 +35,7 @@ from tablesalt.preprocessing.parsing import TableArgParser
 
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
-CPU_USAGE = 0.75
+CPU_USAGE = 0.65
 
 def _load_border_trips(year: int):
 
@@ -460,6 +460,7 @@ def _gather_all_store_keys(operators, nparts, year):
 
     for p in lst_of_temp:
         os.remove(p)
+       
 
     return out_all, out_operators
 
@@ -609,7 +610,6 @@ def main():
     rabatkeys = tuple(_get_rabatkeys(rabat_level, year))
     print('inputs found\n')
 
-
     _get_all_store_keys(
         stores,
         stopzone_map,
@@ -626,7 +626,17 @@ def main():
 
     out_all, out_operators = \
         _gather_all_store_keys(wanted_operators, nparts, year)
-
+    
+    single_fp = os.path.join(
+        THIS_DIR, 
+        '__result_cache__', 
+        f'{year}', 
+        'preprocessed', 
+        f'single_tripkeys_{year}_r{rabat_level}_model_{model}'
+        )
+    with open(single_fp, 'wb') as file:
+        pickle.dump(out_all, file)
+    
     
     print('finding results\n')
     all_wanted_keys = set()
@@ -660,7 +670,6 @@ def main():
         f'{year}',
         'preprocessed', 
         f'single_results_{year}_r{rabat_level}_model_{model}.pickle'
-
         )
 
     with open(fp, 'wb') as f:
