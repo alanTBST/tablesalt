@@ -31,6 +31,8 @@ LOCATIONS = {
     'enkeltbilletter bus': 'movia'
     }
 
+USE_LOCATIONS = False
+
 RESULT_MAP = {'dsb': ('D**', 'D*', 'D'),
               'metro': ('Metro',),  
               'movia': ('Movia_H', 'Movia_S', 'Movia_V')}
@@ -65,8 +67,10 @@ def _get_single_results(year: int,  model: int):
 
     
     fp = os.path.join(
-        THIS_DIR, '__result_cache__', 
-        f'{year}', 'preprocessed'
+        THIS_DIR, 
+        '__result_cache__', 
+        f'{year}', 
+        'preprocessed'
         )
     singles = glob.glob(os.path.join(fp, 'single*'))
 
@@ -75,11 +79,11 @@ def _get_single_results(year: int,  model: int):
     out = {}
     for i in range(3): # using r0, r1, r2
 
-        fmatch = [x for x in singles if f'r{i}' in x]
-        times = [os.path.getmtime(x) for x in fmatch]
-        min_id = np.argmin(times) # find latest entry
-        fp = fmatch[min_id]
-        with open(fp, 'rb') as f:
+        fmatch = [x for x in singles if f'r{i}' in x][0]
+        # times = [os.path.getmtime(x) for x in fmatch]
+        # min_id = np.argmin(times) # find latest entry
+        # fp = fmatch[min_id]
+        with open(fmatch, 'rb') as f:
             res = pickle.load(f)
         out[f'rabat{i}'] = res
             
@@ -337,13 +341,15 @@ def _result_frame(rdict, frame):
     return test_out
     
     
-def _any_single_merge(sales_idxs, location_sales, data, single_results, min_trips):
+def _any_single_merge(sales_idxs, location_sales, data, single_results, min_trips, loc):
     
     sales_nr = set(sales_idxs['enkeltbillet'] + sales_idxs['lang enkeltbillet'])
     location_nr = set(chain(*location_sales.values()))
     
-    wanted = sales_nr - location_nr
-    
+    if loc:
+        wanted = sales_nr - location_nr
+    else:
+        wanted = sales_nr
     sub_data = data.query("NR in @wanted")
     sub_tuples = list(sub_data.itertuples(index=False, name='Sale'))
     
@@ -397,17 +403,21 @@ def _single_tickets(sales_idxs,
                     location_sales, 
                     data, 
                     single_results, 
-                    min_trips):
+                    min_trips, 
+                    loc=False):
     
     any_start = _any_single_merge(
-        sales_idxs, location_sales, data, single_results, min_trips
-        )
+        sales_idxs, location_sales, data, single_results, min_trips,
+        loc=loc)
     
-    specific_start = _location_merge(
-        location_sales, data, single_results, min_trips
-        )
-    
-    out = pd.concat([any_start, specific_start])
+    if loc:
+        specific_start = _location_merge(
+            location_sales, data, single_results, min_trips
+            )
+        
+        out = pd.concat([any_start, specific_start])
+    else:
+        out = any_start
 
     return out.sort_values('NR')
 
@@ -677,7 +687,6 @@ def _load_other_results(year: int, model: int) -> Dict:
         THIS_DIR, '__result_cache__', 
         f'{year}', 'preprocessed', 
         f'subtakst_model_{model}.pickle'
-
         )
     
     with open(fp, 'rb') as f:
@@ -772,6 +781,23 @@ def _other_tickets(
     
     return out_frame
 
+def single_ticket(sales_idxs, location_sales, data, single_results):
+    
+    from collections import Counter
+    for i in [1, 2, 5, 10, 20, 50]:
+        single_output = _single_tickets(
+            sales_idxs, location_sales, data, single_results, i
+            )           
+        single_output.to_csv(f"H:/single_ticket_mintrips{i}.csv", index=False)           
+
+        n = len(single_output)
+        counts = Counter(single_output.note.str.count('->'))
+        ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])    
+        counts = {ordinal(k+1) + ' try': (v / n) * 100 for k, v in counts.items()}
+        stats = pd.DataFrame.from_dict(counts, orient='index')
+        stats = stats.reset_index()
+        stats.columns = ['attempts', 'percentage']
+        stats.to_csv(f"H:/single_ticket_mintrips{i}_stats.csv", index=False)
 
 def main():
     
@@ -781,54 +807,63 @@ def main():
     year = args['year']
     model = args['model']
     
-    single_model = model
-    
-    if model == 3:
-        single_model = 1
-        
-
-           
     data = _load_sales_data(year)
     sales_idxs = _sales_ref(data)
     location_idxs = _location_ref(data)
     location_sales = _get_location_sales(location_idxs, sales_idxs)
 
+    if model == 3:
+        single_model = 1
+    else:
+        single_model = model
+    
     single_results = _get_single_results(year, single_model)
     
     minimum_trips = 1
     
     single_output = _single_tickets(
         sales_idxs, location_sales, data, 
-        single_results, minimum_trips
+        single_results, minimum_trips,
+        loc=USE_LOCATIONS
         )
     
     pendler_output = _pendler_tickets(
         sales_idxs, data, year, minimum_trips, model
         )
-  
-    other_output = _other_tickets(sales_idxs, data, year, single_model)
+      
+    if model == 3:
+        other_model = 1
+    else:
+        other_model = model        
+    
+    other_output = _other_tickets(sales_idxs, data, year, other_model)
  
     output = pd.concat([single_output, pendler_output, other_output])
     output = output.sort_values('NR')
+    output = output.fillna(0)
 
+    
+    cols = ['dsb', 'first', 'stog', 'movia', 'metro']
+    
+    for col in cols:
+        output.loc[:, f'{col}_Andel'] = \
+            output.loc[:, 'omsætning'] * output.loc[:, col]
+
+    output = output[
+        ['NR', 'salgsvirksomhed', 'indtægtsgruppe', 
+         'salgsår', 'salgsmåned', 'takstsæt', 
+         'produktgruppe', 'produktnavn', 'kundetype', 
+         'salgsmedie', 'betaltezoner', 'startzone', 
+         'slutzone', 'valgtezoner', 'omsætning',
+         'antal', 'dsb', 'first', 'stog',  'movia', 
+         'metro', 'n_trips', 'note', 'n_period_cards', 
+         'n_users', 'dsb_Andel', 'first_Andel', 
+         'stog_Andel', 'movia_Andel', 'metro_Andel']
+        ]
+    
     output.to_csv(f'takst_sjælland{year}_model_{model}.csv', index=False)
 
-    # from collections import Counter
-    # for i in [1, 2, 5, 10, 20, 50]:
-    #     single_output = _single_tickets(
-    #         sales_idxs, location_sales, data, single_results, i
-    #         )           
-    #     single_output.to_csv(f"H:/single_ticket_mintrips{i}.csv", index=False)           
-
-    #     n = len(single_output)
-    #     counts = Counter(single_output.note.str.count('->'))
-    #     ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])    
-    #     counts = {ordinal(k+1) + ' try': (v / n) * 100 for k, v in counts.items()}
-    #     stats = pd.DataFrame.from_dict(counts, orient='index')
-    #     stats = stats.reset_index()
-    #     stats.columns = ['attempts', 'percentage']
-    #     stats.to_csv(f"H:/single_ticket_mintrips{i}_stats.csv", index=False)
        
 if __name__ == "__main__":
-     main()
+      main()
 
