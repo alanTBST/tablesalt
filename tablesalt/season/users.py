@@ -365,21 +365,21 @@ class _PendlerInput():
             raise ValueError(
                 "users argument must be one of: 'all', 'static', 'dynamic'"
                 )
+        
+
+        if users == 'all':
+            
+            return _process_cards(
+                self.product_zones, 
+                self.product_dates, 
+                dynamic=False
+                )
+
         static_card_zones, dynamic_card_zones = \
             self._split_static_dynamic(
                 self.product_zones,
                 self._find_dynamic_validity(self.product_zones)
                 )
-
-        if users == 'all':
-            dynamic_card_zones = _process_cards(
-                dynamic_card_zones, self.product_dates, dynamic=False
-                )
-            static_card_zones = _process_cards(
-                static_card_zones, self.product_dates, dynamic=False
-                )
-
-            return {**static_card_zones, **dynamic_card_zones}
 
         if users == 'dynamic':
             return _process_cards(dynamic_card_zones, self.product_dates)
@@ -585,21 +585,29 @@ class UserDict():
         if takst is not None:
             prodzones = self._subset_takst(prodzones, takst)
             
-
-        dynamic_exceptions = \
-            self.input_data._find_dynamic_validity(prodzones)
-
-        stat, dyn = self.input_data._split_static_dynamic(
-            prodzones, dynamic_exceptions
-            )
-        stat = _process_cards(stat, self.input_data.product_dates, dynamic=False)
+        if user_group == 'all':
+            return _process_cards(
+                        prodzones, 
+                        self.input_data.product_dates, 
+                        dynamic=False
+                        )             
+        static_card_zones, dynamic_card_zones = \
+            self._split_static_dynamic(
+                self.product_zones,
+                self._find_dynamic_validity(prodzones)
+                )
+        stat = _process_cards(static_card_zones, self.input_data.product_dates, dynamic=False)
+       
         if user_group == 'static':
             return stat
-        dyn = _process_cards(dyn, self.input_data.product_dates, dynamic=True)
+        
         if user_group == 'dynamic':
+            dyn = _process_cards(dynamic_card_zones, self.input_data.product_dates, dynamic=True)
+    
             return dyn
 
-        return {**stat, **dyn}
+        raise ValueError(f'usergroup: {user_group} not recognised')
+
 
     def subset_time(self):
         """
