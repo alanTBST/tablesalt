@@ -23,6 +23,7 @@ from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.topology.tools import TakstZones
 from tablesalt.topology import ZoneGraph
 from tablesalt.preprocessing.parsing import TableArgParser
+from pendlerkeys import find_no_pay
 
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
@@ -77,7 +78,7 @@ def _load_data(store, stopzone_map, ringzones, rabatkeys):
     reader = StoreReader(store)
     allstops = reader.get_data('stops')
     allstops_rabat_zero = allstops[
-        np.isin(allstops[:, 0], rabatkeys)
+        np.isin(allstops[:, 0], list(rabatkeys))
         ]
     allstops_mapped_zones = _map_zones(
         allstops_rabat_zero, stopzone_map
@@ -169,12 +170,11 @@ def main():
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
-    if model != 1:
+    if model == 2:
         db_path = db_path + f'_model_{model}'    
     
     ringzones = ZoneGraph.ring_dict('sjælland')   
-    rabatkeys = tuple(_get_rabatkeys(rabat_level, year))   
-
+    
     stopzone_map = TakstZones().stop_zone_map()
        
     trips = {
@@ -201,7 +201,10 @@ def main():
             'tv': set(),
              }
         }
+
+    rabatkeys = _get_rabatkeys(rabat_level, year) 
     
+   
     pfunc = partial(
         _load_data, 
         stopzone_map=stopzone_map, 
@@ -274,8 +277,10 @@ def main():
             } for k1, v1 in out.items() 
         }
     fp = os.path.join(
-        THIS_DIR, '__result_cache__', 
-        f'{year}', 'preprocessed', 
+        THIS_DIR, 
+        '__result_cache__', 
+        f'{year}', 
+        'preprocessed', 
         f'subtakst_model_{model}.pickle'
         )
     
