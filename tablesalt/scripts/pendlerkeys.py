@@ -6,6 +6,7 @@ Created on Thu Feb  6 09:31:46 2020
 """
 import ast
 import os
+import pickle
 import pkg_resources
 from datetime import datetime
 from itertools import groupby, chain
@@ -161,15 +162,27 @@ def proc(store):
 
     return get_zeros(price)
 
-def find_no_pay(stores):
-
-    out = set()
-    with Pool(os.cpu_count() - 1) as pool:
-        results = pool.imap(proc, stores)
-        for res in tqdm(results, 
-                        'finding trips inside zones', 
-                        total=len(stores)):
-            out.update(set(res))
+def find_no_pay(stores, year):
+    
+    fp = os.path.join(
+        THIS_DIR, 
+        '__result_cache__', 
+        f'{year}', 
+        'preprocessed',
+        'zero_price.pickle'
+        )
+    
+    try:
+        with open(fp, 'rb') as file:
+            out = pickle.load(file)
+    except FileNotFoundError:
+        out = set()
+        with Pool(os.cpu_count() - 1) as pool:
+            results = pool.imap(proc, stores)
+            for res in tqdm(results, 
+                            'finding trips inside zones', 
+                            total=len(stores)):
+                out.update(set(res))
     return out
 
 def assert_internal_zones(zero_travel_price, zone_combo_trips):
@@ -279,12 +292,10 @@ def get_zone_combination_shares(tofetch, db_path: AnyStr, model: int):
                 all_trips = {}        
                 for trip in trips:
                     t = bytes(trip, 'utf-8')
-                    res = txn.get(t)
-                    
+                    res = txn.get(t)                  
                     if not res:
                         continue
-                    res = res.decode('utf-8')
-                    
+                    res = res.decode('utf-8')                    
                     if res not in ('operator_error', 'station_map_error'):                       
                         val = ast.literal_eval(res)
                         if model != 3:
@@ -350,10 +361,13 @@ def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, db_path, year, 
     for takst in takstsets:
         out = {}
         for nzones in tqdm(range(1, 100), f'calculating kombi paid zones - {takst}'):
-            if nzones in (99, 97):
+            if nzones == 97:
                 paidzones = None
             else:
                 paidzones = nzones
+            if nzones == 99:
+                out[nzones] = out[97]
+                break            
             all_users = userdict.get_data(paid_zones=paidzones, takst=takst)
             usertrips = _kombi_by_users(valid_kombi_store, all_users)
             trips = usertrips.intersection(zero_travel_price)
@@ -436,12 +450,13 @@ def _chosen_zones(
     
     fp = os.path.join(
         THIS_DIR, 
-        '__result_cache__', f'{year}', 
-        'pendler', f'pendlerchosenzones{year}_model_{model}.csv'
+        '__result_cache__', 
+        f'{year}', 
+        'pendler', 
+        f'pendlerchosenzones{year}_model_{model}.csv'
         )
     out.to_csv(fp)
     
-
 # =============================================================================
 # match the zone_relations
 # =============================================================================
@@ -552,10 +567,9 @@ def main():
     paths = db_paths(find_datastores(), year)
     stores = paths['store_paths']
     
-    zero_travel_price = find_no_pay(stores)
+    zero_travel_price = find_no_pay(stores, year)
     zero_travel_price = {str(x) for x in zero_travel_price}
-
-     
+    
     db_path = paths['calculated_stores']
    
     model = args['model']
