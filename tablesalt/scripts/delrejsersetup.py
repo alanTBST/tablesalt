@@ -108,14 +108,16 @@ from itertools import groupby
 from multiprocessing import Process, Queue
 from operator import itemgetter
 from typing import (
-    Generator,
+    ByteString,
+    Iterator, 
     List,
     Dict,
     Tuple,
     Optional,
     AnyStr,
     Union,
-    Any)
+    Any
+    )
 
 # third party imports
 import numpy as np
@@ -144,7 +146,7 @@ from tablesalt.preprocessing.tools import (
 # =============================================================================
 def card_trip_generator(
         ziplist, col_indices, chunksize, skiprows=0
-        ) -> Generator:
+        ) -> Iterator[Dict[bytes, bytes]]:
     """
     Parameters
     ----------
