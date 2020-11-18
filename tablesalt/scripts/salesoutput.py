@@ -72,7 +72,7 @@ def _get_single_results(year: int,  model: int):
         f'{year}', 
         'preprocessed'
         )
-    singles = glob.glob(os.path.join(fp, 'single*'))
+    singles = glob.glob(os.path.join(fp, 'single_results*'))
 
     singles = [x for x in singles if f'model_{model}' in x]
     
@@ -841,7 +841,6 @@ def main():
     output = pd.concat([single_output, pendler_output, other_output])
     output = output.sort_values('NR')
     output = output.fillna(0)
-
     
     cols = ['dsb', 'first', 'stog', 'movia', 'metro']
     
