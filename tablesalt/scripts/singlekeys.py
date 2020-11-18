@@ -35,7 +35,7 @@ from tablesalt.preprocessing.parsing import TableArgParser
 
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
-CPU_USAGE = 0.65
+CPU_USAGE = 0.8
 
 def _load_border_trips(year: int):
 
