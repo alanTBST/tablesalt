@@ -8,7 +8,7 @@ __pycache__
 /__pycache__/
 /gtfs/
 tablesalt/resources/networktopodk/gtfs/
-/.pylint.d/
+.pylint.d/
 tablesalt/.vscode/settings.json
 /.vscode/
 tablesalt/scripts/.pylint.d/
