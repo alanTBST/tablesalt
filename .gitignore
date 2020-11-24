@@ -2,6 +2,8 @@
 __pycache__
 /dist/
 /*.egg-info
+/*.sqlite3
+/*.pyi
 /build/
 /__pycache__/
 /gtfs/
