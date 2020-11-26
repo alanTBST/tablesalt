@@ -120,11 +120,11 @@ from typing import (
     )
 
 # third party imports
-import numpy as np
-import pandas as pd
-import h5py
-import msgpack
-from tqdm import tqdm
+import numpy as np       #type: ignore
+import pandas as pd      #type: ignore
+import h5py              #type: ignore
+import msgpack           #type: ignore
+from tqdm import tqdm    #type: ignore
 
 # this package imports
 from tablesalt.common.io import mappers
@@ -667,7 +667,7 @@ def main() -> None:
 
     check_all_file_headers(zips)
     file_columns = get_columns(*zips[0])
-    col_indices, _ = col_index_dict(file_columns)
+    col_indices, a = col_index_dict(file_columns)
 
     queue = Queue()
     contractor_queue = Queue()
