@@ -16,7 +16,7 @@ from pathlib import Path
 #third party imports
 import numpy as np
 from tqdm import tqdm
-	
+
 # module imports
 from tablesalt.running import WindowsInhibitor
 from tablesalt import StoreReader
@@ -104,7 +104,7 @@ def _load_store_data(store, region, zonemap, region_contractors):
     stops = reader.get_data('stops')
 
     stops = stops[np.lexsort((stops[:, 1], stops[:, 0]))]
-    # stops = stops[np.isin(stops[:, 0], list(ticket_tripkeys))]   
+    # stops = stops[np.isin(stops[:, 0], list(ticket_tripkeys))]
     # print(len(set(stops[:, 0])))
     usage_dict = {
         key: tuple(x[3] for x in grp) for key, grp in
@@ -121,19 +121,19 @@ def _load_store_data(store, region, zonemap, region_contractors):
     zone_dict = {
         k: tuple(zonemap.get(x) for x in v) for
         k, v in stop_dict.items()
-        }    
+        }
     zone_dict = {
-        k:v for k, v in zone_dict.items() if 
+        k:v for k, v in zone_dict.items() if
         all(x for x in v) and all(1000 < y < 1300 for y in v)
         }
-    
+
     op_dict = _load_contractor_pack(store, region, region_contractors)
     op_dict = {k:v for k, v in op_dict.items() if k in zone_dict}
 
     stop_dict = {k:v for k, v in stop_dict.items() if k in op_dict}
     zone_dict = {k:v for k, v in zone_dict.items() if k in op_dict}
     usage_dict = {k:v for k, v in usage_dict.items() if k in op_dict}
-    
+
     return stop_dict, zone_dict, usage_dict, op_dict
 
 
@@ -146,44 +146,32 @@ def _get_store_num(store):
 
 
 def _convert_regional_to_sjælland():
-    
-    return 
 
-
+    return
 
 
 def _get_input(stop_dict, zone_dict, usage_dict, op_dict):
-    
+
     for k, zone_sequence in zone_dict.items():
         yield k, zone_sequence, stop_dict[k], op_dict[k], usage_dict[k]
 
-def _get_store_num(store):
 
-    st = store.split('.')[0]
-    st = st.split('rkfile')[1]
-
-    return st
-
-
-def _convert_regional_to_sjælland():
-    
-    return 
 def chunk_shares(store, year, graph, region, zonemap, region_contractors):
 
 
     stopsd, zonesd, usaged, operatorsd = _load_store_data(
         store, region, zonemap, region_contractors
         )
-    
+
     gen = _get_input(stopsd, zonesd, usaged, operatorsd)
-    
+
     border_changes = {}
     model_one_shares = {}
     model_two_shares = {} # solo_zone_price
-    
+
 
     # k, zones, stops, operators, usage = next(gen)
-    for k, zones, stops, operators, usage in gen:    
+    for k, zones, stops, operators, usage in gen:
 
         sharer = ZoneSharer(graph, zones, stops, operators, usage)
 
@@ -198,11 +186,11 @@ def chunk_shares(store, year, graph, region, zonemap, region_contractors):
         else:
             model_one_shares[k] = sharer.share()
             model_two_shares[k] = sharer.solo_zone_price()
-    
+
     num = _get_store_num(store)
     #TODO ensure fp dir is created
     fp = os.path.join(
-        THIS_DIR, 
+        THIS_DIR,
         '__result_cache__',
         f'{year}',
         'borderzones',
@@ -213,7 +201,7 @@ def chunk_shares(store, year, graph, region, zonemap, region_contractors):
         os.makedirs(parent_dir)
     with open(fp, 'wb') as f:
         pickle.dump(border_changes, f)
-    
+
     return model_one_shares, model_two_shares
 
 def main():
@@ -224,33 +212,33 @@ def main():
 
     parser = TableArgParser('year')
     args = parser.parse()
-    
+
     year = args['year']
 
     store_loc = find_datastores()
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
-    
+
     zones = TakstZones()
     zonemap = zones.stop_zone_map()
-    
+
     # TODO into config
     region_contractors = {
         'hovedstaden': ['Movia_H', 'DSB', 'First', 'Stog', 'Metro'],
         'sjælland': ['Movia_H', 'Movia_S', 'Movia_V', 'DSB', 'First', 'Stog', 'Metro']
         }
-    
+
     region = 'sjælland'
     graph = ZoneGraph(region=region)
 
-    pfunc = partial(chunk_shares, 
+    pfunc = partial(chunk_shares,
                     year=year,
-                    graph=graph, 
-                    region=region, 
-                    zonemap=zonemap, 
+                    graph=graph,
+                    region=region,
+                    zonemap=zonemap,
                     region_contractors=region_contractors)
-    
+
     with Pool(round(os.cpu_count() * CPU_USAGE)) as pool:
         results = pool.imap(pfunc, stores)
         for model_one, model_two in tqdm(results, total=len(stores)):
@@ -265,4 +253,4 @@ if __name__ == "__main__":
         INHIBITOR.uninhibit()
     else:
         main()
-        
+
