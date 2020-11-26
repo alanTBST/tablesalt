@@ -3,7 +3,8 @@ from argparse import (
     ArgumentParser,
     RawTextHelpFormatter
     )
-from typing import AnyStr, NamedTuple, Union, Any
+from typing import Dict, NamedTuple, Union, Any, Optional, Type
+
 import pathlib
 
 
@@ -11,9 +12,9 @@ class ArgTuple(NamedTuple):
 
     short: str
     long: str
-    help: str
+    help_: str
     required: bool
-    type: Union[str, int, pathlib.Path]
+    type_: Union[Type[str], Type[int], Type[pathlib.Path]]
     default: Any
 
 class TableArgParser:
@@ -94,7 +95,29 @@ class TableArgParser:
 
         }
 
-    def __init__(self, *args: str, description: AnyStr = None) -> None:
+    def __init__(self, *args: str, description: Optional[str] = None) -> None:
+        """
+        A Basic argument parser for scripts in tablesalt. Allows only a
+        specific subset of arguments that make sense in this context.
+
+        Parameters
+        ----------
+        *args : str
+            The arguments allowed in the argparser.
+        description : Optional[str], optional
+            A description of the argument. The default is None.
+
+        Raises
+        ------
+        ValueError
+            DESCRIPTION.
+
+        Returns
+        -------
+        None
+
+        """
+        
 
         self.arglist = list(args)
 
@@ -115,11 +138,21 @@ class TableArgParser:
             opt = self.ARGUMENTS[arg]
             self.parser.add_argument(
                 opt.short, opt.long,
-                help=opt.help,
-                type=opt.type,
+                help=opt.help_,
+                type=opt.type_,
                 required=opt.required,
                 default=opt.default
                 )
-    def parse(self):
+    def parse(self) -> Dict[str, Union[int, pathlib.Path, str]]:
+        """
+        
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+
+        """
+        
 
         return vars(self.parser.parse_args())
