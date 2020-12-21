@@ -7,55 +7,66 @@ Created on Thu Jan 30 09:42:36 2020
 Classes for manipulating Pendler Product data sets
 """
 
-
+import os
 import pkg_resources
 from collections import Counter
-from itertools import groupby, repeat
+from itertools import groupby
 from operator import itemgetter
+from pathlib import Path
 from typing import (
+    TypeVar,
     Optional,
-    AnyStr,
+    Any,
+    Sequence,
     Dict,
     Iterable,
+    Iterator,
     List,
     Set,
     Union,
     Tuple
     )
 
-import msgpack
-import pandas as pd
+import msgpack        #type: ignore
+import pandas as pd   #type: ignore
 
 
-def _load_zonerelations() -> Dict[int, Dict[str, Union[str, int, list, float]]]:
+
+ZONE = Dict[str, Union[int, str]]
+ZONES = Sequence[ZONE]
+RELATION = Union[str, int, float, ZONES]
+
+def _load_zonerelations() -> Dict[int, Dict[str, RELATION]]:
     """load the zone relations data"""
     fpath = pkg_resources.resource_filename(
-        'tablesalt', 'resources/revenue/zone_relations.msgpack'
+        'tablesalt',
+        os.path.join(
+            'resources',
+            'revenue',
+            'zone_relations.msgpack'
+            )
         )
     with open(fpath, 'rb') as f:
         zonerelations = msgpack.load(f, strict_map_key=False)
     return zonerelations
 
 
-def _zones_to_paid(zonerel: Dict[int, Dict[str, Union[str, int, list, float]]]) -> Dict[Tuple, int]:
+def _zones_to_paid(zonerel) -> Dict[Tuple[int, ...], int]:
     """create zones: npaid dict"""
     outdict = {}
+    # zones: ZONE
     for _, v in zonerel.items():
         try:
-            zones = tuple(x[b'ZoneID'] for x in v[b'Zones'])
-            paid = v[b'PaidZones']
+            zones = tuple(x['ZoneID'] for x in v['Zones'])
+            paid = v['PaidZones']
             outdict[zones] = paid
         except KeyError:
-            try:
-                zones = tuple(x['ZoneID'] for x in v['Zones'])
-                paid = v['PaidZones']
-                outdict[zones] = paid
-            except Exception as e:
-                # TODO logging.log
-                pass
+            pass
+
     return outdict
 
-def _split_period_indices(group: Iterable) -> List:
+# group: Sequence
+def _split_period_indices(group) -> List[int]:
     """find the indices of the group that indicate a period change"""
     s_indx = []
     for i, j in enumerate(group):
@@ -111,10 +122,12 @@ def _process_dynamic_cards(date_dict):
 
     return dyn_dict
 
-
-def _process_cards(prodzones: Dict,
-                   product_dates: Dict,
-                   dynamic: Optional[bool] = True) -> Dict[int, Dict]:
+# prodzones: Dict,
+#                    product_dates: Dict,
+#                    dynamic: Optional[bool] = True
+def _process_cards(prodzones,
+                   product_dates,
+                   dynamic): # -> Dict[int, Dict]:
     """
     return a  dictionary that has the cardnum as the key
     and values as dictionary:
@@ -143,21 +156,22 @@ def _process_cards(prodzones: Dict,
 
     return _process_dynamic_cards(dates)
 
-def count_trues(zones: Iterable, num: int) -> bool:
-
-    return all(map(any, repeat(iter(zones), num)))
-
-
+# self,
+#                  year: int,
+#                  products_path: FILE_PATH,
+#                  product_zones_path: FILE_PATH,
+#                  min_valid_days: Optional[int] = 14
 class _PendlerInput():
     """
     Class that loads and processes the input pendlerkombi data
     for the pendler revenue distribution models
     """
-
-    def __init__(self, year: int,
-                 products_path: AnyStr,
-                 product_zones_path: AnyStr,
+    def __init__(self,
+                 year: int,
+                 products_path: str,
+                 product_zones_path: str,
                  min_valid_days: Optional[int] = 14) -> None:
+
         """
 
 
@@ -180,8 +194,8 @@ class _PendlerInput():
 
         self.year = year
         self.min_valid_days = min_valid_days
-        self.products_path = products_path
-        self.product_zones_path = product_zones_path
+        self.products_path: str = products_path
+        self.product_zones_path: str = product_zones_path
         self.paid_zones = _zones_to_paid(_load_zonerelations())
 
         self.products = self._load_product_validity()
@@ -241,8 +255,8 @@ class _PendlerInput():
 
     def _get_product_zones(
             self,
-            pendler_validity: pd.core.frame.DataFrame
-        ) -> Dict:
+            pendler_validity #: pd.core.frame.DataFrame
+        ): #-> Dict:
         """
         load the data that gives each zone that a card is valid in
 
@@ -282,7 +296,7 @@ class _PendlerInput():
                 groupby(pendler_product_zones, key=itemgetter(0, 1))}
 
     @staticmethod
-    def _get_product_dates(pendler_validity) -> Dict:
+    def _get_product_dates(pendler_validity): # -> Dict:
         """
         return a ddict of key=(cardnum, seasonpassid) and the start and end dates of
         the card
@@ -365,13 +379,13 @@ class _PendlerInput():
             raise ValueError(
                 "users argument must be one of: 'all', 'static', 'dynamic'"
                 )
-        
+
 
         if users == 'all':
-            
+
             return _process_cards(
-                self.product_zones, 
-                self.product_dates, 
+                self.product_zones,
+                self.product_dates,
                 dynamic=False
                 )
 
@@ -387,8 +401,13 @@ class _PendlerInput():
         return _process_cards(static_card_zones,
                               self.product_dates,
                               dynamic=False)
-
-class UserDict():
+ # self,
+ #        year: int,
+ #        products_path: FILE_PATH,
+ #        product_zones_path: FILE_PATH,
+ #        min_valid_days: Optional[int] = 14,
+ #        user_group: Optional[str] = 'all'
+class PendlerKombiUsers():
     """
     Class that adds functionality to the
     input from PendlerInput()
@@ -396,39 +415,45 @@ class UserDict():
     It allows for easier subsetting of users
     based on valid zones, valid time periods/seasonpass ids, etc.
     """
-    
-    REGIONS = {
-        'sydsjælland': (1200, 1300), 
-        'vestsjælland': (1100, 1200), 
-        'hovedstad': (1000, 1100)
-        } 
-    def __init__(
-        self, 
-        year: int, 
-        min_valid_days: Optional[int] = 14,
-        products_path=None,
-        product_zones_path=None,
-        user_group: Optional[str] = 'all'
-        ) -> None:
 
+    REGIONS = {
+        'sydsjælland': (1200, 1300),
+        'vestsjælland': (1100, 1200),
+        'hovedstad': (1000, 1100)
+        }
+    def __init__(
+        self,
+        year,
+        products_path,
+        product_zones_path,
+        min_valid_days = 14,
+        user_group = 'all'
+        ): # -> None:
         """
+
+
         Parameters
         ----------
-        year : TYPE
+        year : int
             DESCRIPTION.
-        min_valid_days : TYPE, optional
+        min_valid_days : Optional[int], optional
             DESCRIPTION. The default is 14.
         products_path : TYPE, optional
             DESCRIPTION. The default is None.
         product_zones_path : TYPE, optional
             DESCRIPTION. The default is None.
-        user_group
+        user_group : Optional[str], optional
+            DESCRIPTION. The default is 'all'.
 
         Returns
         -------
-        None.
+        None
+            DESCRIPTION.
 
         """
+
+
+
 
         self.input_data = _PendlerInput(
             year, products_path=products_path,
@@ -534,19 +559,19 @@ class UserDict():
 
         return (user_subset, len(user_subset),
                 sum(len(x) for x in user_subset.values()))
-      
-    def _zone_in_region(self, zonenum: int, region: str) -> bool:    
+
+    def _zone_in_region(self, zonenum: int, region: str) -> bool:
         x, y = self.REGIONS[region]
         return x < zonenum < y
 
     def _subset_takst(self, prodzones, takst):
         # *takst - list(takst) for mulit takstset
-        
+
         if takst in self.REGIONS:
             count_func = lambda x: Counter(x)[True] == 1
         else:
             count_func = lambda x: Counter(x)[True] > 1
-    
+
         takst_prods = {}
         for k, v in prodzones.items():
             try:
@@ -554,24 +579,30 @@ class UserDict():
             except KeyError:
                 in_takst = True
             if not in_takst:
-                continue                 
-            all_takst = (any(self._zone_in_region(x, reg) for x in v) 
+                continue
+            all_takst = (any(self._zone_in_region(x, reg) for x in v)
                          for reg in self.REGIONS)
-                    
+
             if count_func(all_takst):
                 takst_prods[k] = v
         return takst_prods
-    
+
+        # self,
+        # paid_zones: Optional[int] = None,
+        # ptype: Optional[str] = None,
+        # takst: Optional[str] = None,
+        # user_group: Optional[str] = 'all'
+
     def get_data(
-        self, 
-        paid_zones: Optional[int] = None,
-        ptype: Optional[str] = None,
-        takst: Optional[str] = None,
-        user_group: Optional[str] ='all'
+        self,
+        paid_zones = None,
+        ptype = None,
+        takst = None,
+        user_group = 'all'
         ):
 
         prodzones = self.input_data.product_zones
-        
+
         if paid_zones is not None:
             paid_valid = self._filter_paid_zones(paid_zones)
             prodzones = {
@@ -584,26 +615,26 @@ class UserDict():
                 }
         if takst is not None:
             prodzones = self._subset_takst(prodzones, takst)
-            
+
         if user_group == 'all':
             return _process_cards(
-                        prodzones, 
-                        self.input_data.product_dates, 
+                        prodzones,
+                        self.input_data.product_dates,
                         dynamic=False
-                        )             
+                        )
         static_card_zones, dynamic_card_zones = \
             self._split_static_dynamic(
                 self.product_zones,
                 self._find_dynamic_validity(prodzones)
                 )
         stat = _process_cards(static_card_zones, self.input_data.product_dates, dynamic=False)
-       
+
         if user_group == 'static':
             return stat
-        
+
         if user_group == 'dynamic':
             dyn = _process_cards(dynamic_card_zones, self.input_data.product_dates, dynamic=True)
-    
+
             return dyn
 
         raise ValueError(f'usergroup: {user_group} not recognised')
@@ -631,5 +662,3 @@ class UserDict():
         #     return self._subset_users()
         return self._subset_users(chosen_zones=zones)
 
-# UserDict is a language class wrapper
-PendlerKombiUsers = UserDict
