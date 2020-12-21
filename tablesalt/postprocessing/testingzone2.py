@@ -164,15 +164,18 @@ def _get_all_store_keys(stores, stopzone_map, rabatkeys, year):
 
 def _gather_all_store_keys(year):
 
+    base = THIS_DIR.parent
+
 
     lst_of_temp = glob.glob(
         os.path.join(
-            THIS_DIR,
+            base,
+            'scripts',
             '__result_cache__',
             f'{year}',
             '*.pickle'
-            )
         )
+    )
 
     lst_of_temp = [x for x in lst_of_temp if 'zone2' in x]
 
@@ -224,12 +227,12 @@ def main(year):
 
     rabatkeys = tuple(_determine_rabat_keys(year))
 
-    _get_all_store_keys(
-        stores,
-        stopzone_map,
-        rabatkeys,
-        year
-        )
+    # _get_all_store_keys(
+    #     stores,
+    #     stopzone_map,
+    #     rabatkeys,
+    #     year
+    #     )
 
     zone1, zone2, zone134 = \
         _gather_all_store_keys(year)

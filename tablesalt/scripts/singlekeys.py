@@ -39,11 +39,11 @@ CPU_USAGE = 0.8
 
 def _load_border_trips(year: int):
 
-    
+
     filedir = os.path.join(
-        THIS_DIR, 
-        '__result_cache__', 
-        f'{year}', 
+        THIS_DIR,
+        '__result_cache__',
+        f'{year}',
         'borderzones'
         )
 
@@ -118,7 +118,7 @@ def _aggregate_zones(shares):
          key, group in groupby(test_out, key=itemgetter(1))}
     t = {k: v/totalzones for k, v in t.items()}
     t['n_trips'] = n_trips
-    
+
     return t
 
 
@@ -201,19 +201,19 @@ def _separate_keys(short, long, _max, ringzones):
 def _determine_keys(stop_arr, stopzone_map, ringzones, bordertrips):
 
     zones = _map_zones(stop_arr, stopzone_map)
-    
+
     borders = {k: v for k, v in bordertrips.items() if k in zones}
     zones.update(borders)
     region_trips = {
-        'th': set(), 
-        'ts': set(), 
-        'tv': set(), 
+        'th': set(),
+        'ts': set(),
+        'tv': set(),
         'dsb': set()
         }
-    
+
     for k, v in zones.items():
         if all(x < 1100 for x in v):
-            region_trips["th"].add(k)           
+            region_trips["th"].add(k)
         elif all(1100 < x <= 1200 for x in v):
             region_trips["tv"].add(k)
         elif all(1200 < x < 1300 for x in v):
@@ -271,12 +271,12 @@ def _filter_operators(ticket_keys, operator_tripkeys: Set[int]):
     return out
 
 def _get_exception_stations(stops, *uic):
-        
+
     tripkeys = stops[
-        (np.isin(stops[:, 2], list(uic))) & 
+        (np.isin(stops[:, 2], list(uic))) &
         (stops[:, -1] == 1)
         ][:, 0]
-          
+
     return tripkeys
 
 
@@ -291,19 +291,19 @@ def _store_tripkeys(store, stopzone_map, ringzones, rabatkeys, bordertrips):
 
     dr_byen = _get_exception_stations(all_stops, 8603311)
     dr_byen = all_stops[np.isin(all_stops[:, 0], dr_byen)]
-    
-    
+
+
     tick_keys, region_keys = _determine_keys(
         all_stops, stopzone_map, ringzones, bordertrips
         )
-    
+
     dr_keys, dr_region_keys = _determine_keys(
         dr_byen, stopzone_map, ringzones, bordertrips
         )
-    
+
     dr_keys['regions'] = dr_region_keys
     tick_keys['regions'] = region_keys
-  
+
     return tick_keys, dr_keys
 
 def _store_operator_tripkeys(store, ticket_keys, operators):
@@ -336,7 +336,8 @@ def _get_trips(db, tripkeys):
                         shares = shares.decode('utf-8')
                         out[int(k.decode('utf-8'))] = ast.literal_eval(shares)
                     except ValueError:
-                        continue 
+
+                        continue
 
     return out
 
@@ -360,8 +361,8 @@ def _get_store_keys(store, stopzone_map, ringzones, operators, rabatkeys, year, 
 
     op_tripkeys['all'] = tripkeys
     op_tripkeys['dr_byen'] = dr_keys
-    
-    
+
+
     num = _get_store_num(store)
     fp = os.path.join(
         '__result_cache__',
@@ -374,15 +375,15 @@ def _get_store_keys(store, stopzone_map, ringzones, operators, rabatkeys, year, 
 
 def _get_all_store_keys(stores, stopzone_map, ringzones, operators, rabatkeys, year):
 
-    
+
     borders = _load_border_trips(year)
-    
+
     pfunc = partial(_get_store_keys,
                     stopzone_map=stopzone_map,
                     ringzones=ringzones,
                     operators=operators,
                     rabatkeys=rabatkeys,
-                    year=year, 
+                    year=year,
                     bordertrips=borders)
 
     with Pool(round(os.cpu_count() * CPU_USAGE)) as pool:
@@ -431,9 +432,9 @@ def _gather_all_store_keys(operators, nparts, year):
 
     lst_of_temp = glob.glob(
         os.path.join(
-            THIS_DIR, 
-            '__result_cache__', 
-            f'{year}', 
+            THIS_DIR,
+            '__result_cache__',
+            f'{year}',
             '*.pickle'
             )
         )
@@ -460,7 +461,7 @@ def _gather_all_store_keys(operators, nparts, year):
 
     for p in lst_of_temp:
         os.remove(p)
-       
+
 
     return out_all, out_operators
 
@@ -468,10 +469,10 @@ def _gather_all_store_keys(operators, nparts, year):
 def _get_rabatkeys(rabattrin, year):
 
     fp = os.path.join(
-        THIS_DIR, 
-        '__result_cache__', 
+        THIS_DIR,
+        '__result_cache__',
         f'{year}',
-        'preprocessed', 
+        'preprocessed',
         f'rabat{rabattrin}trips.pickle'
         )
     try:
@@ -521,7 +522,7 @@ def agg_nested_dict(node):
         return dupe_node or None
 
 def _output_df(results, tick) -> pd.core.frame.DataFrame:
-    
+
     frame = pd.DataFrame.from_dict(results, orient='index')
     frame = frame.fillna(0)
     frame = frame.reset_index()
@@ -537,13 +538,13 @@ def _output_df(results, tick) -> pd.core.frame.DataFrame:
     neworder = [x for x in col_order if x != 'n_trips']
     neworder.append('n_trips')
     frame = frame[neworder]
-    
+
     return frame
 
 def _write_results(rabattrin, year) -> None:
 
     dir_path = os.path.join(
-        '__result_cache__', 
+        '__result_cache__',
         f'{year}',
         'single'
         )
@@ -559,8 +560,8 @@ def _write_results(rabattrin, year) -> None:
 
     tmap = {'D**': 'DSB'}
     for start, tickets in res.items():
-        for tick, results in tickets.items():           
-            df = _output_df(results, tick)          
+        for tick, results in tickets.items():
+            df = _output_df(results, tick)
             name = tmap.get(start, start)
             fp = os.path.join(
                 '__result_cache__',
@@ -572,14 +573,14 @@ def _write_results(rabattrin, year) -> None:
 
 
 def _nzone_merge(resultdict):
-    
+
     nzone = {k[1]: tuple() for k in resultdict}
-    
+
     for k, v in resultdict.items():
         nzone[k[1]] = nzone[k[1]] + v
-    
+
     return agg_nested_dict(nzone)
-    
+
 
 def main():
 
@@ -618,26 +619,26 @@ def main():
         rabatkeys,
         year
         )
-    
+
     del rabatkeys
-    
+
 
     nparts = 10
 
     out_all, out_operators = \
         _gather_all_store_keys(wanted_operators, nparts, year)
-    
+
     single_fp = os.path.join(
-        THIS_DIR, 
-        '__result_cache__', 
-        f'{year}', 
-        'preprocessed', 
+        THIS_DIR,
+        '__result_cache__',
+        f'{year}',
+        'preprocessed',
         f'single_tripkeys_{year}_r{rabat_level}_model_{model}'
         )
     with open(single_fp, 'wb') as file:
         pickle.dump(out_all, file)
-    
-    
+
+
     print('finding results\n')
     all_wanted_keys = set()
     for k, v in out_all.items():
@@ -645,7 +646,7 @@ def main():
             all_wanted_keys.update(v1)
 
     result_dict = _get_trips(db_path, all_wanted_keys)
-    
+
     print('loaded results\n')
     del all_wanted_keys
 
@@ -668,7 +669,7 @@ def main():
         THIS_DIR,
         '__result_cache__',
         f'{year}',
-        'preprocessed', 
+        'preprocessed',
         f'single_results_{year}_r{rabat_level}_model_{model}.pickle'
         )
 
@@ -677,16 +678,16 @@ def main():
 
     # _write_results(rabat_level, year)
 
-if __name__ == "__main__":
-    from datetime import datetime
-    dt = datetime.now()
+# if __name__ == "__main__":
+#     from datetime import datetime
+#     dt = datetime.now()
 
-    if os.name == 'nt':
-        INHIBITOR = WindowsInhibitor()
-        INHIBITOR.inhibit()
-        main()
-        INHIBITOR.uninhibit()
-    else:
-        main()
+#     if os.name == 'nt':
+#         INHIBITOR = WindowsInhibitor()
+#         INHIBITOR.inhibit()
+#         main()
+#         INHIBITOR.uninhibit()
+#     else:
+#         main()
 
-    print(datetime.now() - dt)
+#     print(datetime.now() - dt)
