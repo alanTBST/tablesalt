@@ -65,7 +65,9 @@ def weight_trips(base_factors: Dict[str, Dict[str, float]]) -> Dict[str, Dict[st
     return base_factors
 
 
-def calculate_correction_factors(base_factors: Dict[str, Dict[str, float]]) -> Dict[str, Dict[str, float]]:
+def calculate_correction_factors(
+        base_factors: Dict[str, Dict[str, float]]
+        ) -> Dict[str, Dict[str, float]]:
 
     A, B = ['contains_zone1', 'in_01_or_0103_or_0104'] # A, B
     C = 'contains_zone2'
@@ -82,7 +84,10 @@ def calculate_correction_factors(base_factors: Dict[str, Dict[str, float]]) -> D
 
     return base_factors
 
-def calibrate_sale(sale: 'pd.core.frame.sale', base_factors:  Dict[str, Dict[str, float]]) -> Dict[str, float]:
+def calibrate_sale(
+        sale: 'pd.core.frame.sale',
+        base_factors:  Dict[str, Dict[str, float]]
+        ) -> Dict[str, float]:
 
     s = sale._asdict()
 
@@ -129,7 +134,6 @@ def main(year: int, model: int) -> None:
 
     df = df[['NR'] + OPERATORS]
     df.to_csv(f'zone2_request_model_{model}.csv')
-
 
 
 if __name__ == "__main__":
