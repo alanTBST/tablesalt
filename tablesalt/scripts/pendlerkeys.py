@@ -146,6 +146,15 @@ def _date_in_window(test_period, test_date):
     return min(test_period) <= test_date <= max(test_period)
 
 def wrap_price(store):
+    """
+
+    :param store: DESCRIPTION
+    :type store: TYPE
+    :return: DESCRIPTION
+    :rtype: TYPE
+
+    """
+
     # TODO: rather use partial
     return StoreReader(store).get_data('price')
 
@@ -163,15 +172,15 @@ def proc(store):
     return get_zeros(price)
 
 def find_no_pay(stores, year):
-    
+
     fp = os.path.join(
-        THIS_DIR, 
-        '__result_cache__', 
-        f'{year}', 
+        THIS_DIR,
+        '__result_cache__',
+        f'{year}',
         'preprocessed',
         'zero_price.pickle'
         )
-    
+
     try:
         with open(fp, 'rb') as file:
             out = pickle.load(file)
@@ -179,8 +188,8 @@ def find_no_pay(stores, year):
         out = set()
         with Pool(os.cpu_count() - 1) as pool:
             results = pool.imap(proc, stores)
-            for res in tqdm(results, 
-                            'finding trips inside zones', 
+            for res in tqdm(results,
+                            'finding trips inside zones',
                             total=len(stores)):
                 out.update(set(res))
     return out
@@ -232,7 +241,7 @@ def trips_to_zone_combination(season_trips, zone_combo_users):
 
     zone_combo_trips = {}
     for zones, userseasons in tqdm(
-            zone_combo_users.items(), 
+            zone_combo_users.items(),
             'matching trips to zone combinations'
             ):
         useasons = set(chain(*[tuple((k, x) for x in v) for k, v in userseasons.items()]))
@@ -269,39 +278,39 @@ def get_user_shares(all_trips):
 
 
 def n_operators(share_tuple):
-    
+
     return len({x[1] for x in share_tuple})
 
 def pendler_reshare(share_tuple):
-        
+
     n_ops = n_operators(share_tuple)
-    
+
     return tuple((1/n_ops, x[1]) for x in share_tuple)
 
 def get_zone_combination_shares(tofetch, db_path: AnyStr, model: int):
 
-    
+
     with lmdb.open(db_path) as env:
         final = {}
         with env.begin() as txn:
             for combo, trips in tqdm(
-                    tofetch.items(), 
-                    'fetching combo results', 
+                    tofetch.items(),
+                    'fetching combo results',
                     total=len(tofetch)
                     ):
-                all_trips = {}        
+                all_trips = {}
                 for trip in trips:
                     t = bytes(trip, 'utf-8')
-                    res = txn.get(t)                  
+                    res = txn.get(t)
                     if not res:
                         continue
-                    res = res.decode('utf-8')                    
-                    if res not in ('operator_error', 'station_map_error'):                       
+                    res = res.decode('utf-8')
+                    if res not in ('operator_error', 'station_map_error'):
                         val = ast.literal_eval(res)
                         if model != 3:
                             all_trips[trip] = val
                         else:
-                            all_trips[trip] = pendler_reshare(val)               
+                            all_trips[trip] = pendler_reshare(val)
                 combo_result = get_user_shares(all_trips.values())
                 final[combo] = combo_result
 
@@ -340,24 +349,24 @@ def _get_trips(db_path, tripkeys, model):
                 res = txn.get(k)
                 if not res:
                     continue
-                res = res.decode('utf-8')                    
+                res = res.decode('utf-8')
                 if res not in ('operator_error', 'station_map_error'):
                     val = ast.literal_eval(res)
                     if model != 3:
                         out[int(k.decode('utf-8'))] = val
                     else:
                         out[int(k.decode('utf-8'))] = pendler_reshare(val)
-                
+
 
     return out
 
 
 def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, db_path, year, model):
 
-    
+
     zero_travel_price = {int(x) for x in zero_travel_price}
     takstsets = ["vestsjælland", "sydsjælland", "hovedstad", "dsb"]
-    
+
     for takst in takstsets:
         out = {}
         for nzones in tqdm(range(1, 100), f'calculating kombi paid zones - {takst}'):
@@ -367,7 +376,7 @@ def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, db_path, year, 
                 paidzones = nzones
             if nzones == 99:
                 out[nzones] = out[97]
-                break            
+                break
             all_users = userdict.get_data(paid_zones=paidzones, takst=takst)
             usertrips = _kombi_by_users(valid_kombi_store, all_users)
             trips = usertrips.intersection(zero_travel_price)
@@ -376,7 +385,7 @@ def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, db_path, year, 
             shared['n_users'] = len(all_users)
             shared['n_period_cards'] = sum(len(x) for x in all_users.values())
             out[nzones] = shared
-        
+
         frame = pd.DataFrame.from_dict(out, orient='index')
         frame.index.name = 'betaltezoner'
         frame = frame.reset_index()
@@ -384,12 +393,12 @@ def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, db_path, year, 
         colorder = [x for x in frame.columns if x not in ('n_users', 'n_period_cards', 'n_trips')]
         colorder = colorder + ['n_users', 'n_period_cards', 'n_trips']
         frame = frame[colorder]
-        
+
         fp = os.path.join(
-            THIS_DIR, 
-            '__result_cache__', 
-            f'{year}', 
-            'pendler', 
+            THIS_DIR,
+            '__result_cache__',
+            f'{year}',
+            'pendler',
             f'kombi_paid_zones_region_{takst}_model_{model}.csv'
 
             )
@@ -397,15 +406,15 @@ def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, db_path, year, 
 
 
 def _chosen_zones(
-        userdict, 
-        db_path, 
-        kombi_valid_db,                  
+        userdict,
+        db_path,
+        kombi_valid_db,
         kombi_dates_db,
-        zero_travel_price, 
-        year, 
+        zero_travel_price,
+        year,
         model
         ):
-   
+
     userdata = userdict.get_data()
     zone_combinations = get_zone_combinations(userdata)
 
@@ -431,7 +440,7 @@ def _chosen_zones(
     results = get_zone_combination_shares(
         zone_combo_trips_valid, db_path, model
         )
-       
+
     results = {tuple(sorted(k)): v for k, v in results.items()}
     statistics = {tuple(sorted(k)):v for k, v in statistics.items()}
     for k, v in results.copy().items():
@@ -442,21 +451,21 @@ def _chosen_zones(
     out = pd.DataFrame.from_dict(results, orient='index')
     out = out.fillna(0)
     colorder = [
-        x for x in out.columns if x 
+        x for x in out.columns if x
         not in ('n_users', 'n_period_cards', 'n_trips')
         ]
-    colorder = colorder + ['n_users', 'n_period_cards', 'n_trips']   
+    colorder = colorder + ['n_users', 'n_period_cards', 'n_trips']
     out = out[colorder]
-    
+
     fp = os.path.join(
-        THIS_DIR, 
-        '__result_cache__', 
-        f'{year}', 
-        'pendler', 
+        THIS_DIR,
+        '__result_cache__',
+        f'{year}',
+        'pendler',
         f'pendlerchosenzones{year}_model_{model}.csv'
         )
     out.to_csv(fp)
-    
+
 # =============================================================================
 # match the zone_relations
 # =============================================================================
@@ -468,12 +477,12 @@ def _load_zone_relations():
         DESCRIPTION.
 
     """
-    
+
     fp = pkg_resources.resource_filename(
-        'tablesalt', 
+        'tablesalt',
         '/resources/revenue/zone_relations.msgpack'
         )
-        
+
     with open(fp, 'rb') as f:
         zone_relations = msgpack.load(f, strict_map_key=False)
 
@@ -505,18 +514,18 @@ def _load_kombi_results(year, model):
 
 
     fp = os.path.join(
-        THIS_DIR, 
-        '__result_cache__', f'{year}', 
-        'pendler', 
+        THIS_DIR,
+        '__result_cache__', f'{year}',
+        'pendler',
         f'pendlerchosenzones{year}_model_{model}.csv'
         )
-    
+
     results = pd.read_csv(fp, index_col=0)
     results = results.to_dict(orient='index')
 
     return {ast.literal_eval(k): v for k, v in results.items()}
 
-    
+
 def _zonerelations(year, model):
 
     zone_rels = _load_zone_relations()
@@ -536,23 +545,23 @@ def _zonerelations(year, model):
     frame = pd.DataFrame.from_dict(out, orient='index')
     cp = frame.copy(deep=True)
     cp.columns = [
-        'DestinationZone', 'StartZone', 
+        'DestinationZone', 'StartZone',
         'PaidZones', 'ValidityZones',
-        'ValidZones', 'first', 'metro', 
+        'ValidZones', 'first', 'metro',
         'movia', 'stog', 'dsb', 'n_users',
         'n_period_cards', 'n_trips'
         ]
     df = pd.concat([frame, cp])
     df = df.fillna(0)
-    
+
     # add new frame d=o and o=d
     fp = os.path.join(
-        THIS_DIR, 
-        '__result_cache__', f'{year}', 
-        'pendler', 
+        THIS_DIR,
+        '__result_cache__', f'{year}',
+        'pendler',
         f'zonerelations{year}_model_{model}.csv'
         )
-       
+
     df.to_csv(fp, index=False)
 
 
@@ -566,20 +575,20 @@ def main():
 
     paths = db_paths(find_datastores(), year)
     stores = paths['store_paths']
-    
+
     zero_travel_price = find_no_pay(stores, year)
     zero_travel_price = {str(x) for x in zero_travel_price}
-    
+
     db_path = paths['calculated_stores']
-   
+
     model = args['model']
-    
+
     if model != 1:
         db_path = db_path + '_model_2'
-        
+
     zone_path = args['zones']
     product_path = args['products']
-        
+
     userdict = PendlerKombiUsers(
         year, products_path=product_path,
         product_zones_path=zone_path,
@@ -588,24 +597,24 @@ def main():
 
 
     _chosen_zones(
-        userdict, 
-        db_path, 
-        paths['kombi_valid_trips'],                  
-        paths['kombi_dates_db'],
-        zero_travel_price, 
-        year, 
-        model
-        )
-  
-    _npaid_zones(
-        userdict, 
-        paths['kombi_valid_trips'], 
-        zero_travel_price, 
+        userdict,
         db_path,
-        year, 
+        paths['kombi_valid_trips'],
+        paths['kombi_dates_db'],
+        zero_travel_price,
+        year,
         model
         )
-    
+
+    _npaid_zones(
+        userdict,
+        paths['kombi_valid_trips'],
+        zero_travel_price,
+        db_path,
+        year,
+        model
+        )
+
     _zonerelations(year, model)
 
 
@@ -617,4 +626,4 @@ if __name__ == "__main__":
         INHIBITOR.uninhibit()
     else:
         main()
-    
+
