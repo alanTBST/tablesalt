@@ -32,9 +32,10 @@ LOCATIONS = {
     }
 
 USE_LOCATIONS = False
+MINIMUM_NTRIPS = 1
 
 RESULT_MAP = {'dsb': ('D**', 'D*', 'D'),
-              'metro': ('Metro',),  
+              'metro': ('Metro',),
               'movia': ('Movia_H', 'Movia_S', 'Movia_V')}
 
 def _proc_sales(frame):
@@ -44,7 +45,7 @@ def _proc_sales(frame):
         )
 
     frame.loc[:, 'valgtezoner'] = frame.loc[:, 'valgtezoner'].astype(str)
-    
+
     frame.loc[:, 'slutzone'] = frame.loc[:, 'slutzone'].fillna('1000')
     frame.loc[:, 'startzone'] = frame.loc[:, 'startzone'].fillna('1000')
 
@@ -54,28 +55,28 @@ def _proc_sales(frame):
 def _load_sales_data(year: int) -> pd.core.frame.DataFrame:
 
     fp = os.path.join(
-        THIS_DIR, '__result_cache__', 
-        f'{year}', 'preprocessed', 
+        THIS_DIR, '__result_cache__',
+        f'{year}', 'preprocessed',
         'mergedsales.csv'
         )
 
     df = pd.read_csv(fp, low_memory=False)
-    
+
     return _proc_sales(df)
 
 def _get_single_results(year: int,  model: int):
 
-    
+
     fp = os.path.join(
-        THIS_DIR, 
-        '__result_cache__', 
-        f'{year}', 
+        THIS_DIR,
+        '__result_cache__',
+        f'{year}',
         'preprocessed'
         )
     singles = glob.glob(os.path.join(fp, 'single_results*'))
 
     singles = [x for x in singles if f'model_{model}' in x]
-    
+
     out = {}
     for i in range(3): # using r0, r1, r2
 
@@ -86,7 +87,7 @@ def _get_single_results(year: int,  model: int):
         with open(fmatch, 'rb') as f:
             res = pickle.load(f)
         out[f'rabat{i}'] = res
-            
+
     return out
 
 def _sales_ref(frame: pd.core.frame.DataFrame) -> Dict[str, Tuple[int, ...]]:
@@ -118,58 +119,58 @@ def _location_ref(
 
 
 def _get_location_sales(location_idxs, sales_idxs):
-    
+
     wanted_start_locations = {
         k: v for k, v in location_idxs.items() if k in LOCATIONS
         }
-    
+
     single = set(sales_idxs['enkeltbillet']) | \
         set(sales_idxs['lang enkeltbillet'])
     location_sales = {}
     for k, v in wanted_start_locations.items():
         location_sales[k] = set(v).intersection(single)
-          
+
     return location_sales
 
 def _get_location_results(location: str, results):
-    
-    operator = LOCATIONS[location]    
+
+    operator = LOCATIONS[location]
     result_keys = set(RESULT_MAP[operator])
     result_keys.add('all')
     if location.lower() == 'automat':
         result_keys.add('dr_byen')
-    res_dict = {k: {k1: v1 for k1, v1 in v.items() if k1 in result_keys} 
+    res_dict = {k: {k1: v1 for k1, v1 in v.items() if k1 in result_keys}
                 for k, v in results.copy().items()}
-    
+
     return res_dict
 
 def _method_resolution_operator(res, length):
-    
+
     mro = []
     any_start = []
     paid = []
     paid_any = []
-    
+
     for k, v in res.items():
         if length == 'short':
-            start_op = [(k, x, 'short_ring') for x in v if x != 'all']  
-            start_any = [(k, x, 'short_ring')for x in v if x == 'all'] 
-        
+            start_op = [(k, x, 'short_ring') for x in v if x != 'all']
+            start_any = [(k, x, 'short_ring')for x in v if x == 'all']
+
         if length == 'long':
             start_op = [(k, x, 'long') for x in v if x != 'all'] + \
-                [(k, x, 'long')for x in v if x == 'all']                
-            
+                [(k, x, 'long')for x in v if x == 'all']
+
             start_any = [(k, x, 'long_ring') for x in v if x != 'all'] + \
-                [(k, x, 'long_ring')for x in v if x == 'all'] 
-                    
-        start_op_paid = [(k, x, 'paid_zones') for x in v if x != 'all']        
+                [(k, x, 'long_ring')for x in v if x == 'all']
+
+        start_op_paid = [(k, x, 'paid_zones') for x in v if x != 'all']
         start_any_paid = [(k, x, 'paid_zones') for x in v if x == 'all']
-        
-        mro.extend(start_op)   
+
+        mro.extend(start_op)
         any_start.extend(start_any)
         paid.extend(start_op_paid)
         paid_any.extend(start_any_paid)
-    
+
     if length == 'long':
         mro = sorted(mro, key=itemgetter(1, 0))
     mro = mro + any_start + paid + paid_any
@@ -178,32 +179,32 @@ def _method_resolution_operator(res, length):
     return mro
 
 def _filter_mro(record, mro):
-    
+
     if record.takstsæt == 'th':
         mro = [x for x in mro if 'Movia_S' not in x and 'Movia_V' not in x]
     elif record.takstsæt == 'tv':
         mro = [x for x in mro if 'Movia_S' not in x and 'Movia_H' not in x]
     elif record.takstsæt == 'ts':
         mro = [x for x in mro if 'Movia_H' not in x and 'Movia_V' not in x]
-    
+
     return mro
 
 
 def _join_note(notelist: List[str]) -> str:
-    
+
     return ''.join(
-        ('_'.join(j) + r'->' if i!=len(notelist)-1 else '_'.join(j) 
+        ('_'.join(j) + r'->' if i!=len(notelist)-1 else '_'.join(j)
          for i, j in enumerate(notelist)
          )
         )
 
 def _resolve_tickets(record):
-    
-    startzone = record.startzone 
+
+    startzone = record.startzone
     paid_zones = record.betaltezoner
     endzone = record.slutzone
-    
-    try: 
+
+    try:
         startzone = int(startzone)
     except ValueError:
         if not '1003' in startzone:
@@ -211,12 +212,12 @@ def _resolve_tickets(record):
         else:
             # byen
             pass
-    try: 
+    try:
         endzone = int(endzone)
     except ValueError:
         endzone = int(endzone[:4]) # endzone not needed
 
- 
+
     paid_zones = int(paid_zones)
 
     ring_ticket = startzone, paid_zones
@@ -224,50 +225,50 @@ def _resolve_tickets(record):
     return ring_ticket, ft_ticket
 
 def _match_single_operator(record, res, mro, trip_threshhold):
-    
-    
+
+
     mro = _filter_mro(record, mro)
     ring_ticket, ft_ticket = _resolve_tickets(record)
-    
+
     if '1001/1003' in ring_ticket or '1001/1003' in ft_ticket:
         mro_dr = [x for x in mro if any(y == 'dr_byen' for y in x)]
         mro_other = [x for x in mro if x not in mro_dr]
         mro = mro_dr + mro_other
-        
-        ring_ticket = int(ring_ticket[0][:4]), ring_ticket[1]        
-        ft_ticket = int(ft_ticket[0][:4]), ft_ticket[1]        
- 
+
+        ring_ticket = int(ring_ticket[0][:4]), ring_ticket[1]
+        ft_ticket = int(ft_ticket[0][:4]), ft_ticket[1]
+
     note = []
     for method in mro:
         note.append(method)
-        
-        
+
+
         try:
             d = res[method[0]][method[1]][method[2]].copy()
         except KeyError:
             continue
-        
+
         if 'short_ring' in method or 'long_ring' in method:
             r = d.get(ring_ticket, {})
         elif 'long' in method:
             r = d.get(ft_ticket, {})
         else:
-            r = d.get(ring_ticket[1], {})            
-                
+            r = d.get(ring_ticket[1], {})
+
         if not r:
             continue
         if r and r['n_trips'] < trip_threshhold:
             continue
         if r is not None:
             break
-    else:        
-        r = {}   
-    
+    else:
+        r = {}
+
     r['note'] = _join_note(note)
     return r
 
 def _match_single_any(record, res, mro, trip_threshhold):
-    
+
     ring_ticket, ft_ticket = _resolve_tickets(record)
 
     note = []
@@ -277,42 +278,42 @@ def _match_single_any(record, res, mro, trip_threshhold):
             d = res[method[0]][method[1]]
         except KeyError:
             continue
-        
+
         if 'short_ring' in method or 'long_ring' in method:
             r = d.get(ring_ticket, {})
         elif 'long' in method:
             r = d.get(ft_ticket, {})
         else:
-            r = d.get(ring_ticket[1], {})            
-                
+            r = d.get(ring_ticket[1], {})
+
         if not r:
             continue
         if r and r['n_trips'] < trip_threshhold:
             continue
         if r is not None:
             break
-    else:        
-        r = {}   
-    
+    else:
+        r = {}
+
     r['note'] = _join_note(note)
     return r
 
 
 def _method_resolution_any(res, length):
-    
+
     mro = []
     paid = []
-    
+
     for k, v in res.items():
         if length == 'short':
             start_any = (k, 'short_ring')
-            mro.append(start_any)           
+            mro.append(start_any)
         if length == 'long':
-            start_any = (k, 'long')  
-            mro.append(start_any)                         
+            start_any = (k, 'long')
+            mro.append(start_any)
             start_any_ring = (k, 'long_ring')
             mro.append(start_any_ring)
-            
+
         start_any_paid = (k, 'paid_zones')
         paid.append(start_any_paid)
 
@@ -327,36 +328,36 @@ def _result_frame(rdict, frame):
     out_frame = pd.DataFrame.from_dict(rdict).T
     out_frame.index.name = 'NR'
     out_frame = out_frame.reset_index()
-    
-    test_out = pd.merge(frame, out_frame, on='NR', how='left')
-    test_out.note = test_out.note.fillna('')
-    test_out = test_out.fillna(0)
-    
+
+    output = pd.merge(frame, out_frame, on='NR', how='left')
+    output.note = output.note.fillna('')
+    output = output.fillna(0)
+
     main_cols = list(frame.columns)
-    new = [x for x in test_out if x not in main_cols]
+    new = [x for x in output if x not in main_cols]
     ops = [x for x in new if x not in ('note', 'n_trips')]
     out_cols = main_cols + sorted(ops) + ['n_trips', 'note']
-    test_out = test_out[out_cols]
-    
-    return test_out
-    
-    
+    output = output[out_cols]
+
+    return output
+
+
 def _any_single_merge(sales_idxs, location_sales, data, single_results, min_trips, loc):
-    
+
     sales_nr = set(sales_idxs['enkeltbillet'] + sales_idxs['lang enkeltbillet'])
     location_nr = set(chain(*location_sales.values()))
-    
+
     if loc:
         wanted = sales_nr - location_nr
     else:
         wanted = sales_nr
     sub_data = data.query("NR in @wanted")
     sub_tuples = list(sub_data.itertuples(index=False, name='Sale'))
-    
+
     res = {k: v['all'] for k, v in single_results.copy().items()}
 
     mro_short = _method_resolution_any(res, 'short')
-    mro_long = _method_resolution_any(res, 'long')    
+    mro_long = _method_resolution_any(res, 'long')
 
     out = {}
     for record in sub_tuples:
@@ -366,23 +367,23 @@ def _any_single_merge(sales_idxs, location_sales, data, single_results, min_trip
         else:
             out[record.NR] = _match_single_any(record, res, mro_long, min_trips)
 
-             
-    outframe = _result_frame(out, sub_data)   
+
+    outframe = _result_frame(out, sub_data)
 
     return outframe
 
 def _location_merge(location_sales, data, single_results, min_trips):
-    
+
     final = []
     for loc in LOCATIONS:
         location_nr = location_sales[loc]
         sub_data = data.query("NR in @location_nr")
         sub_tuples = list(sub_data.itertuples(index=False, name='Sale'))
-        
-        res = _get_location_results(loc, single_results)   
+
+        res = _get_location_results(loc, single_results)
         mro_short = _method_resolution_operator(res, 'short')
         mro_long = _method_resolution_operator(res, 'long')
-         
+
         out = {}
         for record in sub_tuples:
             if record.betaltezoner <= 8:
@@ -393,28 +394,28 @@ def _location_merge(location_sales, data, single_results, min_trips):
                 out[record.NR] = _match_single_operator(
                     record, res, mro_long, min_trips
                     )
-        outframe = _result_frame(out, sub_data)           
+        outframe = _result_frame(out, sub_data)
         final.append(outframe)
-               
+
     return pd.concat(final)
 
 
-def _single_tickets(sales_idxs, 
-                    location_sales, 
-                    data, 
-                    single_results, 
-                    min_trips, 
+def _single_tickets(sales_idxs,
+                    location_sales,
+                    data,
+                    single_results,
+                    min_trips,
                     loc=False):
-    
+
     any_start = _any_single_merge(
         sales_idxs, location_sales, data, single_results, min_trips,
         loc=loc)
-    
+
     if loc:
         specific_start = _location_merge(
             location_sales, data, single_results, min_trips
             )
-        
+
         out = pd.concat([any_start, specific_start])
     else:
         out = any_start
@@ -429,14 +430,14 @@ def _single_tickets(sales_idxs,
 def _load_kombi_shares(year: int, model: int) -> dict:
 
     fp = os.path.join(
-        THIS_DIR, 
-        '__result_cache__', f'{year}', 
+        THIS_DIR,
+        '__result_cache__', f'{year}',
         'pendler', f'pendlerchosenzones{year}_model_{model}.csv'
         )
 
     df = pd.read_csv(fp, index_col=0)
     df.rename(columns={'S-tog': 'stog'}, inplace=True)
-    
+
     d = df.to_dict(orient='index')
 
     return {ast.literal_eval(k): v for k, v in d.items()}
@@ -471,12 +472,12 @@ def _load_zone_relations():
         DESCRIPTION.
 
     """
-    
+
     fp = pkg_resources.resource_filename(
-        'tablesalt', 
+        'tablesalt',
         '/resources/revenue/zone_relations.msgpack'
         )
-        
+
     with open(fp, 'rb') as f:
         zone_relations = msgpack.load(f, strict_map_key=False)
 
@@ -486,15 +487,15 @@ def _load_zone_relations():
 def _load_kombi_map_shares(year: int, model: int) -> pd.core.frame.DataFrame:
 
     fp = os.path.join(
-        THIS_DIR, '__result_cache__', 
-        f'{year}', 'pendler', 
+        THIS_DIR, '__result_cache__',
+        f'{year}', 'pendler',
         f'zonerelations{year}_model_{model}.csv'
         )
     df = pd.read_csv(
-        fp, 
-        dtype={'PaidZones': int}, 
-        usecols = ['StartZone', 'DestinationZone', 'PaidZones', 
-                   'movia', 'stog', 'first', 'metro', 'dsb', 
+        fp,
+        dtype={'PaidZones': int},
+        usecols = ['StartZone', 'DestinationZone', 'PaidZones',
+                   'movia', 'stog', 'first', 'metro', 'dsb',
                    'n_users', 'n_period_cards', 'n_trips']
         )
     df = df.set_index(['StartZone', 'DestinationZone', 'PaidZones'])
@@ -504,14 +505,14 @@ def _load_kombi_map_shares(year: int, model: int) -> pd.core.frame.DataFrame:
 
 def _load_nzone_shares(year: int, model: int):
 
-    
+
     takst_map = {
-        'dsb': 'dsb', 
-        'th': 'hovedstad', 
-        'ts': 'sydsjælland', 
+        'dsb': 'dsb',
+        'th': 'hovedstad',
+        'ts': 'sydsjælland',
         'tv': 'vestsjælland'
         }
-    
+
     filedir = os.path.join(THIS_DIR, '__result_cache__', f'{year}', 'pendler')
     files = glob.glob(os.path.join(filedir, '*.csv'))
     kombi = [x for x in files if 'kombi_paid_zones' in x and f'model_{model}' in x]
@@ -519,44 +520,50 @@ def _load_nzone_shares(year: int, model: int):
 
     out = {}
     for file in kombi:
-        
+
         df = pd.read_csv(file, index_col=0)
         d = df.to_dict(orient='index')
         for k, v in takst_map.items():
             if v in file:
                 out[k] = d
                 break
-               
+
     return out
 
 
 def _kombimatch(valgt, kombi_results):
-    
+
     return kombi_results.get(valgt, {})
-    
-  
+
+
 def _kombi_paid():
-    
-    return 
+
+    return
 
 
 def _join_note_p(notelist: List[str]) -> str:
-    
+
     return ''.join(
-        (''.join(j) + r'->' if i!=len(notelist)-1 else ''.join(j) 
+        (''.join(j) + r'->' if i!=len(notelist)-1 else ''.join(j)
          for i, j in enumerate(notelist)
          )
         )
 
+def _get_closest_kombi(chosen_zones):
+
+    # only for zone 1001/1002 problem right now
+    new_chosen_zones = [1001] + list(chosen_zones)
+    return tuple(new_chosen_zones)
 
 def _match_pendler_record(
-        record, kombi_results, 
-        zone_relation_results, 
-        paid_zones_results, 
+        record,
+        kombi_results,
+        zone_relation_results,
+        paid_zones_results,
         min_trips
         ):
-    
-    valgt = ast.literal_eval(record.valgtezoner)
+
+    chosen_zones = ast.literal_eval(record.valgtezoner)
     takst = record.takstsæt
     try:
         start = int(record.startzone)
@@ -565,43 +572,55 @@ def _match_pendler_record(
             start = int(record.startzone.split('/')[1])
         else:
             raise ValueError("Can't determine startzone")
-    
+
     end = int(record.slutzone)
     paid = int(record.betaltezoner)
-      
+
     note = []
-    if valgt:  
-        if 1002 in valgt and 1001 not in valgt:
+    flag = False
+    if chosen_zones:
+
+        mro = ['kombimatch', f'kombi_paid_zones_{takst}']
+        if 1002 in chosen_zones and 1001 not in chosen_zones:
             note.append('INVALID_KOMBI')
-        mro = ['kombimatch', f'kombi_paid_zones_{takst}']       
-        for method in mro:           
-            note.append(method)
-            r = kombi_results.get(valgt, {})
-            if r and r['n_trips'] >= min_trips:
-                break
-            else:
-                r = paid_zones_results[takst].get(paid, {})
-            
-    else:
-        mro = ['zonerelation_match', f'kombi_paid_zones_{takst}']
+            flag = True
+
+        if flag:
+            mro = ['kombimatch', 'closekombi', f'kombi_paid_zones_{takst}']
+
         for method in mro:
-            note.append(method)            
-            r = zone_relation_results.get((start, end, paid), {})
+            note.append(method)
+            if method == 'closekombi':
+                chosen_zones = _get_closest_kombi(chosen_zones)
+            r = kombi_results.get(chosen_zones, {})
+
             if r and r['n_trips'] >= min_trips:
                 break
             else:
                 r = paid_zones_results[takst].get(paid, {})
 
-   
+    else:
+        mro = ['zonerelation_match', f'kombi_paid_zones_{takst}']
+        for method in mro:
+            note.append(method)
+            r = zone_relation_results.get((start, end, paid), {})
+
+            if r and r['n_trips'] >= min_trips:
+                break
+            else:
+                r = paid_zones_results[takst].get(paid, {})
+
+
     if r['n_trips'] < min_trips:
         note.append(f'kombi_paid_all_zones_{takst}')
         r = paid_zones_results[takst].get(99, {})
-    
+
     out = r.copy()
-    out['note'] = _join_note_p(note)    
+    out['note'] = _join_note_p(note)
     return out
-   
-def _get_zone_relation_results(kombi_results):
+
+def _load_zone_relation_results(kombi_results):
+
     zone_relations = _load_zone_relations()
 
     test = {}
@@ -610,22 +629,22 @@ def _get_zone_relation_results(kombi_results):
             rel = (x['StartZone'], x['DestinationZone'], x['PaidZones'])
             validzones = x['ValidZones']
         except Exception as e:
-            continue       
+            continue
         test[rel] = validzones
-    
-    zone_relation_results = {}   
+
+    zone_relation_results = {}
     for k, v in test.items():
         try:
             zone_relation_results[k] = kombi_results[v]
         except KeyError:
             pass
-    return zone_relation_results 
-    
-    
+    return zone_relation_results
+
+
 def _pendler_tickets(
         sales_idxs: Dict,
         data: pd.core.frame.DataFrame,
-        year: int, 
+        year: int,
         min_trips: int,
         model: int
         ) -> pd.core.frame.DataFrame:
@@ -644,64 +663,67 @@ def _pendler_tickets(
 
     sub_data = data.query("NR in @pendler_ids")
     sub_tuples = list(sub_data.itertuples(index=False, name='Sale'))
-    
-    kombi_results = _load_kombi_shares(year, model)    
-    zone_relation_results = _get_zone_relation_results(kombi_results)
+
+    kombi_results = _load_kombi_shares(year, model)
+    zone_relation_results = _load_zone_relation_results(kombi_results)
     paid_zones_results = _load_nzone_shares(year, model)
 
-       
+
     bad = set()
     out = {}
     for record in sub_tuples:
         try:
-            out[record.NR] = _match_pendler_record(
-                record, kombi_results, 
-                zone_relation_results, 
-                paid_zones_results, 
+            result =  _match_pendler_record(
+                record, kombi_results,
+                zone_relation_results,
+                paid_zones_results,
                 min_trips
-                )                
+                )
+            # if 'INVALID_KOMBI' in result['note']:
+            #     break
+            out[record.NR] = result
         except:
             bad.add(record.NR)
     # merge into _result_frame func
     out_frame = pd.DataFrame.from_dict(out).T
     out_frame.index.name = 'NR'
     out_frame = out_frame.reset_index()
-    
-    test_out = pd.merge(sub_data, out_frame, on='NR', how='left')
-    test_out.note = test_out.note.fillna('')
-    test_out = test_out.fillna(0)
-    
+
+    output = pd.merge(sub_data, out_frame, on='NR', how='left')
+    output.note = output.note.fillna('')
+    output = output.fillna(0)
+
     main_cols = list(data.columns)
-    new = [x for x in test_out if x not in main_cols]
+    new = [x for x in output if x not in main_cols]
     ops = [x for x in new if x not in ('note', 'n_trips', 'n_users', 'n_period_cards')]
     out_cols = main_cols + sorted(ops) + ['n_trips', 'n_period_cards', 'n_users', 'note']
-    test_out = test_out[out_cols]
-    
-    return test_out
+    output = output[out_cols]
+
+    return output
 
 
-    
+
 def _load_other_results(year: int, model: int) -> Dict:
 
     fp = os.path.join(
-        THIS_DIR, '__result_cache__', 
-        f'{year}', 'preprocessed', 
+        THIS_DIR, '__result_cache__',
+        f'{year}', 'preprocessed',
         f'subtakst_model_{model}.pickle'
         )
-    
+
     with open(fp, 'rb') as f:
         d = pickle.load(f)
     return d
-    
+
 
 def _match_other_record(
-        record, other_results, 
+        record, other_results,
         small_ids, big_ids
         ):
     takst = record.takstsæt
     product = record.produktnavn
-    
-    
+
+
     note = None
     if record.NR in small_ids:
         r =  other_results['city']
@@ -713,7 +735,7 @@ def _match_other_record(
         else:
             r = other_results[f'{takst}']
             note = f'all_{takst}_rabat0'
-    
+
     out = r.copy()
     out['note'] = note
     return out
@@ -721,14 +743,14 @@ def _match_other_record(
 def _other_tickets(
         sales_idxs: Dict,
         data: pd.core.frame.DataFrame,
-        year: int, 
+        year: int,
         model: int
         ):
 
     results = _load_other_results(year, model)
     results = results['alltrips']
 
-    
+
     small_tickets = {
         'city pass small',
         'citypass small 24 timer',
@@ -756,12 +778,12 @@ def _other_tickets(
         'print-selv-billet',
         'enkeltbillet refusion'
         }
-      
+
     small_ids = set().union(*[set(sales_idxs.get(x, set())) for x in small_tickets])
     big_ids = set().union(*[set(sales_idxs.get(x, set())) for x in big_tickets])
-    
+
     sub_data = data.query("NR in @small_ids or NR in @big_ids")
-    
+
     records = list(sub_data.itertuples(index=False, name='Sale'))
 
 
@@ -770,29 +792,29 @@ def _other_tickets(
     for record in records:
         try:
             out[record.NR] = _match_other_record(
-                record, results, 
-                small_ids, 
-                big_ids, 
-                )                
+                record, results,
+                small_ids,
+                big_ids,
+                )
         except:
             bad.add(record.NR)
-    
+
     out_frame = _result_frame(out, sub_data)
-    
+
     return out_frame
 
 def single_ticket(sales_idxs, location_sales, data, single_results):
-    
+
     from collections import Counter
     for i in [1, 2, 5, 10, 20, 50]:
         single_output = _single_tickets(
             sales_idxs, location_sales, data, single_results, i
-            )           
-        single_output.to_csv(f"H:/single_ticket_mintrips{i}.csv", index=False)           
+            )
+        single_output.to_csv(f"H:/single_ticket_mintrips{i}.csv", index=False)
 
         n = len(single_output)
         counts = Counter(single_output.note.str.count('->'))
-        ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])    
+        ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])
         counts = {ordinal(k+1) + ' try': (v / n) * 100 for k, v in counts.items()}
         stats = pd.DataFrame.from_dict(counts, orient='index')
         stats = stats.reset_index()
@@ -800,13 +822,13 @@ def single_ticket(sales_idxs, location_sales, data, single_results):
         stats.to_csv(f"H:/single_ticket_mintrips{i}_stats.csv", index=False)
 
 def main():
-    
+
     parser = TableArgParser('year', 'model')
-    
+
     args = parser.parse()
     year = args['year']
     model = args['model']
-    
+
     data = _load_sales_data(year)
     sales_idxs = _sales_ref(data)
     location_idxs = _location_ref(data)
@@ -816,53 +838,51 @@ def main():
         single_model = 1
     else:
         single_model = model
-    
+
     single_results = _get_single_results(year, single_model)
-    
-    minimum_trips = 1
-    
+
     single_output = _single_tickets(
-        sales_idxs, location_sales, data, 
-        single_results, minimum_trips,
+        sales_idxs, location_sales, data,
+        single_results, MINIMUM_NTRIPS,
         loc=USE_LOCATIONS
         )
-    
+
     pendler_output = _pendler_tickets(
-        sales_idxs, data, year, minimum_trips, model
+        sales_idxs, data, year, MINIMUM_NTRIPS, model
         )
-      
+
     if model == 3:
         other_model = 1
     else:
-        other_model = model        
-    
+        other_model = model
+
     other_output = _other_tickets(sales_idxs, data, year, other_model)
- 
+
     output = pd.concat([single_output, pendler_output, other_output])
     output = output.sort_values('NR')
     output = output.fillna(0)
-    
+
     cols = ['dsb', 'first', 'stog', 'movia', 'metro']
-    
+
     for col in cols:
         output.loc[:, f'{col}_Andel'] = \
             output.loc[:, 'omsætning'] * output.loc[:, col]
 
     output = output[
-        ['NR', 'salgsvirksomhed', 'indtægtsgruppe', 
-         'salgsår', 'salgsmåned', 'takstsæt', 
-         'produktgruppe', 'produktnavn', 'kundetype', 
-         'salgsmedie', 'betaltezoner', 'startzone', 
+        ['NR', 'salgsvirksomhed', 'indtægtsgruppe',
+         'salgsår', 'salgsmåned', 'takstsæt',
+         'produktgruppe', 'produktnavn', 'kundetype',
+         'salgsmedie', 'betaltezoner', 'startzone',
          'slutzone', 'valgtezoner', 'omsætning',
-         'antal', 'dsb', 'first', 'stog',  'movia', 
-         'metro', 'n_trips', 'note', 'n_period_cards', 
-         'n_users', 'dsb_Andel', 'first_Andel', 
+         'antal', 'dsb', 'first', 'stog',  'movia',
+         'metro', 'n_trips', 'note', 'n_period_cards',
+         'n_users', 'dsb_Andel', 'first_Andel',
          'stog_Andel', 'movia_Andel', 'metro_Andel']
         ]
-    
+
     output.to_csv(f'takst_sjælland{year}_model_{model}.csv', index=False)
 
-       
+
 if __name__ == "__main__":
       main()
 
