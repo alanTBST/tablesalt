@@ -13,11 +13,13 @@ import zipfile
 from io import BytesIO
 from itertools import groupby, chain
 from operator import itemgetter
+from pathlib import Path
 from typing import (
     AnyStr, 
     Dict, 
     Mapping, 
     Optional, 
+    Union,
     Tuple, 
     Set,
     Any, 
@@ -35,6 +37,7 @@ from shapely import wkt
 #from tablesalt.common import check_dw_for_table, insert_query, make_connection
 from tablesalt.common.io import mappers
 
+FILE_PATH = Union[str, bytes, 'os.PathLike[Any]']
 
 REGIONS = {
     'hovedstaden',
@@ -194,7 +197,7 @@ class _GTFSloader:
                     k, v in self._route_types.items()}
         raise TypeError("only int and str supported")
 
-    
+    # change this from: no return_value = true
     def load_agency(
         self, 
         filepath: Optional[AnyStr] = None,
@@ -230,6 +233,7 @@ class _GTFSloader:
             k, g in groupby(agency, key=lambda y: y[0])
             }
         self._agency_ids = agency_ids
+        
         if return_value:
             return {
                 'agency_ids': agency_ids, 
@@ -238,7 +242,7 @@ class _GTFSloader:
 
     def load_shapes(
         self, 
-        filepath: Optional[AnyStr] = None,
+        filepath: FILE_PATH = None,
         return_value: Optional[bool] = False
         ) -> pd.core.frame.DataFrame:
         """
