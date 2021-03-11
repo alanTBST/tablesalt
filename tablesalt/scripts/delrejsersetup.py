@@ -109,7 +109,7 @@ from multiprocessing import Process, Queue
 from operator import itemgetter
 from typing import (
     ByteString,
-    Iterator, 
+    Iterator,
     List,
     Dict,
     Tuple,
@@ -174,8 +174,9 @@ def card_trip_generator(
             chunksize=chunksize, skiprows=skiprows,
             error_bad_lines=False, low_memory=False
             )
+
         for chunk in df_gen:
-            chunk_dict = dict(chunk.iloc[:, 0], chunk.iloc[:, 1])
+            chunk_dict = dict(zip(chunk.iloc[:, 0], chunk.iloc[:, 1]))
             byte_dict = {bytes(str(k), 'utf-8'): bytes(str(v), 'utf-8')
                          for k, v in chunk_dict.items()}
             yield byte_dict
@@ -293,7 +294,7 @@ def trip_application(array, column_order):
         return (np.array(time_arr, dtype=np.int64),
                 np.array(stop_arr, dtype=np.int64))
     except Exception as e:
-        print("failed quick ", str(e))
+        pass
 
     try:
         trip_app = np.array(array[:][:, (turngl, app)], dtype=np.int64)
@@ -452,23 +453,19 @@ def contractor_information(array, column_order):
     unseen = check_collection_complete(cont_arr[:, 2], 'operator_id')
 
     if not unseen:
-        cont_arr[:, 2] = np.vectorize(
-            mappers['operator_id'].get)(cont_arr[:, 2])
+        cont_arr[:, 2] = [mappers['operator_id'].get(x, 0) for x in cont_arr[:, 2]]
     else:
         update_collection(unseen, 'operator_id')
-        cont_arr[:, 2] = np.vectorize(
-            mappers['operator_id'].get)(cont_arr[:, 2])
+        cont_arr[:, 2] = [mappers['operator_id'].get(x, 0) for x in cont_arr[:, 2]]
     unseen = check_collection_complete(
         cont_arr[:, 3], 'contractor_id'
         )
     if not unseen:
-        cont_arr[:, 3] = np.vectorize(
-            mappers['contractor_id'].get)(cont_arr[:, 3])
+        cont_arr[:, 3] = [mappers['contractor_id'].get(x, 0) for x in cont_arr[:, 3]]
     else:
         print('updating collection')
         update_collection(unseen, 'contractor_id')
-        cont_arr[:, 3] = np.vectorize(
-            mappers['contractor_id'].get)(cont_arr[:, 3])
+        cont_arr[:, 3] = [mappers['contractor_id'].get(x, 0) for x in cont_arr[:, 3]]
 
     cont_arr = cont_arr[np.lexsort((cont_arr[:, 1], cont_arr[:, 0]))]
 
@@ -566,7 +563,7 @@ def passengers_producer(ziplist, col_indices, q, chunksize) -> None:
         time.sleep(0.1)
 
 
-def contractor_process(ziplist, col_indices, q, chunksize) -> None:
+def contractor_producer(ziplist, col_indices, q, chunksize) -> None:
     """
     Parameters
     ----------
@@ -652,7 +649,7 @@ def contractor_consumer(q, location) -> None:
 def main() -> None:
     """entry"""
 
-    parser = TableArgParser('year', 'chunksize')
+    parser = TableArgParser('year', 'chunksize', 'input_dir', 'output_dir')
     args = parser.parse()
 
     year = args['year']
@@ -660,11 +657,13 @@ def main() -> None:
     input_dir = args['input_dir']
     chunk_size = args['chunksize']
 
-    tc_store_path, hdf_path, cont_path = \
-        setup_directories(year, output_dir)
+    paths = setup_directories(year, output_dir)
+
+    tc_store_path = paths['dbs']
+    hdf_path = paths['hdfstores']
+    cont_path = paths['packs']
 
     zips = get_zips(input_dir)
-
     check_all_file_headers(zips)
     file_columns = get_columns(*zips[0])
     col_indices, a = col_index_dict(file_columns)
@@ -681,7 +680,7 @@ def main() -> None:
                   args=(zips, col_indices, queue, chunk_size))
     p3 = Process(target=passengers_producer,
                   args=(zips, col_indices, queue, chunk_size))
-    p4 = Process(target=contractor_process,
+    p4 = Process(target=contractor_producer,
                   args=(zips, col_indices, contractor_queue, chunk_size))
 
     t2 = Thread(target=consumer_process,
@@ -707,13 +706,18 @@ def main() -> None:
     contractor_queue.put(None)
     t2.join()
     t3.join()
-    # return args
 
 if __name__ == "__main__":
 
-    inhibitor = WindowsInhibitor()
-    inhibitor.inhibit()
-    st = datetime.now()
-    main()
-    inhibitor.uninhibit()
-    print(datetime.now() - st)
+
+    dt = datetime.now()
+
+    if os.name == 'nt':
+        INHIBITOR = WindowsInhibitor()
+        INHIBITOR.inhibit()
+        main()
+        INHIBITOR.uninhibit()
+    else:
+        main()
+
+    print(datetime.now() - dt)
