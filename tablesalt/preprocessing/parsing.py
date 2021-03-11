@@ -117,7 +117,6 @@ class TableArgParser:
         None
 
         """
-        
 
         self.arglist = list(args)
 
@@ -145,14 +144,11 @@ class TableArgParser:
                 )
     def parse(self) -> Dict[str, Union[int, pathlib.Path, str]]:
         """
-        
-
+        Parse the command line arguments
         Returns
         -------
-        TYPE
+        Dict
             DESCRIPTION.
 
         """
-        
-
         return vars(self.parser.parse_args())
