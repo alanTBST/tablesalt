@@ -220,17 +220,32 @@ class _PendlerInput():
             default path is ..inputdata/PeriodProdukt.csv
 
         """
-        pendler_product = pd.read_csv(
-            self.products_path,
-            encoding='iso-8859-1',
-            sep=';',
-            usecols=['EncryptedCardEngravedID', 'SeasonPassID',
+
+        col1 = ['EncryptedCardEngravedID', 'SeasonPassID',
                      'Fareset', 'PsedoFareset',
                      'SeasonPassName', 'SeasonPassZones',
                      'ValidityStartDT', 'ValidityEndDT',
                      'ValidDays', 'FromZoneNr',
-                     'ToZoneNr', 'PassagerType'],
-            dtype={'EncryptedCardEngravedID':str, 'SeasonPassID':int})
+                     'ToZoneNr', 'PassagerType']
+
+        try:
+            pendler_product = pd.read_csv(
+                self.products_path,
+                encoding='iso-8859-1',
+                sep=';',
+                usecols= col1,
+                dtype={'EncryptedCardEngravedID':str, 'SeasonPassID':int}
+                )
+        except ValueError:
+            pendler_product = pd.read_csv(
+                self.products_path,
+                encoding='utf-8',
+                sep=',',
+                usecols= col1,
+                dtype={'EncryptedCardEngravedID':str, 'SeasonPassID':int}
+                )
+
+
 
         pendler_product = pendler_product.fillna(0)
         pendler_product.loc[:, ('FromZoneNr', 'ToZoneNr')] = \
@@ -638,7 +653,6 @@ class PendlerKombiUsers():
             return dyn
 
         raise ValueError(f'usergroup: {user_group} not recognised')
-
 
     def subset_time(self):
         """
