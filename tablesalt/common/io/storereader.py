@@ -50,7 +50,7 @@ DSET_NAME_MAP = {
     'contractor_information': 'contractor_information'
     }
 
-# TODO...put in config 
+# TODO...put in config
 PAS_TYPES = {
     'voksen': [1, 7, 8, 11],
     'barn': [2, 9, 10, 12],
