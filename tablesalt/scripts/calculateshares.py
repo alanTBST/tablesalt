@@ -29,7 +29,7 @@ from tablesalt.topology import ZoneGraph, ZoneSharer
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 
-CPU_USAGE = 0.4# %
+CPU_USAGE = 0.5# %
 DB_START_SIZE = 8 # gb
 
 
