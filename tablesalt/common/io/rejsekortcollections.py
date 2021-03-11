@@ -7,12 +7,14 @@ Created on Wed Jun 27 11:21:12 2018
 
 import json
 import pkg_resources
+from pathlib import Path
 
 from typing import Dict, List, Union
 
 
 col_dict: Dict[str, Union[List[int], List[List[int]], Dict[str, int], Dict[str, str]]] = { ... }
 
+THIS_DIR = Path(__file__).parent
 
 def _load_collection() -> col_dict:
     """Load the json file containing the rejsekort collections
@@ -21,10 +23,10 @@ def _load_collection() -> col_dict:
     -------
     Dict[str, Union[List[int], List[List[int]], Dict[str, int], Dict[str, str]]]
         A dictionary of the json file
-    """    
-    with open(pkg_resources.resource_filename(
-        "tablesalt", "resources/rejsekortcollections.json"
-        ),
+    """
+
+    fp = THIS_DIR.parent.parent / 'resources' / 'rejsekortcollections.json'
+    with open(fp,
         'r', encoding='utf-8') as f:
         collection = json.load(f)
 
@@ -34,7 +36,7 @@ def _load_collection() -> col_dict:
 def proc_collection(
     collection: col_dict
     ) -> col_dict:
-    """process the dictionary in more python like types and 
+    """process the dictionary in more python like types and
     add some extra keys needed for analysis
 
     Parameters
