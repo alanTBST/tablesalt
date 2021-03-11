@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Nov 11 15:20:27 2019
-
-@author: alkj
-"""
-
-# -*- coding: utf-8 -*-
-"""
 Created on Tue Oct 15 10:31:40 2019
 
 @author: alkj
@@ -18,12 +11,12 @@ a trip. Calculated from the given zones
 in which a user taps in or out
 
 """
-import pkg_resources
+
 from itertools import chain, groupby
 from collections import Counter
 from functools import lru_cache
 from typing import Tuple, Union, Optional
-
+import pkg_resources
 
 import pandas as pd
 import numpy as np
@@ -42,36 +35,40 @@ rev_model_dict = {v:k for k, v in mappers['model_dict'].items()}
 CO_TR = (rev_model_dict['Co'], rev_model_dict['Tr'])
 
 
-
+COMPANY_FACTOR = 1
 # TODO load from config
 SOLO_ZONE_PRIS = {
     'th': {
         'dsb': 6.38,
-        'movia': 9.18,
+        'movia': 9.18 * COMPANY_FACTOR,
         'first': 6.42,
         'stog': 7.12,
-        'metro': 9.44
+        's-tog': 7.12,
+        'metro': 9.44 * COMPANY_FACTOR
         },
     'ts': {
         'dsb': 6.55,
-        'movia': 7.94,
+        'movia': 7.94 * COMPANY_FACTOR,
         'first': 6.42,
         'stog': 7.12,
-        'metro': 9.44
+        's-tog': 7.12,
+        'metro': 9.44  * COMPANY_FACTOR,
         },
     'tv': {
-        'dsb': 6.38,
-        'movia': 8.43,
+        'dsb': 6.74,
+        'movia': 8.43 * COMPANY_FACTOR,
         'first': 6.42,
         'stog': 7.12,
-        'metro': 9.44
+        's-tog': 7.12,
+        'metro': 9.44 * COMPANY_FACTOR,
         },
     'dsb': {
         'dsb': 6.57,
-        'movia': 6.36,
+        'movia': 6.36 * COMPANY_FACTOR,
         'first': 6.42,
         'stog': 7.12,
-        'metro': 9.44
+        's-tog': 7.12,
+        'metro': 9.44 * COMPANY_FACTOR,
         }
     }
 
@@ -87,8 +84,7 @@ def _determine_region(zone_sequence: Tuple[int, ...]) -> str:
 
 
 def load_border_stations(): # put this in TBSTtopology
-
-
+    "load the border stations dataset from package"
     fp = pkg_resources.resource_filename(
         'tablesalt',
         'resources/revenue/borderstations.xlsx'
@@ -188,7 +184,7 @@ def _border_legs():
     return
 
 class ZoneProperties():
-
+    "ZoneProperties"
 
     VISITED_CACHE = {}
 
@@ -199,11 +195,13 @@ class ZoneProperties():
                  region: Optional[str] = 'sjælland') -> None:
 
         """
-
+        Class to determine how many zones are travelled through,
+        whether a border zone is touched, how the border affects the
+        total number or zones, etc
 
         Parameters
         ----------
-        graph : TYPE
+        graph : ZoneGraph
             DESCRIPTION.
         zone_sequence : TYPE
             DESCRIPTION.
@@ -363,6 +361,7 @@ class ZoneProperties():
         return self._borderless_properties()
 
     def property_dict(self):
+        "returns a dictionary of the zone properties for the trip"
 
         if not self.border_trip:
             return self._borderless_properties()
@@ -420,6 +419,7 @@ def operators_in_touched_(tzones, zonelegs, oplegs):
 
 @lru_cache(2**16)
 def aggregated_zone_operators(v):
+    "aggregate all the operators for the zone shares"
 
     vals = list(v)
 
@@ -451,6 +451,27 @@ class ZoneSharer(ZoneProperties):
             operator_sequence: Tuple[int, ...],
             usage_sequence: Tuple[int, ...]
             ) -> None:
+        """
+        Main class to determine the zone shares for each operator
+        on a trip.
+
+        Parameters
+        ----------
+        graph : ZoneGraph
+            the zonegraph that is created from the shapes.txt and
+            takst zones polygons.
+        zone_sequence : Tuple[int, ...]
+            a tuple of zone numbers from the delrejser data.
+        stop_sequence : Tuple[int, ...]
+            a tuple of stop ids from the delrejser data.
+        operator_sequence : Tuple[int, ...]
+            a tuple of operator ids corr. to the operator names.
+        usage_sequence : Tuple[int, ...]
+            a tuple of model ids .
+
+
+        """
+
         super().__init__(graph, zone_sequence, stop_sequence)
 
         self.zone_sequence = zone_sequence
@@ -461,7 +482,6 @@ class ZoneSharer(ZoneProperties):
         self.usage_legs = to_legs(self.usage_sequence)
 
         self.single: bool = self._is_single()
-
 
         self.region: str = _determine_region(self.zone_sequence)
 
@@ -474,15 +494,15 @@ class ZoneSharer(ZoneProperties):
 
         if CO_TR not in self.usage_legs:
             return
-        CoTr_idxs = ()
+        cotr_idxs = ()
         for i, j in enumerate(self.usage_legs):
             if j == CO_TR:
-                CoTr_idxs += (i,)
+                cotr_idxs += (i,)
 
-        self.stop_legs = _remove_idxs(CoTr_idxs, self.stop_legs)
-        self.operator_legs = _remove_idxs(CoTr_idxs, self.operator_legs)
-        self.zone_legs = _remove_idxs(CoTr_idxs, self.zone_legs)
-        self.usage_legs = _remove_idxs(CoTr_idxs, self.usage_legs)
+        self.stop_legs = _remove_idxs(cotr_idxs, self.stop_legs)
+        self.operator_legs = _remove_idxs(cotr_idxs, self.operator_legs)
+        self.zone_legs = _remove_idxs(cotr_idxs, self.zone_legs)
+        self.usage_legs = _remove_idxs(cotr_idxs, self.usage_legs)
 
     def _station_operators(self):
 
@@ -501,9 +521,20 @@ class ZoneSharer(ZoneProperties):
         self.SHARE_CACHE[val] = shares
         return shares
 
-    def share_calculation(self, val):
+    def share_calculation(self, val): # val is a property dict
         """
-        calculate the shares for
+        Calculate the zone shares for the operators on the trip
+
+        Parameters
+        ----------
+        val : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+
         """
 
         out = {}
@@ -531,6 +562,7 @@ class ZoneSharer(ZoneProperties):
     def _standardise(share):
 
         if isinstance(share[0], int):
+            # removes _h, _s, _v from Movia_H, ...
             return share[0], share[1].lower().split('_')[0]
         if isinstance(share[0], tuple):
             return tuple((x[0], x[1].lower().split('_')[0]) for x in share)
@@ -550,10 +582,9 @@ class ZoneSharer(ZoneProperties):
         if self.single:
             return self._standardise(self._share_single(val))
 
-
         self._remove_cotr()
 
-        if not all(len(set(x))== 1 for x in self.operator_legs):
+        if not all(len(set(x)) == 1 for x in self.operator_legs):
             try:
                 new_op_legs = self._station_operators()
             except (TypeError, KeyError):
@@ -564,7 +595,6 @@ class ZoneSharer(ZoneProperties):
             except IndexError:
                 self.SHARE_CACHE[val] = 'operator_error'
                 return 'operator_error'
-
 
         if not all(x for x in self.operator_legs):
             self.SHARE_CACHE[val] = 'operator_error'
@@ -634,27 +664,7 @@ class ZoneSharer(ZoneProperties):
         try:
             return self._standardise(self._weight_solo(shares, solo_prices))
         except TypeError:
-
             return shares
-
-    # def solo_zone_price(self):
-    #     shares = self.share()
-
-    #     if isinstance(shares, str):
-    #         return shares
-
-    #     if not isinstance(shares[0], tuple):
-    #         shares = (shares, )
-
-    #     solo_prices = SOLO_ZONE_PRIS[self.region]
-
-    #     operator_prices = tuple(
-    #         (x[0] * solo_prices[x[1]], x[1])
-    #         for x in shares
-    #         )
-
-    #     return operator_prices
-
 
 def shrink_search(graph, start, goal, ringzones, distance_buffer=2):
     """
@@ -690,4 +700,3 @@ def shrink_search(graph, start, goal, ringzones, distance_buffer=2):
                  k, v in new_graph.items()}
 
     return new_graph
-
