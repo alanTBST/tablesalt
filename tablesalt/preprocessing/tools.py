@@ -5,7 +5,7 @@ import socket
 import zipfile
 from pathlib import Path
 from typing import (
-    IO, 
+    IO,
     Any,
     Optional,
     Iterable,
@@ -58,10 +58,10 @@ def _hdfstores(store_loc: str, year: int) -> List[str]:
     """Return path of the hdf5 files"""
     return glob.glob(
         os.path.join(
-            store_loc, 
+            store_loc,
             'rejsekortstores',
-            f'{year}DataStores', 
-            'hdfstores', 
+            f'{year}DataStores',
+            'hdfstores',
             '*.h5'
             )
         )
@@ -79,37 +79,37 @@ def setup_directories(year: int, dstores: Optional[str] = None) -> List[str]:
     """
     if not dstores:
         dstores = os.path.join(
-            Path(THIS_DIR).parent, 
+            Path(THIS_DIR).parent,
             'datastores',
             'rejsekortstores'
             )
     else:
         dstores = os.path.join(
-            dstores, 
+            dstores,
             'rejsekortstores'
             )
     if not os.path.isdir(dstores):
         os.makedirs(dstores)
-    
-    dstore_paths = ('dbs', 'dbs', 'packs')
-    
-    new_paths = []
+
+    dstore_paths = ('hdfstores', 'dbs', 'packs')
+
+    new_paths = {}
     for d in dstore_paths:
         new_path = os.path.join(dstores, f'{year}DataStores', d)
-        new_paths.append(new_path)
+        new_paths[d] = new_path
 
     result_paths = ['other', 'pendler', 'single', 'preprocessed']
     for d in result_paths:
         new_path =  os.path.join(
             Path(THIS_DIR).parent,
             'scripts',
-            '__result_cache__', 
-            f'{year}', 
+            '__result_cache__',
+            f'{year}',
             d
             )
-        new_paths.append(new_path) 
-  
-    for path in new_paths:
+        new_paths[d] = new_path
+
+    for _, path in new_paths.items():
         if not os.path.isdir(path):
             os.makedirs(path)
 
@@ -144,10 +144,10 @@ def db_paths(store_location: str, year: int) -> Dict[str, Union[str, List[str]]]
     out: Dict[str, Union[str, List[str]]] = {}
     for name in kv_names:
         path = os.path.join(
-            store_location, 
-            'rejsekortstores', 
+            store_location,
+            'rejsekortstores',
             f'{year}DataStores',
-            'dbs', 
+            'dbs',
             name
             )
         out[name] = path
@@ -186,7 +186,7 @@ def get_zips(path: str) -> List[Tuple[str, str]]:
 
 
 def get_columns(
-        zfile: Union[str, 'os.PathLike[Any]', IO[bytes]], 
+        zfile: Union[str, 'os.PathLike[Any]', IO[bytes]],
         content: Union[str, zipfile.ZipInfo]
         ) -> List[str]:
     """return a list of the file headers"""
@@ -203,7 +203,7 @@ def check_all_file_headers(
     """test to see if all file headers are like the first"""
     if len(file_list) == 1:
         return True
-    
+
     zfile, content = file_list[0]
     first_headers = get_columns(zfile, content)
     for file in file_list[1:]:
@@ -245,7 +245,7 @@ def col_index_dict(
 
     colindices: Dict[str, int] = {}
     colindices['kortnr'] = kortnr
-    
+
     for col, *_ in wanted:
         try:
             colindices[col] = file_columns.index(col)
