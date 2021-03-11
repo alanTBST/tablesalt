@@ -10,11 +10,11 @@ import json
 import pkg_resources
 from itertools import chain, permutations
 from typing import (
-    Any, 
-    AnyStr, 
-    Dict, 
-    Optional, 
-    Tuple, 
+    Any,
+    AnyStr,
+    Dict,
+    Optional,
+    Tuple,
     Union
     )
 
@@ -74,7 +74,7 @@ def _load_operator_settings(
     operators = tuple(set(config_dict[x] for x in chosen_lines))
 
     return {
-        'operator_ids': operator_ids, 
+        'operator_ids': operator_ids,
         'operators': operators,
         'config': config_dict
         }
@@ -97,20 +97,20 @@ def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
     fp = pkg_resources.resource_filename(
             'tablesalt',
             'resources/networktopodk/operator_stations.csv'
-            
+
         )
 
     pas_stations = pd.read_csv(
         fp, encoding='utf-8'
         )
-   
+
     pas_stations.columns = [x.lower() for x in pas_stations.columns]
-    
+
     base_cols = [
-        'uic', 'parent_uic', 'stationsnavn', 
-        'forkortelse', 'region nr', 'region navn', 
+        'uic', 'parent_uic', 'stationsnavn',
+        'forkortelse', 'region nr', 'region navn',
         'kommune nr', 'kommune navn'
-        ] 
+        ]
     line_cols = [x for x in pas_stations.columns if x in lines]
 
     cols = base_cols + line_cols
@@ -134,7 +134,7 @@ class StationOperators():
 
     """
     BUS_ID_MAP = load_bus_station_connectors()
-    
+
     ID_CACHE = {}
 
     def __init__(self, *lines: str) -> None:
@@ -151,7 +151,7 @@ class StationOperators():
         """
         create the query to select valid values from the dataframe
         """
-            
+
         qry = []
         for oper in self.lines:
             if 'bus' not in oper:
@@ -161,8 +161,8 @@ class StationOperators():
         qry = " & ".join(qry)
 
         return qry
-    
-    
+
+
     def _pas_station_dict(self):
         """
         create the station dictionary from the underlying
@@ -172,9 +172,9 @@ class StationOperators():
         pas_stations = _load_default_passenger_stations(*self.lines)
         s_exceptions = pas_stations.query(
             "uic > 8690000")['parent_uic'].dropna().astype(int).tolist()
-        
+
         # range(1, ..) - include single operators in the permutations
-        
+
         all_perms = [
             x for l in range(1, len(self.lines)) for
             x in permutations(self.lines, l)
@@ -254,7 +254,7 @@ class StationOperators():
     def _get_line(self, uic_number: int) -> Tuple[str, ...]:
 
         minidict = {
-            v: k for k, v in self._settings['config'].items() 
+            v: k for k, v in self._settings['config'].items()
             if k in self.lines
             }
         try:
@@ -262,7 +262,7 @@ class StationOperators():
         except KeyError:
              if uic_number > MAX_RAIL_UIC or uic_number < MIN_RAIL_UIC:
                 return tuple(('bus', ))
-        raise KeyError("uic number not found")           
+        raise KeyError("uic number not found")
 
     def _get_operator_id(self, uic_number: int) -> Tuple[int, ...]:
         try:
@@ -277,7 +277,7 @@ class StationOperators():
 
 
     def get_ops(
-        self, uic_number: int, 
+        self, uic_number: int,
         format: Optional[str] = 'operator_id'
         ) -> Union[Tuple[int, ...], Tuple[str, ...]]:
         """
@@ -322,7 +322,7 @@ class StationOperators():
         "format must be one of 'operator', 'operator_id', 'line'"
         )
         fdict = {
-            'operator_id': self._get_operator_id(uic_number), 
+            'operator_id': self._get_operator_id(uic_number),
             'operator': self._get_operator(uic_number),
             'line': self._get_line(uic_number)
             }
@@ -334,52 +334,52 @@ class StationOperators():
         return self.BUS_ID_MAP.get(bus_stop_id, 0)
 
     def _pair_operator(
-        self, start_uic: int, 
-        start_ops: Tuple[str, ...], 
+        self, start_uic: int,
+        start_ops: Tuple[str, ...],
         end_ops: Tuple[str, ...]
         ) -> Tuple[str, ...]:
-        
+
         intersect = set(start_ops).intersection(set(end_ops))
         if len(intersect) == 1:
             return tuple(intersect)
-        
+
         if intersect:
             if start_uic in M_RANGE:
                 return tuple((self._settings['config']['metro'], ))
-            
+
             if start_uic in S_RANGE:
                 return tuple((self._settings['config']['suburban'], ))
-            
+
         return tuple(intersect)
 
     def _pair_operator_id(
-        self, start_uic: int, 
-        start_ops: Tuple[int, ...], 
+        self, start_uic: int,
+        start_ops: Tuple[int, ...],
         end_ops: Tuple[int, ...]
         ) -> Tuple[int, ...]:
 
-        
+
         intersect = set(start_ops).intersection(set(end_ops))
         if len(intersect) == 1:
             return tuple(intersect)
-        
+
         if intersect:
-            
+
             if start_uic in M_RANGE:
                 return tuple(
                     (self._settings['operator_ids'][self._settings['config']['metro']], )
-                    )   
+                    )
             if start_uic in S_RANGE:
                 return tuple(
                     (self._settings['operator_ids'][self._settings['config']['suburban']], )
                     )
-        
+
         return tuple(intersect)
 
-    
+
     def _pair_line(
-        self, start_uic: int, 
-        start_ops: Tuple[str, ...], 
+        self, start_uic: int,
+        start_ops: Tuple[str, ...],
         end_ops: Tuple[str, ...]
         ) -> Tuple[str, ...]:
 
@@ -388,15 +388,17 @@ class StationOperators():
             return tuple(intersect)
         if intersect:
             if start_uic in M_RANGE:
-                return tuple(('metro', ))       
+                return tuple(('metro', ))
             if start_uic in S_RANGE:
                 return tuple(('suburban', ))
-        
+
         return tuple(intersect)
 
 
     def station_pair(
-        self, start_uic: int, end_uic: int, 
+        self,
+        start_uic: int,
+        end_uic: int,
         format: Optional[str] = 'operator_id'
         ) -> Union[Tuple[int, ...], Tuple[str, ...]]:
         """
@@ -419,12 +421,12 @@ class StationOperators():
         --------
 
         """
-        
+
         try:
             return self.ID_CACHE[(start_uic, end_uic)]
         except KeyError:
             pass
-        
+
         start_bus = start_uic > MAX_RAIL_UIC or start_uic < MIN_RAIL_UIC
         end_bus = end_uic > MAX_RAIL_UIC or end_uic < MIN_RAIL_UIC
 
@@ -440,10 +442,10 @@ class StationOperators():
             f"Can't find station for end of leg bus stop id {end_uic}"
             )
         start_ops = self.get_ops(start_uic, format=format)
-        end_ops = self.get_ops(end_uic, format=format)        
-        
+        end_ops = self.get_ops(end_uic, format=format)
+
         fdict = {
-            'operator_id': self._pair_operator_id(start_uic, start_ops, end_ops), 
+            'operator_id': self._pair_operator_id(start_uic, start_ops, end_ops),
             'operator': self._pair_operator(start_uic, start_ops, end_ops),
             'line': self._pair_line(start_uic, start_ops, end_ops)
             }
@@ -451,5 +453,5 @@ class StationOperators():
         if format == 'operator_id':
             self.ID_CACHE[(start_uic, end_uic)] = returnval
         return returnval
-        
+
 
