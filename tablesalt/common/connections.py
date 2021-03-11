@@ -47,6 +47,7 @@ def make_connection():
 
     """
     CNXN_CONF = _load_connection_config()
+
     if _MOD == 'pyodbc':
         url = ''
         for k, v in CNXN_CONF.items():
