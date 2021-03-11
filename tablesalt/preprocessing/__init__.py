@@ -1,2 +1,2 @@
 
-from .tools import find_datastores
+from .tools import find_datastores, db_paths
