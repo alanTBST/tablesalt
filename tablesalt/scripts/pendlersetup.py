@@ -57,9 +57,6 @@ Created on Sat Mar 14 18:07:24 2020
 """
 # standard imports
 import ast
-import sys
-import os
-import glob
 from datetime import datetime
 from multiprocessing import Pool
 # from multiprocessing.pool import ThreadPool
@@ -68,7 +65,7 @@ from functools import partial
 from operator import itemgetter
 from pathlib import Path
 
-#thrid party imports
+#third party imports
 import numpy as np
 import lmdb
 
@@ -178,13 +175,10 @@ def thread_dates(lst_of_stores, pendler_keys, dbpath):
     """
     func = partial(load_store_dates, pendler_trip_keys=pendler_keys)
     print("Loading travel dates...")
-    with Pool(os.cpu_count() // 2) as pool:
+    with Pool(7) as pool:
         results = pool.imap(func, lst_of_stores)
         for res in results:
             make_store(res, dbpath, start_size=5)
-            env = lmdb.open(dbpath)
-            print(env.stat()['entries'])
-            env.close()
 
 def _card_periods(dict_dicts):
     """get val periods from dict of dicts"""
@@ -260,7 +254,8 @@ def main():
     stores = paths['store_paths']
 
     pendler_cards = users._PendlerInput(
-        args['year'], products_path=args['products'],
+        args['year'],
+        products_path=args['products'],
         product_zones_path=args['zones']
         )
 
