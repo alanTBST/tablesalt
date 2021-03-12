@@ -516,7 +516,7 @@ def _correct_chosen_form(string: str) -> bool:
     if not any(x.isdigit() for x in string):
         return False
 
-    return (all(x.isdigit() or x == ',' or 
+    return (all(x.isdigit() or x == ',' or
                 x == ' ' for x in string)
             and ',' in string)
 
@@ -561,9 +561,9 @@ def clean_frame(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
 
 def main():
     """main function"""
-    
-    d = r'H:\revenue\salesdata'
-    year = 2019
+
+    d = r'H:\revenue\inputdata\2020\sales'
+    year = 2020
     contents = directory_contents(d)
     operators = identify_operator(contents)
     given_columns = find_columns(operators)
@@ -571,9 +571,9 @@ def main():
     df = read_and_merge(operators, columns_matched)
     df = clean_frame(df)
     fp = os.path.join(
-        THIS_DIR, 
-        '__result_cache__', 
-        f'{year}', 
+        THIS_DIR,
+        '__result_cache__',
+        f'{year}',
         'preprocessed',
         'mergedsales.csv'
         )
