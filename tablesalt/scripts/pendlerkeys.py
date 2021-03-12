@@ -26,7 +26,7 @@ from tablesalt.season.users import PendlerKombiUsers
 from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
 
-THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
+THIS_DIR = Path(__file__).parent
 
 def get_zone_combinations(udata):
     """
@@ -159,7 +159,7 @@ def wrap_price(store):
     return StoreReader(store).get_data('price')
 
 def get_zeros(p):
-    df = pd.DataFrame(p[:, (0, -1)],
+    df = pd.DataFrame(p[:, (0, 1)],
                       columns=['tripkey', 'price']).set_index('tripkey')
     df = df.groupby(level=0)['price'].transform(max)
     df = df[df == 0]
@@ -186,12 +186,14 @@ def find_no_pay(stores, year):
             out = pickle.load(file)
     except FileNotFoundError:
         out = set()
-        with Pool(os.cpu_count() - 1) as pool:
+        with Pool(os.cpu_count() - 2) as pool:
             results = pool.imap(proc, stores)
             for res in tqdm(results,
                             'finding trips inside zones',
                             total=len(stores)):
                 out.update(set(res))
+        with open(fp, 'wb') as f:
+            pickle.dump(out, f)
     return out
 
 def assert_internal_zones(zero_travel_price, zone_combo_trips):
@@ -258,9 +260,9 @@ def _aggregate_zones(shares):
     # TODO: import this from package
     test_out = sorted(shares, key=itemgetter(1))
     totalzones = sum(x[0] for x in test_out)
-    t = {key:sum(x[0] for x in group) for
+    t = {key: sum(x[0] for x in group) for
          key, group in groupby(test_out, key=itemgetter(1))}
-    t = {k:v/totalzones for k, v in t.items()}
+    t = {k: v/totalzones for k, v in t.items()}
 
     return t
 
@@ -285,9 +287,9 @@ def pendler_reshare(share_tuple):
 
     n_ops = n_operators(share_tuple)
 
-    return tuple((1/n_ops, x[1]) for x in share_tuple)
+    return tuple((1/ n_ops, x[1]) for x in share_tuple)
 
-def get_zone_combination_shares(tofetch, db_path: AnyStr, model: int):
+def get_zone_combination_shares(tofetch, db_path: str, model: int):
 
 
     with lmdb.open(db_path) as env:
@@ -339,8 +341,7 @@ def _kombi_by_users(pendler_kombi, cardnums):
 
 def _get_trips(db_path, tripkeys, model):
 
-
-    tripkeys_ = {bytes(str(x), 'utf-8') for x in tripkeys}
+    tripkeys_ = (bytes(str(x), 'utf-8') for x in tripkeys)
 
     out = {}
     with lmdb.open(db_path) as env:
@@ -572,7 +573,6 @@ def main():
     args = parser.parse()
 
     year = args['year']
-
     paths = db_paths(find_datastores(), year)
     stores = paths['store_paths']
 
@@ -594,7 +594,6 @@ def main():
         product_zones_path=zone_path,
         min_valid_days=14
         )
-
 
     _chosen_zones(
         userdict,
@@ -626,4 +625,3 @@ if __name__ == "__main__":
         INHIBITOR.uninhibit()
     else:
         main()
-
