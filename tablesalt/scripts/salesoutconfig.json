@@ -1,0 +1,65 @@
+{
+    "start_locations": {
+        "automat": "metro",
+        "nautila": "dsb",
+        "lokaltog-automater i 25 nordsj\u00e6llandske togs\u00e6t": "movia",
+        "enkeltbilletter bus": "movia"
+    },
+    "single_tickets": [
+        "enkeltbillet",
+        "lang enkeltbillet",
+        "forsorgsbilletter"
+    ],
+    "pendler_tickets": [
+        "pendlerkort",
+        "erhvervskort",
+        "virksomhedskort",
+        "pensionistkort",
+        "ungdomskort xu",
+        "flexcard 7 dage",
+        "flexcard",
+        "ungdomskort vu",
+        "ungdomskort uu",
+        "skolekort"
+    ],
+    "city_small": [
+        "city pass small",
+        "citypass small 24 timer",
+        "citypass small 120 timer",
+        "citypass small 48 timer",
+        "citypass small 72 timer",
+        "citypass small 96 timer",
+        "mobilklippekort",
+        "park and ride"
+    ],
+    "city_large": [
+        "institutionskort, 20 b\u00f8rn",
+        "travel pass",
+        "kulturnatten",
+        "citypass large 120 timer",
+        "citypass large 24 timer",
+        "b\u00f8rnealderskompensation",
+        "city pass large",
+        "citypass large 96 timer",
+        "citypass large 72 timer",
+        "copenhagen card",
+        "citypass large 48 timer",
+        "skoleklassekort",
+        "institutionskort, 15 b\u00f8rn",
+        "blindekort",
+        "off peak-kompensation",
+        "mobilklippekort",
+        "turistbillet",
+        "print-selv-billet",
+        "enkeltbillet refusion",
+        "ungdomskort uu - fritid",
+        "ungdomskort uu - kompensation",
+        "ungdomskort vu - fritid",
+        "ungdomskort vu - kompensation",
+        "ungdomskort xu - fritid",
+        "dsb-salg uspecificeret",
+        "bornholmtrafikken"
+    ],
+    "use_locations": false,
+    "minimum_trips": 1
+}
