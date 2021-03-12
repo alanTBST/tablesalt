@@ -34,20 +34,16 @@ from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
 
 
-THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
-CPU_USAGE = 0.8
+THIS_DIR = Path(__file__).parent
+CPU_USAGE = 0.5
 
 def _load_border_trips(year: int):
+    "load and merge the dumped border trips"
 
 
-    filedir = os.path.join(
-        THIS_DIR,
-        '__result_cache__',
-        f'{year}',
-        'borderzones'
-        )
+    filedir = THIS_DIR / '__result_cache__' / f'{year}'/ 'borderzones'
 
-    files = glob.glob(os.path.join(filedir, '*.pickle'))
+    files = filedir.glob('*.pickle')
     borders = {}
     for file in tqdm(files, 'merging border trips'):
         with open(file, 'rb') as f:
@@ -55,7 +51,7 @@ def _load_border_trips(year: int):
             borders = {**borders, **border}
     return borders
 
-
+# TODO into io
 def helrejser_rabattrin(rabattrin, year):
     """
     return a set of the tripkeys from the helrejser data in
@@ -424,7 +420,6 @@ def _gather_store_keys(lst_of_files, operators, nparts):
             out_all, out, out_operators, opkeys, operators
             )
 
-
     return out_all, out_operators
 
 def _gather_all_store_keys(operators, nparts, year):
@@ -461,7 +456,6 @@ def _gather_all_store_keys(operators, nparts, year):
 
     for p in lst_of_temp:
         os.remove(p)
-
 
     return out_all, out_operators
 
@@ -582,62 +576,60 @@ def _nzone_merge(resultdict):
     return agg_nested_dict(nzone)
 
 
-def main():
+def _all_rabat_keys(year):
 
-    parser = TableArgParser('year', 'rabattrin', 'model')
-    args = parser.parse()
+    all_rabat_levels = ()
+    for i in range(0, 8):
+        rabatkeys = tuple(_get_rabatkeys(i, year))
+        all_rabat_levels += rabatkeys
 
-    year = args['year']
-    rabat_level = args['rabattrin']
-    model = args['model']
+    return all_rabat_levels
 
-
-    store_loc = find_datastores()
-    paths = db_paths(store_loc, year)
-    stores = paths['store_paths']
-    db_path = paths['calculated_stores']
-
-    if model == 2:
-        db_path = db_path + f'_model_{model}'
-
-
-    ringzones = ZoneGraph.ring_dict('sjælland')
-    stopzone_map = TakstZones().stop_zone_map()
-
-    wanted_operators = [
-        'Metro', 'D**', 'Movia_S', 'Movia_V', 'Movia_H'
-        ]
-
-    rabatkeys = tuple(_get_rabatkeys(rabat_level, year))
-    print('inputs found\n')
-
-    _get_all_store_keys(
+def _rabat_results(
+        year,
+        model,
+        rabat_level,
+        db_path,
         stores,
         stopzone_map,
         ringzones,
-        wanted_operators,
-        rabatkeys,
-        year
-        )
+        wanted_operators
+        ):
 
-    del rabatkeys
+    single_fp = (THIS_DIR / '__result_cache__' /
+                 f'{year}' / 'preprocessed' /
+                 f'single_tripkeys_{year}_r{rabat_level}.pickle')
 
 
-    nparts = 10
+    if not single_fp.is_file():
 
-    out_all, out_operators = \
-        _gather_all_store_keys(wanted_operators, nparts, year)
+        if rabat_level <= 7:
+            rabatkeys = tuple(_get_rabatkeys(rabat_level, year))
+        else:
+            rabatkeys = _all_rabat_keys(year)
 
-    single_fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__',
-        f'{year}',
-        'preprocessed',
-        f'single_tripkeys_{year}_r{rabat_level}_model_{model}'
-        )
-    with open(single_fp, 'wb') as file:
-        pickle.dump(out_all, file)
+        _get_all_store_keys(
+            stores,
+            stopzone_map,
+            ringzones,
+            wanted_operators,
+            rabatkeys,
+            year
+            )
 
+        del rabatkeys
+        nparts = 10
+        out_all, out_operators = \
+            _gather_all_store_keys(wanted_operators, nparts, year)
+
+        out_operators['all'] = out_all
+        with open(single_fp, 'wb') as file:
+            pickle.dump(out_operators, file)
+    else:
+        with open(single_fp, 'rb') as f:
+            res = pickle.load(f)
+            out_all = res['all']
+            out_operators = {k: v for k, v in res.items() if k != 'all'}
 
     print('finding results\n')
     all_wanted_keys = set()
@@ -665,7 +657,7 @@ def main():
 
     operator_results_['all'] = all_results_
 
-    fp = os.path.join(
+    fp = Path(
         THIS_DIR,
         '__result_cache__',
         f'{year}',
@@ -676,18 +668,51 @@ def main():
     with open(fp, 'wb') as f:
         pickle.dump(operator_results_, f)
 
-    # _write_results(rabat_level, year)
 
-# if __name__ == "__main__":
-#     from datetime import datetime
-#     dt = datetime.now()
+def main():
 
-#     if os.name == 'nt':
-#         INHIBITOR = WindowsInhibitor()
-#         INHIBITOR.inhibit()
-#         main()
-#         INHIBITOR.uninhibit()
-#     else:
-#         main()
+    parser = TableArgParser('year', 'model')
+    args = parser.parse()
 
-#     print(datetime.now() - dt)
+    year = args['year']
+    model = args['model']
+
+    store_loc = find_datastores()
+    paths = db_paths(store_loc, year)
+    stores = paths['store_paths']
+    db_path = paths['calculated_stores']
+
+    if model == 2:
+        db_path = db_path + f'_model_{model}'
+
+
+    ringzones = ZoneGraph.ring_dict('sjælland')
+    stopzone_map = TakstZones().stop_zone_map()
+
+    wanted_operators = [
+        'Metro', 'D**', 'Movia_S', 'Movia_V', 'Movia_H'
+        ]
+
+    for rabat_level in [0, 1, 2]:
+        _rabat_results(
+        year,
+        model,
+        rabat_level,
+        db_path, stores,
+        stopzone_map,
+        ringzones,
+        wanted_operators
+        )
+    # _write_results(rabat_level, year) # csv results
+
+if __name__ == "__main__":
+    from datetime import datetime
+    dt = datetime.now()
+    if os.name == 'nt':
+        INHIBITOR = WindowsInhibitor()
+        INHIBITOR.inhibit()
+        main()
+        INHIBITOR.uninhibit()
+    else:
+        main()
+    print(datetime.now() - dt)
