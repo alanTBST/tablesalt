@@ -6,37 +6,44 @@ Created on Sat May 23 00:18:51 2020
 """
 import ast
 import glob
+import json
 import os
 import pickle
 import pkg_resources
 from itertools import chain
 from operator import itemgetter
-from typing import AnyStr, Dict, Tuple, Optional, List
+from typing import Dict, Tuple, List
 from pathlib import Path
 
 import msgpack
-import numpy as np
 import pandas as pd
 
 from tablesalt.preprocessing.parsing import TableArgParser
 
-THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 
+THIS_DIR = Path(__file__).parent
 
-# TODO maybe put this in a config file
-LOCATIONS = {
-    'automat': 'metro',
-    'nautila': 'dsb',
-    'lokaltog-automater i 25 nordsjællandske togsæt': 'movia',
-    'enkeltbilletter bus': 'movia'
+def _load_outconfig():
+
+    fp = THIS_DIR / 'salesoutconfig.json'
+    with open(fp, 'r') as f:
+        config = json.load(f)
+    return config
+
+CONFIG = _load_outconfig()
+LOCATIONS = CONFIG['start_locations']
+SINGLE_IDS = CONFIG['single_tickets']
+PENDLER_IDS = CONFIG['pendler_tickets']
+CITY_SMALL = CONFIG['city_small']
+CITY_LARGE = CONFIG['city_large']
+USE_LOCATIONS = CONFIG['use_locations']
+MINIMUM_NTRIPS = CONFIG['minimum_trips']
+
+RESULT_MAP = {
+    'dsb': ('D**', 'D*', 'D'),
+    'metro': ('Metro',),
+    'movia': ('Movia_H', 'Movia_S', 'Movia_V')
     }
-
-USE_LOCATIONS = False
-MINIMUM_NTRIPS = 1
-
-RESULT_MAP = {'dsb': ('D**', 'D*', 'D'),
-              'metro': ('Metro',),
-              'movia': ('Movia_H', 'Movia_S', 'Movia_V')}
 
 def _proc_sales(frame):
 
@@ -54,11 +61,9 @@ def _proc_sales(frame):
 
 def _load_sales_data(year: int) -> pd.core.frame.DataFrame:
 
-    fp = os.path.join(
-        THIS_DIR, '__result_cache__',
-        f'{year}', 'preprocessed',
-        'mergedsales.csv'
-        )
+    fp = (THIS_DIR / '__result_cache__' /
+          f'{year}' / 'preprocessed' /
+          'mergedsales.csv')
 
     df = pd.read_csv(fp, low_memory=False)
 
@@ -67,20 +72,16 @@ def _load_sales_data(year: int) -> pd.core.frame.DataFrame:
 def _get_single_results(year: int,  model: int):
 
 
-    fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__',
-        f'{year}',
-        'preprocessed'
-        )
-    singles = glob.glob(os.path.join(fp, 'single_results*'))
+    fp = THIS_DIR / '__result_cache__'/ f'{year}' / 'preprocessed'
 
-    singles = [x for x in singles if f'model_{model}' in x]
+    singles = list(fp.glob('single_results*'))
+
+    singles = [x for x in singles if f'model_{model}' in x.name]
 
     out = {}
     for i in range(3): # using r0, r1, r2
 
-        fmatch = [x for x in singles if f'r{i}' in x][0]
+        fmatch = [x for x in singles if f'r{i}' in x.name][0]
         # times = [os.path.getmtime(x) for x in fmatch]
         # min_id = np.argmin(times) # find latest entry
         # fp = fmatch[min_id]
@@ -124,8 +125,13 @@ def _get_location_sales(location_idxs, sales_idxs):
         k: v for k, v in location_idxs.items() if k in LOCATIONS
         }
 
-    single = set(sales_idxs['enkeltbillet']) | \
-        set(sales_idxs['lang enkeltbillet'])
+    single = set()
+
+    for name in SINGLE_IDS:
+        try:
+            single.update(set(sales_idxs[name]))
+        except KeyError:
+            continue
     location_sales = {}
     for k, v in wanted_start_locations.items():
         location_sales[k] = set(v).intersection(single)
@@ -215,7 +221,7 @@ def _resolve_tickets(record):
     try:
         endzone = int(endzone)
     except ValueError:
-        endzone = int(endzone[:4]) # endzone not needed
+        endzone = 0 # endzone not needed
 
 
     paid_zones = int(paid_zones)
@@ -241,8 +247,6 @@ def _match_single_operator(record, res, mro, trip_threshhold):
     note = []
     for method in mro:
         note.append(method)
-
-
         try:
             d = res[method[0]][method[1]][method[2]].copy()
         except KeyError:
@@ -342,15 +346,29 @@ def _result_frame(rdict, frame):
     return output
 
 
-def _any_single_merge(sales_idxs, location_sales, data, single_results, min_trips, loc):
+def _any_single_merge(
+        sales_idxs,
+        location_sales,
+        data,
+        single_results,
+        min_trips,
+        loc):
 
-    sales_nr = set(sales_idxs['enkeltbillet'] + sales_idxs['lang enkeltbillet'])
+    sales_nr = set()
+
+    for name in SINGLE_IDS:
+        try:
+            sales_nr.update(set(sales_idxs[name]))
+        except KeyError:
+            continue
+
     location_nr = set(chain(*location_sales.values()))
 
     if loc:
         wanted = sales_nr - location_nr
     else:
         wanted = sales_nr
+
     sub_data = data.query("NR in @wanted")
     sub_tuples = list(sub_data.itertuples(index=False, name='Sale'))
 
@@ -363,9 +381,12 @@ def _any_single_merge(sales_idxs, location_sales, data, single_results, min_trip
     for record in sub_tuples:
         if record.betaltezoner <= 8:
             out[record.NR] = _match_single_any(
-                record, res, mro_short, min_trips)
+                record, res, mro_short, min_trips
+                )
         else:
-            out[record.NR] = _match_single_any(record, res, mro_long, min_trips)
+            out[record.NR] = _match_single_any(
+                record, res, mro_long, min_trips
+                )
 
 
     outframe = _result_frame(out, sub_data)
@@ -408,8 +429,10 @@ def _single_tickets(sales_idxs,
                     loc=False):
 
     any_start = _any_single_merge(
-        sales_idxs, location_sales, data, single_results, min_trips,
-        loc=loc)
+        sales_idxs, location_sales,
+        data, single_results,
+        min_trips,loc=loc
+        )
 
     if loc:
         specific_start = _location_merge(
@@ -429,11 +452,8 @@ def _single_tickets(sales_idxs,
 
 def _load_kombi_shares(year: int, model: int) -> dict:
 
-    fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__', f'{year}',
-        'pendler', f'pendlerchosenzones{year}_model_{model}.csv'
-        )
+    fp =  (THIS_DIR / '__result_cache__' / f'{year}' /
+           'pendler' / f'pendlerchosenzones{year}_model_{model}.csv')
 
     df = pd.read_csv(fp, index_col=0)
     df.rename(columns={'S-tog': 'stog'}, inplace=True)
@@ -486,11 +506,9 @@ def _load_zone_relations():
 
 def _load_kombi_map_shares(year: int, model: int) -> pd.core.frame.DataFrame:
 
-    fp = os.path.join(
-        THIS_DIR, '__result_cache__',
-        f'{year}', 'pendler',
-        f'zonerelations{year}_model_{model}.csv'
-        )
+    fp = (THIS_DIR / '__result_cache__' / f'{year}' /
+          'pendler' / f'zonerelations{year}_model_{model}.csv')
+
     df = pd.read_csv(
         fp,
         dtype={'PaidZones': int},
@@ -513,21 +531,20 @@ def _load_nzone_shares(year: int, model: int):
         'tv': 'vestsjælland'
         }
 
-    filedir = os.path.join(THIS_DIR, '__result_cache__', f'{year}', 'pendler')
-    files = glob.glob(os.path.join(filedir, '*.csv'))
-    kombi = [x for x in files if 'kombi_paid_zones' in x and f'model_{model}' in x]
+    filedir = THIS_DIR /'__result_cache__' / f'{year}' / 'pendler'
 
+    files = glob.glob(os.path.join(filedir, '*.csv'))
+    kombi = [x for x in files if 'kombi_paid_zones' in
+             x and f'model_{model}' in x]
 
     out = {}
     for file in kombi:
-
         df = pd.read_csv(file, index_col=0)
         d = df.to_dict(orient='index')
         for k, v in takst_map.items():
             if v in file:
                 out[k] = d
                 break
-
     return out
 
 
@@ -610,7 +627,6 @@ def _match_pendler_record(
             else:
                 r = paid_zones_results[takst].get(paid, {})
 
-
     if r['n_trips'] < min_trips:
         note.append(f'kombi_paid_all_zones_{takst}')
         r = paid_zones_results[takst].get(99, {})
@@ -649,17 +665,13 @@ def _pendler_tickets(
         model: int
         ) -> pd.core.frame.DataFrame:
 
-    # TODO - set this in config
-    pendler_ids = \
-        sales_idxs.get('pendlerkort', ()) + \
-            sales_idxs.get('erhvervskort', ())  + \
-                sales_idxs.get('virksomhedskort', ())  + \
-                    sales_idxs.get('pensionistkort', ())  + \
-                        sales_idxs.get('ungdomskort xu', ())  + \
-                            sales_idxs.get('flexcard 7 dage', ()) + \
-                                sales_idxs.get('flexcard', ()) + \
-                                    sales_idxs.get('ungdomskort vu', ())  + \
-                                        sales_idxs.get('ungdomskort uu', ())
+    pendler_ids = set()
+
+    for name in PENDLER_IDS:
+        try:
+            pendler_ids.update(set(sales_idxs[name]))
+        except KeyError:
+            continue
 
     sub_data = data.query("NR in @pendler_ids")
     sub_tuples = list(sub_data.itertuples(index=False, name='Sale'))
@@ -717,8 +729,10 @@ def _load_other_results(year: int, model: int) -> Dict:
 
 
 def _match_other_record(
-        record, other_results,
-        small_ids, big_ids
+        record,
+        other_results,
+        small_ids,
+        big_ids
         ):
     takst = record.takstsæt
     product = record.produktnavn
@@ -750,37 +764,8 @@ def _other_tickets(
     results = _load_other_results(year, model)
     results = results['alltrips']
 
-
-    small_tickets = {
-        'city pass small',
-        'citypass small 24 timer',
-        'citypass small 120 timer',
-        'citypass small 48 timer',
-        'citypass small 72 timer',
-        'citypass small 96 timer',
-        'mobilklippekort'
-        }
-
-    big_tickets = {
-        'institutionskort, 20 børn', 'travel pass',
-        'kulturnatten', 'citypass large 120 timer',
-        'citypass large 24 timer',
-        'børnealderskompensation', 'city pass large',
-        'citypass large 96 timer',
-        'citypass large 72 timer',
-        'copenhagen card',
-        'citypass large 48 timer', 'skoleklassekort',
-        'institutionskort, 15 børn',
-        'blindekort',
-        'off peak-kompensation',
-        'mobilklippekort',
-        'turistbillet',
-        'print-selv-billet',
-        'enkeltbillet refusion'
-        }
-
-    small_ids = set().union(*[set(sales_idxs.get(x, set())) for x in small_tickets])
-    big_ids = set().union(*[set(sales_idxs.get(x, set())) for x in big_tickets])
+    small_ids = set().union(*[set(sales_idxs.get(x, set())) for x in CITY_SMALL])
+    big_ids = set().union(*[set(sales_idxs.get(x, set())) for x in CITY_LARGE])
 
     sub_data = data.query("NR in @small_ids or NR in @big_ids")
 
@@ -836,53 +821,71 @@ def main():
 
     if model == 3:
         single_model = 1
+        other_model = 1
     else:
         single_model = model
+        other_model = model
 
     single_results = _get_single_results(year, single_model)
 
     single_output = _single_tickets(
-        sales_idxs, location_sales, data,
-        single_results, MINIMUM_NTRIPS,
+        sales_idxs,
+        location_sales,
+        data,
+        single_results,
+        MINIMUM_NTRIPS,
         loc=USE_LOCATIONS
         )
 
     pendler_output = _pendler_tickets(
-        sales_idxs, data, year, MINIMUM_NTRIPS, model
+        sales_idxs,
+        data,
+        year,
+        MINIMUM_NTRIPS,
+        model
         )
 
-    if model == 3:
-        other_model = 1
-    else:
-        other_model = model
-
-    other_output = _other_tickets(sales_idxs, data, year, other_model)
+    other_output = _other_tickets(
+        sales_idxs,
+        data,
+        year,
+        other_model
+        )
 
     output = pd.concat([single_output, pendler_output, other_output])
     output = output.sort_values('NR')
     output = output.fillna(0)
 
-    cols = ['dsb', 'first', 'stog', 'movia', 'metro']
+    cols = ['dsb', 'first', 's-tog', 'movia', 'metro']
 
     for col in cols:
         output.loc[:, f'{col}_Andel'] = \
             output.loc[:, 'omsætning'] * output.loc[:, col]
 
-    output = output[
-        ['NR', 'salgsvirksomhed', 'indtægtsgruppe',
-         'salgsår', 'salgsmåned', 'takstsæt',
-         'produktgruppe', 'produktnavn', 'kundetype',
-         'salgsmedie', 'betaltezoner', 'startzone',
-         'slutzone', 'valgtezoner', 'omsætning',
-         'antal', 'dsb', 'first', 'stog',  'movia',
-         'metro', 'n_trips', 'note', 'n_period_cards',
-         'n_users', 'dsb_Andel', 'first_Andel',
-         'stog_Andel', 'movia_Andel', 'metro_Andel']
-        ]
+    col_order = [
+        'NR', 'salgsvirksomhed', 'indtægtsgruppe',
+        'salgsår', 'salgsmåned', 'takstsæt',
+        'produktgruppe', 'produktnavn', 'kundetype',
+        'salgsmedie', 'betaltezoner', 'startzone',
+        'slutzone', 'valgtezoner', 'omsætning',
+        'antal', 'dsb', 'first', 's-tog',  'movia',
+        'metro', 'n_trips', 'note', 'n_period_cards',
+        'n_users', 'dsb_Andel', 'first_Andel',
+        's-tog_Andel', 'movia_Andel', 'metro_Andel'
+         ]
+    output = output[col_order]
 
-    output.to_csv(f'takst_sjælland{year}_model_{model}.csv', index=False)
+    fp = (THIS_DIR / '__result_cache__' / f'{year}'/
+          f'takst_sjælland{year}_model_{model}.csv')
+
+    output.to_csv(fp, index=False)
 
 
 if __name__ == "__main__":
-      main()
+    main()
+    fp = (THIS_DIR / '__result_cache__' / '2020'/
+          'takst_sjælland2020_model_1.csv')
+    df = pd.read_csv(fp)
+
+
 
