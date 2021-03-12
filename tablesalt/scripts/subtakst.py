@@ -7,6 +7,7 @@ Created on Sun Sep 27 23:17:45 2020
 import ast
 import os
 import pickle
+from datetime import datetime
 from operator import itemgetter
 from functools import partial
 from itertools import groupby, chain
@@ -15,7 +16,6 @@ from pathlib import Path
 
 import lmdb
 import numpy as np
-import pandas as pd
 from tqdm import tqdm
 
 from tablesalt import StoreReader
@@ -23,18 +23,16 @@ from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.topology.tools import TakstZones
 from tablesalt.topology import ZoneGraph
 from tablesalt.preprocessing.parsing import TableArgParser
-from pendlerkeys import find_no_pay
 
-
-THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
+THIS_DIR = Path(__file__).parent
 
 def _get_rabatkeys(rabattrin, year):
 
     fp = os.path.join(
-        THIS_DIR, 
-        '__result_cache__', 
+        THIS_DIR,
+        '__result_cache__',
         f'{year}',
-        'preprocessed', 
+        'preprocessed',
         f'rabat{rabattrin}trips.pickle'
         )
 
@@ -74,7 +72,7 @@ def _max_zones(operator_zones, ringdict):
     return out
 
 def _load_data(store, stopzone_map, ringzones, rabatkeys):
-    
+
     reader = StoreReader(store)
     allstops = reader.get_data('stops')
     allstops_rabat_zero = allstops[
@@ -83,18 +81,18 @@ def _load_data(store, stopzone_map, ringzones, rabatkeys):
     allstops_mapped_zones = _map_zones(
         allstops_rabat_zero, stopzone_map
         )
-    
+
     pensionstops = reader.get_data(
         'stops', passenger_type='pensioner'
         )
     peak_trips = reader.get_data(
-        'stops', passenger_type='pensioner', 
+        'stops', passenger_type='pensioner',
         day=[0, 1, 2, 3, 4], hour=[7, 8, 15, 16]
-        )    
+        )
     pensionstops = pensionstops[
         ~np.isin(pensionstops[:, 0], peak_trips[:, 0])
         ]
-    
+
     pensionstops_mapped_zones = _map_zones(pensionstops, stopzone_map)
     pension_max_zones = _max_zones(pensionstops_mapped_zones, ringzones)
     threezones = {k for k, v in pension_max_zones.items() if v <= 3}
@@ -108,14 +106,14 @@ def _load_data(store, stopzone_map, ringzones, rabatkeys):
     youth_mapped_zones = _map_zones(
         youthstops, stopzone_map
         )
-    
+
     return (
-        allstops_mapped_zones, 
-        pensionstops_mapped_zones, 
+        allstops_mapped_zones,
+        pensionstops_mapped_zones,
         pension_mapped_zones_three,
         youth_mapped_zones
         )
-        
+
 def _aggregate_zones(shares):
     """
     aggregate the individual operator
@@ -150,51 +148,52 @@ def _get_trips(calculated_stores, tripkeys):
             for trip in tqdm(tripkeys):
                 t = bytes(str(trip), 'utf-8')
                 res = txn.get(t)
+
                 if not res:
                     continue
-                res = res.decode('utf-8')               
+                res = res.decode('utf-8')
                 if res not in ('operator_error', 'station_map_error'):
                     out[trip] = ast.literal_eval(res)
     return out
-   
+
 def main():
-    
+
     parser = TableArgParser('year', 'rabattrin', 'model')
     args = parser.parse()
     rabat_level = args['rabattrin']
     model = args['model']
 
     year = args['year']
-    
+
     store_loc = find_datastores(r'H://')
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
     if model == 2:
-        db_path = db_path + f'_model_{model}'    
-    
-    ringzones = ZoneGraph.ring_dict('sjælland')   
-    
+        db_path = db_path + f'_model_{model}'
+
+    ringzones = ZoneGraph.ring_dict('sjælland')
+
     stopzone_map = TakstZones().stop_zone_map()
-       
+
     trips = {
         'alltrips': {
-            'th': set(), 
-            'ts': set(), 
-            'tv': set(), 
-            'city': set(), 
+            'th': set(),
+            'ts': set(),
+            'tv': set(),
+            'city': set(),
             'dsb': set()
-             }, 
+             },
         'pension': {
-            'th': set(), 
-            'ts': set(), 
-            'tv': set(), 
-             }, 
+            'th': set(),
+            'ts': set(),
+            'tv': set(),
+             },
         'pension_three': {
-            'th': set(), 
-            'ts': set(), 
-            'tv': set(), 
-             }, 
+            'th': set(),
+            'ts': set(),
+            'tv': set(),
+             },
         'youth': {
             'th': set(),
             'ts': set(),
@@ -202,41 +201,32 @@ def main():
              }
         }
 
-    rabatkeys = _get_rabatkeys(rabat_level, year) 
-    
-   
+    rabatkeys = _get_rabatkeys(rabat_level, year)
+
+
     pfunc = partial(
-        _load_data, 
-        stopzone_map=stopzone_map, 
-        ringzones=ringzones, 
+        _load_data,
+        stopzone_map=stopzone_map,
+        ringzones=ringzones,
         rabatkeys=rabatkeys
         )
-    
-    with Pool(7) as pool:
-        results = pool.imap(pfunc, stores)       
-        for res in tqdm(results, total=len(stores)):       
-            alltrips, pension, pension_three, youth = res                
-            for k, v in alltrips.items():       
+
+    with Pool(5) as pool:
+        results = pool.imap(pfunc, stores)
+        for res in tqdm(results, total=len(stores)):
+            alltrips, pension, pension_three, youth = res
+            for k, v in alltrips.items():
                 if all(x < 1100 for x in v):
                     trips['alltrips']["th"].add(k)
-                    if all(x in (1002, 1002, 1003, 1004) for x in v):
-                        trips['alltrips']["city"].add(k)             
+                    if all(x in (1001, 1002, 1003, 1004) for x in v):
+                        trips['alltrips']["city"].add(k)
                 elif all(1100 < x <= 1200 for x in v):
                     trips['alltrips']["tv"].add(k)
                 elif all(1200 < x < 1300 for x in v):
                     trips['alltrips']["ts"].add(k)
                 else:
                     trips['alltrips']["dsb"].add(k)
-            for k, v in pension.items():       
-                if all(x < 1100 for x in v):
-                    trips['pension']["th"].add(k)       
-                elif all(1100 < x <= 1200 for x in v):
-                    trips['pension']["tv"].add(k)
-                elif all(1200 < x < 1300 for x in v):
-                    trips['pension']["ts"].add(k)
-                else:
-                    pass
-            for k, v in pension.items():       
+            for k, v in pension.items():
                 if all(x < 1100 for x in v):
                     trips['pension']["th"].add(k)
                 elif all(1100 < x <= 1200 for x in v):
@@ -245,50 +235,59 @@ def main():
                     trips['pension']["ts"].add(k)
                 else:
                     pass
-            for k, v in pension_three.items():       
+            for k, v in pension.items():
                 if all(x < 1100 for x in v):
-                    trips['pension_three']["th"].add(k)       
+                    trips['pension']["th"].add(k)
+                elif all(1100 < x <= 1200 for x in v):
+                    trips['pension']["tv"].add(k)
+                elif all(1200 < x < 1300 for x in v):
+                    trips['pension']["ts"].add(k)
+                else:
+                    pass
+            for k, v in pension_three.items():
+                if all(x < 1100 for x in v):
+                    trips['pension_three']["th"].add(k)
                 elif all(1100 < x <= 1200 for x in v):
                     trips['pension_three']["tv"].add(k)
                 elif all(1200 < x < 1300 for x in v):
                     trips['pension_three']["ts"].add(k)
                 else:
                     pass
-            for k, v in youth.items():       
+            for k, v in youth.items():
                 if all(x < 1100 for x in v):
-                    trips['youth']["th"].add(k)       
+                    trips['youth']["th"].add(k)
                 elif all(1100 < x <= 1200 for x in v):
                     trips['youth']["tv"].add(k)
                 elif all(1200 < x < 1300 for x in v):
                     trips['youth']["ts"].add(k)
                 else:
                     pass
-    
+
     out = {}
     for k1, v1 in trips.items():
         sub = {}
         for k2, v2 in v1.items():
             sub[k2] = _get_trips(db_path, v2)
         out[k1] = sub
-    
+
     test = {
         k1: {
             k2: get_user_shares(v2.values()) for k2, v2 in v1.items()
-            } for k1, v1 in out.items() 
+            } for k1, v1 in out.items()
         }
     fp = os.path.join(
-        THIS_DIR, 
-        '__result_cache__', 
-        f'{year}', 
-        'preprocessed', 
+        THIS_DIR,
+        '__result_cache__',
+        f'{year}',
+        'preprocessed',
         f'subtakst_model_{model}.pickle'
         )
-    
+
     with open(fp, 'wb') as f:
         pickle.dump(test, f)
 
-            
 if __name__ == "__main__":
-    main()       
-        
-    
+    st = datetime.now()
+    main()
+    print(datetime.now() - st)
+
