@@ -13,7 +13,7 @@ import pkg_resources
 from itertools import groupby, chain
 from collections import Counter
 from operator import itemgetter
-from typing import Optional
+from typing import Optional, Generator, Tuple, Dict
 
 
 #third party imports
@@ -157,38 +157,24 @@ def _load_tripzones(region_stops, region_zonemap):
     return trip_zones
 
 class ZoneGraph():
-    """
-    class for analysing the tariff zones
-    as an undirected graph
 
-    parameter
-    ---------
-    adjacency_array:
-        an adjacency array for the the graph
-
-    """
     PATH_CACHE = {}
 
-
     def __init__(
-            self, 
-            region: Optional[str] = 'sjælland', 
+            self,
+            region: Optional[str] = 'sjælland',
             mode: Optional[str] = None
             ) -> None:
-
         """
+        A network graph that uses zones as nodes and
+        a route connection as edges
 
-
-        Parameters
-        ----------
-        region : TYPE, optional
-            DESCRIPTION. The default is None.
-        mode : TYPE, optional
-            DESCRIPTION. The default is None.
-
-        Returns
-        -------
-        None.
+        :param region: the region to create a graph for, defaults to 'sjælland'
+        :type region: Optional[str], optional
+        :param mode: the mode ['rail', 'bus', None], defaults to None
+        :type mode: Optional[str], optional
+        :return: ''
+        :rtype: None
 
         """
 
@@ -202,7 +188,7 @@ class ZoneGraph():
         self.rev_rows =  self.data['rev_idx']
         self.graph = nx.from_numpy_matrix(self.data['adj_array'])
         self._ringzone_dict = _ringzone_dict(self.region)
-        self.SHORTEST_PATHS_CACHE = {}
+        self.SHORTEST_PATHS_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
 
     @classmethod
     def ring_dict(cls, region):
@@ -211,21 +197,34 @@ class ZoneGraph():
 
     def _as_graph(self):
         """return a networkx graph object"""
-        return
+        return self.graph
 
-    def find_paths(self, start, end, limit=None):
+    def find_paths(
+            self,
+            start: int,
+            end,
+            ) -> Generator[Tuple[int, ...], None, None]:
         """
-        return a generator of simple paths
-        between the start zone and the end zone
-        limit the lenght of the path with limit
+        Return all simple paths between the given start and end zones
+
+        :param start: the start zone (nation zone format)
+        :type start: int
+        :param end: the end zone (nation zone format)
+        :type end: int
+        :yield: a tuple of the zone path
+        :rtype: Generator[Tuple[int, ...], None, None]
+
         """
+
         ring_dist = self._ringzone_dict[(start, end)]
 
         source = self.columns[start]
         target = self.rows[end]
         paths = nx.all_simple_paths(
-            self.graph, source=source,
-            target=target, cutoff=ring_dist
+            self.graph,
+            source=source,
+            target=target,
+            cutoff=ring_dist
             )
 
         for found in paths:
@@ -233,11 +232,22 @@ class ZoneGraph():
             self.PATH_CACHE[(start, end)] = mapped
             yield mapped
 
-    def shortest_path(self, start, end):
+    def shortest_path(
+            self,
+            start: int,
+            end: int
+            ) -> Tuple[Tuple[int, ...], ...]:
         """
-        return the shortest path between the
-        chosen start and end zones using
-        djikstra's method
+        Return the shortest paths between the given start and
+        end zones using Djikstra's method
+
+        :param start: the starting zone (national zone format)
+        :type start: int
+        :param end: the ending zone (national zone format)
+        :type end: int
+        :return: all of the shortest zone paths
+        :rtype: Tuple[Tuple[int, ...], ...]
+
         """
 
         if (start, end) in self.SHORTEST_PATHS_CACHE:
@@ -246,7 +256,9 @@ class ZoneGraph():
         source = self.columns[start]
         target = self.rows[end]
         sp = nx.all_shortest_paths(self.graph, source, target)
-        mapped = tuple(tuple(self.rev_columns[x] for x in l) for l in list(sp))
+        mapped = tuple(
+            tuple(self.rev_columns[x] for x in l) for l in list(sp)
+            )
 
         self.SHORTEST_PATHS_CACHE[(start, end)] = mapped
 
