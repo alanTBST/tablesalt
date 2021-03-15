@@ -15,7 +15,9 @@ from typing import (
     Dict,
     Optional,
     Tuple,
-    Union
+    List,
+    Union,
+    Set
     )
 
 import h5py #type: ignore
@@ -24,17 +26,20 @@ import pandas as pd #type: ignore
 
 from tablesalt.common.io import mappers
 
-M_RANGE = set(range(8603301, 8603400))
-S_RANGE = set(range(8690000, 8699999))
+M_RANGE: Set[int] = set(range(8603301, 8603400))
+S_RANGE: Set[int] = set(range(8690000, 8699999))
 
-MIN_RAIL_UIC = 7400000
-MAX_RAIL_UIC = 9999999
+MIN_RAIL_UIC: int = 7400000
+MAX_RAIL_UIC: int = 9999999
 
 
 def _load_default_config() -> Dict[str, str]:
     fp = pkg_resources.resource_filename(
     'tablesalt', 'resources/config/operator_config.json'
     )
+
+    config_dict: Dict[str, str]
+
     with open(fp, 'r', encoding='utf-8') as f:
         config_dict = json.load(f)
     return config_dict
@@ -43,6 +48,8 @@ def _load_default_config() -> Dict[str, str]:
 def _load_operator_configuration(
     config_file: Optional[AnyStr] = None
     ) -> Dict[str, str]:
+
+
     if config_file is None:
         config_dict = _load_default_config()
     else:
@@ -51,8 +58,9 @@ def _load_operator_configuration(
     return config_dict
 
 def _load_operator_settings(
-    *lines: str, config_file: Optional[AnyStr] = None
-    ) -> Dict[str, Any]:
+    *lines: str,
+    config_file: Optional[AnyStr] = None
+    ) -> Dict[str, str]:
 
     config_dict = _load_operator_configuration(config_file)
 
@@ -93,11 +101,12 @@ def load_bus_station_connectors() -> Dict[int, int]:
     return {x[0]: x[1] for x in bus_map}
 
 def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
+
+
     fp = pkg_resources.resource_filename(
             'tablesalt',
             'resources/networktopodk/operator_stations.csv'
-
-        )
+            )
 
     pas_stations = pd.read_csv(
         fp, encoding='utf-8'
@@ -132,9 +141,9 @@ class StationOperators():
 
 
     """
-    BUS_ID_MAP = load_bus_station_connectors()
+    BUS_ID_MAP: Dict[int, int] = load_bus_station_connectors()
 
-    ID_CACHE = {}
+    ID_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
 
     def __init__(self, *lines: str) -> None:
 
@@ -157,12 +166,13 @@ class StationOperators():
                 val = int(oper in intup)
                 string = f"{oper} == {val}"
                 qry.append(string)
-        qry = " & ".join(qry)
 
-        return qry
+        full_qry = " & ".join(qry)
+
+        return full_qry
 
 
-    def _pas_station_dict(self):
+    def _pas_station_dict(self) -> Dict[Tuple[str, ...], List[int]]:
         """
         create the station dictionary from the underlying
         dataset
@@ -320,6 +330,8 @@ class StationOperators():
             raise ValueError(
         "format must be one of 'operator', 'operator_id', 'line'"
         )
+
+        fdict: Dict[str,  Union[Tuple[int, ...], Tuple[str, ...]]]
         fdict = {
             'operator_id': self._get_operator_id(uic_number),
             'operator': self._get_operator(uic_number),
@@ -328,7 +340,7 @@ class StationOperators():
         return fdict[format]
 
 
-    def _check_bus_location(self, bus_stop_id):
+    def _check_bus_location(self, bus_stop_id) -> int:
 
         return self.BUS_ID_MAP.get(bus_stop_id, 0)
 
@@ -443,11 +455,15 @@ class StationOperators():
         start_ops = self.get_ops(start_uic, format=format)
         end_ops = self.get_ops(end_uic, format=format)
 
+        fdict: Dict[str,  Union[Tuple[int, ...], Tuple[str, ...]]]
+
         fdict = {
             'operator_id': self._pair_operator_id(start_uic, start_ops, end_ops),
             'operator': self._pair_operator(start_uic, start_ops, end_ops),
             'line': self._pair_line(start_uic, start_ops, end_ops)
             }
+
+        returnval: Union[Tuple[int, ...], Tuple[str, ...]]
         returnval = fdict[format]
         if format == 'operator_id':
             self.ID_CACHE[(start_uic, end_uic)] = returnval
