@@ -61,6 +61,16 @@ def _load_operator_settings(
     *lines: str,
     config_file: Optional[AnyStr] = None
     ) -> Dict[str, str]:
+    """
+
+    :param *lines: DESCRIPTION
+    :type *lines: str
+    :param config_file: DESCRIPTION, defaults to None
+    :type config_file: Optional[AnyStr], optional
+    :return: DESCRIPTION
+    :rtype: Dict[str, str]
+
+    """
 
     config_dict = _load_operator_configuration(config_file)
 
@@ -89,9 +99,11 @@ def _load_operator_settings(
 
 def load_bus_station_connectors() -> Dict[int, int]:
     """
-    load the bus stops station array from the support data
-    """
+    Load the bus stops station array from the support data
+    :return: DESCRIPTION
+    :rtype: Dict[int, int]
 
+    """
     support_store = pkg_resources.resource_filename(
         'tablesalt', 'resources/support_store.h5')
 
@@ -128,24 +140,30 @@ def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
 
 
 class StationOperators():
-    """
-    class used to find the operators at stations and the
-    interoperability at stations
 
-
-    parameter
-    ----------
-    station_csv_path:
-        the filepath of the passenger stations csv dataset
-        if the path is not given, the default underlying dataset is used
-
-
-    """
     BUS_ID_MAP: Dict[int, int] = load_bus_station_connectors()
 
     ID_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
 
     def __init__(self, *lines: str) -> None:
+        """
+        Class used to find the operators at stations and the
+        interoperability at stations
+
+        :param *lines: the physical rail lines to include
+            options: any combination of:
+                        'kystbanen',
+                        'local',
+                        'metro',
+                        'suburban',
+                        'fjernregional'
+
+        :type *lines: str
+        :return: ''
+        :rtype: None
+
+        """
+
 
         self.lines = lines
         self._settings = _load_operator_settings(*self.lines)
@@ -288,21 +306,22 @@ class StationOperators():
     def get_ops(
         self, uic_number: int,
         format: Optional[str] = 'operator_id'
-        ) -> Union[Tuple[int, ...], Tuple[str, ...]]:
+        ) -> Tuple[Union[int, str], ...]:
         """
+        Returns a tuple of the operators at the given station id
 
-        returns a tuple of the operators at the given station id
-
-        parameters
-        ----------
-        uic_number:
-            int: uic number of the station
-        format:
-            str: 'operator' or 'line'
+        :param uic_number: uic number of the station
+        :type uic_number: int
+        :param format: 'operator_id', 'operator' or 'line', defaults to 'operator_id'
             'operator' - returns str values representing the operators at the stop
             'line' - returns line names of the stop
 
-        Example:
+        :type format: Optional[str], optional
+        :raises ValueError: if incorrect format is given
+        :return: the operators or lines serving the given station
+        :rtype: Tuple[Union[int, str], ...]
+
+        :Example:
         ----------
         to return the operators at Copenhagen central station:
             the uic number is 8600626
@@ -324,8 +343,8 @@ class StationOperators():
         >>> cph_stog_operators
         >>> ('s-tog', 'first', 'dsb', 'metro')
 
-
         """
+
         if format not in {'operator', 'operator_id', 'line'}:
             raise ValueError(
         "format must be one of 'operator', 'operator_id', 'line'"
@@ -413,23 +432,21 @@ class StationOperators():
         format: Optional[str] = 'operator_id'
         ) -> Union[Tuple[int, ...], Tuple[str, ...]]:
         """
-
-        returns the possible operators that can perform
+        Returns the possible operators that can perform
         the journey between a given station pair
 
-        parameters
-        ----------
-        start_uic:
-            the uic number of the start station
-        end_uic:
-            the uic number of the end station
-        format:
-            the way in which you desire the output
+        :param start_uic: the uic number of the start station
+        :type start_uic: int
+        :param end_uic: the uic number of the end station
+        :type end_uic: int
+        :param format:  the way in which you desire the output, defaults to 'operator_id'
             'operator_id' - returns values as integer ids representing operators
             'operator' - returns values as strings of the operator name
 
-        Example
-        --------
+        :type format: Optional[str], optional
+        :raises ValueError: if the end stopid is not mappable to a station
+        :return: the operators serving the given station pair
+        :rtype: Tuple[int, ...]
 
         """
 
