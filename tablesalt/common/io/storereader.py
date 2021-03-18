@@ -7,18 +7,17 @@ are created from the csv zipfile delivered
 by rejsedata
 
 """
-# standard imports
+
 import os
 import pathlib
 from itertools import chain, groupby
 from operator import itemgetter
-from typing import Iterable
+from typing import Iterable, Dict, Set, Union, List, Tuple, Any
 
 
-# third party imports
-import h5py
-import msgpack
-import numpy as np
+import h5py #type: ignore
+import msgpack #type: ignore
+import numpy as np #type: ignore
 
 from tablesalt.common.io.rejsekortcollections import (_load_collection,
                                                       proc_collection)
@@ -92,31 +91,26 @@ def _msg(x):
     return f"{x} kwarg accepts int, tuple or list"
 
 
-def _time_filter(timeinfo, val, filt_type):
+def _time_filter(
+        timeinfo: np.ndarray,
+        val: Union[int, List[int]],
+        filt_type: str
+        ) -> np.ndarray:
     """
-    Filter the time information dataset.
+    Filter the time information dataset
 
-    Parameters
-    ----------
-    timeinfo : np.ndarray
-        DESCRIPTION.
-    val : int or list/tuple
-        an integer or list for the filter values.
-    filt_type : str
-        The
-        'month', 'day', 'hour', 'weekday'.
-
-    Raises
-    ------
-    TypeError
-        If filt_type value is an int or a list.
-
-    Returns
-    -------
-    timeinfo : np.ndarray
-        The filtered array of the time_information dataset.
+    :param timeinfo: time dataset from hdf store
+    :type timeinfo: np.ndarray
+    :param val: the filter values to use
+    :type val: Union[int, List[int]]
+    :param filt_type: 'month', 'day', 'hour', 'weekday'
+    :type filt_type: str
+    :raises TypeError: If filt_type value is an int or a list.
+    :return: The filtered array of the time_information dataset
+    :rtype: np.ndarray
 
     """
+
     col_id = {
         'month': 3,
         'day': 4,
@@ -135,68 +129,11 @@ def _time_filter(timeinfo, val, filt_type):
     return timeinfo
 
 
-def _op_intersect(val, ids):
+def _op_intersect(val, ids) -> bool:
     opsets = set(x[1] for x in val)
     wantedset = set.union(*[set(x) for x in ids])
 
     return wantedset == opsets.intersection(wantedset)
-
-
-# def _operator_filter(contr_info, *operator_string, bitwise='|',
-#                      startswith=None, endswith=None):
-#     """
-
-#     Filter the contractor dict based on chosen operators.
-
-#     Parameters
-#     ----------
-#     contr_info : dict
-#         The dictionary loaded from the msgpack.
-#     *operator_string : str
-#         The operator string of operator filters.
-#     bitwise : str, optional
-#         The bitwise operator to use . '|' or '&'
-#         The default is '|'.
-
-#     Returns
-#     -------
-#     dict
-#         contractor dictionary of trips that meet the filters.
-
-#     """
-#     ids = [OP_IDS[x] for x in operator_string]
-#     ids = [x if isinstance(x, list) else [x] for x in ids]
-
-#     if bitwise == '|':
-#         ids = list(chain(*ids))
-#         outdict = {k: v for k, v in contr_info.items() if
-#                    any(x[1] in ids for x in v)}
-#     if bitwise == '&':
-#         outdict = {k: v for k, v in contr_info.items()
-#                    if _op_intersect(v, ids)}
-#     if startswith is not None:
-#         outdict = {k: v for k, v in outdict.items() if
-#                    v[0][1] == OP_IDS[startswith]}
-#     if endswith is not None:
-#         outdict = {k: v for k, v in outdict.items() if
-#                    v[-1][1] == OP_IDS[endswith]}
-#     return outdict
-
-# def _operator_filter(contr_info, operators, bitwise='|'):
-
-#     ids = [OP_IDS[x] for x in operators]
-#     ids = [x if isinstance(x, list) else [x] for x in ids]
-
-#     if bitwise == '|':
-#         ids = list(chain(*ids))
-#         outdict = {k: v for k, v in contr_info.items() if
-#                    any(x[1] in ids for x in v)}
-#     if bitwise == '&':
-#         outdict = {k: v for k, v in contr_info.items()
-#                    if _op_intersect(v, ids)}
-
-#     return outdict
-
 
 def _start_end(contr_info, startswith=None, endswith=None):
     """filter for kwargs startswith and endswith"""
@@ -222,7 +159,10 @@ def _starts_stopid():
     """filter for kwarg starts_at and ends_at"""
     return
 
-def _station_filter(stop_info, stations):
+def _station_filter(
+        stop_info: np.ndarray,
+        stations: Union[int, List[int]]
+        ) -> np.ndarray:
 
     if not isinstance(stations, list):
         stations = [stations]
@@ -238,27 +178,26 @@ class StoreReader():
     Uses h5 and msgpack files from the rejsekort datastores
     """
     # TODO
-    def __init__(self, filepath, **kwargs) -> None:
+    def __init__(self, filepath: str, **kwargs) -> None:
         """
         Reader object that reads rejsekort data.
 
-        Parameters
-        ----------
-        filepath : str
-            a string of the filepath to an individual h5 file.
-        **kwargs : optional keyword arguments
-            month : int/list/tuple
-            day : int/list/tuple
-            hour : int/list/tuple
-            weekday : int/list/tuple
-            pas_type: defaults to 'main' (all humans and only humans)
-            pas_total: int - total number of passengers on the trip
-
-        Returns
-        -------
-        None.
+        :param filepath: a string of the filepath to an individual h5 file.
+        :type filepath: str
+        :param **kwargs: optional keyword arguments
+            kwargs : optional keyword arguments
+                month : int/list/tuple
+                day : int/list/tuple
+                hour : int/list/tuple
+                weekday : int/list/tuple
+                pas_type: defaults to 'main' (all humans and only humans)
+                pas_total: int - total number of passengers on the trip
+        :type **kwargs: TYPE
+        :return: ''
+        :rtype: None
 
         """
+
         self.filepath = filepath
         self.kwargs = kwargs
         self.month = kwargs.get('month', None)
@@ -279,10 +218,10 @@ class StoreReader():
             }
 
     def __repr__(self):
-        """Repr magic."""
+
         return f"Rejsekort StoreReader for {self.filepath}"
 
-    def _load_time(self):
+    def _load_time(self) -> np.ndarray:
         if self.__CACHES['time_information'] is not None:
             return self.__CACHES['time_information']
         with h5py.File(self.filepath, 'r') as store:
@@ -290,7 +229,7 @@ class StoreReader():
         self.__CACHES['time_information'] = timeinfo
         return timeinfo
 
-    def _pas_info(self):
+    def _pas_info(self) -> np.ndarray:
         if self.__CACHES['passenger_information'] is not None:
             return self.__CACHES['passenger_information']
         with h5py.File(self.filepath, 'r') as store:
@@ -298,21 +237,8 @@ class StoreReader():
         self.__CACHES['passenger_information'] = pasinfo
         return pasinfo
 
-    def _get_time_filtered_keys(self):
-        """
-        Determine the tripkeys for the applied time filters.
+    def _get_time_filtered_keys(self) -> Set[int]:
 
-        Raises
-        ------
-        TypeError
-            DESCRIPTION.
-
-        Returns
-        -------
-        set
-            a set of tripkeys that meet the filter conditions.
-
-        """
         timeinfo = self._load_time()
 
         if hasattr(self, 'month') and self.month is not None:
@@ -362,44 +288,28 @@ class StoreReader():
         return set(opdata)
 
     @staticmethod
-    def total_passengers(pas_info):
+    def total_passengers(pas_info: np.ndarray) -> Dict[int, int]:
         """
-        Make a dictionary of keys as trip keys.
+        Make a dictionary of keys as trip keys and values
+        as the total number of passengers on the trip
 
-        and values as the total number of passengers
-        on the trip
-
-        Parameters
-        ----------
-        pas_info : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        dict
-            a dictionary of trip keys and corresponding
+        :param pas_info: passenger_info dataset
+        :type pas_info: np.ndarray
+        :return: a dictionary of trip keys and corresponding
             sum of all passengers.
+        :rtype: Dict[int, int]
 
         """
+
         return {x[0]: sum(x[2:5]) for x in pas_info}
 
-    def _get_pas_filtered_keys(self):
+    def _get_pas_filtered_keys(self) -> Set[int]:
         """
-        Determine the tripkeys for passenger filters.
+        Determine the tripkeys for the passenger filters
 
-        Currently only supports trips that have a human
-        traveller
-
-        Raises
-        ------
-        TypeError
-            if the passed keyword argument 'pas_type'
-            is not a list, tuple or string.
-
-        Returns
-        -------
-        set
-            A set of the valid trip keys for the passenger filters.
+        :raises TypeError: if kwarg pas_type is not a list, tuple or string.
+        :return: A set of the valid trip keys for the passenger filters.
+        :rtype: Set[int]
 
         """
         pasinfo = self._pas_info()
@@ -451,16 +361,15 @@ class StoreReader():
         except IndexError:
             return set(only_humans)
 
-    def _all_filters(self):
+    def _all_filters(self) -> Set[int]:
         """
         Apply all of the selected filters.
 
-        Returns
-        -------
-        set
-            a set of tripkeys that meet the selected filters
+        :return: a set of tripkeys that meet the selected filters
+        :rtype: Set[int]
 
         """
+
         time_keys = self._get_time_filtered_keys()
         pas_keys = self._get_pas_filtered_keys()
         op_keys = self._get_operator_filtered_keys()
@@ -473,13 +382,11 @@ class StoreReader():
 
     def _get_contractor_data(self):
         """
-        Find and load the corresponding msgpack file for the .h5 file.
-
-        Returns
-        -------
-        cont : dict
-            the dicrionary of contractor information with tripkeys
+        Find and load the corresponding msgpack file for .h5 file
+        :return: the dicrionary of contractor information with tripkeys
             that meet the filter conditions.
+
+        :rtype: Dict
 
         """
         if self.__CACHES['contractor_information'] is not None:
@@ -496,23 +403,17 @@ class StoreReader():
         return cont
 
     @staticmethod
-    def bad_keys(stop_info):
+    def bad_keys(stop_info: np.ndarray) -> Set[int]:
         """
-        Determine the bad tripkeys.
+        Determine the bad tripkeys. Trips that don't have FiCo etc
 
-        Trips that do not contain a checkin and a checkout
-
-        Parameters
-        ----------
-        stop_info : np.ndarray
-            the stop_information dataset in the h5 file.
-
-        Returns
-        -------
-        bad_keys : set
-            a set of the tripkeys that are not fully completed trips.
+        :param stop_info: the stop_information dataset in the h5 file.
+        :type stop_info: np.ndarray
+        :return: a set of tripkeys to discard
+        :rtype: Set[int]
 
         """
+
         stop_info = stop_info[
             np.lexsort((stop_info[:, 1], stop_info[:, 0]))
             ]
@@ -543,41 +444,40 @@ class StoreReader():
 
     def _flush_kwargs(self):
 
-        kwargs = ['startswith', 'endswith', 'remove_bad_trips',
-                  'hour', 'weekday', 'month', 'passenger_type',
+        kwargs = ['startswith', 'endswith',
+                  'remove_bad_trips',
+                  'hour', 'weekday', 'month',
+                  'passenger_type',
                   'passenger_total']
 
-        self.__dict__ = {k:v for k, v in self.__dict__.items() if
-                         k not in kwargs}
+        self.__dict__ = {
+            k: v for k, v in self.__dict__.items() if
+            k not in kwargs
+            }
 
 
-    def get_data(self, dset, **kwargs):
+    def get_data(self, dset: str, **kwargs) -> Union[np.ndarray, Dict[int, Any]]:
         """
         Get the requested data from the datastore.
 
-        Parameters
-        ----------
-        dset : str, optional
-            the dataset to load from the h5 file.
-            The default is 'stops'.
-        remove_bad_trips : bool, optional
-            Remove trips that are in some way incomplete.
-            The default is False.
+        :param dset: the dataset to load from the h5 file.
+        :type dset: str
+        :param **kwargs: the filter kwargs:
+            ['startswith', 'endswith',
+             'remove_bad_trips',
+             'hour', 'weekday', 'month',
+             'passenger_type',
+             'passenger_total']
 
-        Raises
-        ------
-        ValueError
-            raises a value error if the dset argument is not
-            one of ['stops', 'price', 'time',"
-            'pas', 'passengers', 'contractor']
+        :type **kwargs:
+        :raises ValueError: if the dset argument is not
+            one of ['stops', 'price', 'time', 'pas', 'passengers', 'contractor']
 
-        Returns
-        -------
-        np.ndarray/dict(if dset=='contractor')
-            The data set returned from the datastore given
-            the selected filters applied
+        :return: array statisfiying conditions np.ndarray/dict(if dset=='contractor')
+        :rtype: TYPE
 
         """
+
         dset = dset.lower()
         if dset not in DSET_NAME_MAP:
             raise ValueError(
