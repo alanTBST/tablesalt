@@ -1,0 +1,348 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>tablesalt.revenue package &mdash; tablesalt 0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> tablesalt
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <!-- Local TOC -->
+              <div class="local-toc"><ul>
+<li><a class="reference internal" href="#">tablesalt.revenue package</a><ul>
+<li><a class="reference internal" href="#submodules">Submodules</a></li>
+<li><a class="reference internal" href="#module-tablesalt.revenue.multisharing">tablesalt.revenue.multisharing module</a></li>
+<li><a class="reference internal" href="#module-tablesalt.revenue.operatorvalidation">tablesalt.revenue.operatorvalidation module</a></li>
+<li><a class="reference internal" href="#module-tablesalt.revenue">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">tablesalt</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+      <li>tablesalt.revenue package</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/source/tablesalt.revenue.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="tablesalt-revenue-package">
+<h1>tablesalt.revenue package<a class="headerlink" href="#tablesalt-revenue-package" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="module-tablesalt.revenue.multisharing">
+<span id="tablesalt-revenue-multisharing-module"></span><h2>tablesalt.revenue.multisharing module<a class="headerlink" href="#module-tablesalt.revenue.multisharing" title="Permalink to this headline">¶</a></h2>
+<p>Created on Tue Oct 22 10:23:33 2019</p>
+<p>&#64;author: alkj</p>
+<p>functions for analysing and distributing
+the zone shares for kombi operator rejsekort
+trips</p>
+<dl class="py function">
+<dt id="tablesalt.revenue.multisharing.aggregated_zone_operators">
+<code class="sig-prename descclassname">tablesalt.revenue.multisharing.</code><code class="sig-name descname">aggregated_zone_operators</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">vals</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tablesalt.revenue.multisharing.aggregated_zone_operators" title="Permalink to this definition">¶</a></dt>
+<dd><p>perform the aggregation</p>
+<dl class="simple">
+<dt>vals:</dt><dd><dl class="simple">
+<dt>a list or tuple of tuples of the form:</dt><dd><p>((n_zones[0], op_id[0]), (n_zones[1], op_id[1]),….(n_zones[n], op_id[n]))</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt id="tablesalt.revenue.multisharing.property_dicts">
+<code class="sig-prename descclassname">tablesalt.revenue.multisharing.</code><code class="sig-name descname">property_dicts</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">operator_legs</span></em>, <em class="sig-param"><span class="n">usage_legs</span></em>, <em class="sig-param"><span class="n">multi_zone_properties</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tablesalt.revenue.multisharing.property_dicts" title="Permalink to this definition">¶</a></dt>
+<dd><p>generator that yields the input dictionary for the
+calculation</p>
+<dl class="simple">
+<dt>operator_legs:</dt><dd><p>the dictionary of legified operators</p>
+</dd>
+<dt>zone_legs:</dt><dd><p>dict of legified zones</p>
+</dd>
+<dt>stop_legs:</dt><dd><p>dict of legified stop ids</p>
+</dd>
+<dt>multi_zone_properties:</dt><dd><p>the dict of zone properties of kombi trips</p>
+</dd>
+<dt>touched_zones:</dt><dd><p>the dict of zones touched for each trip</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt id="tablesalt.revenue.multisharing.share_calculation">
+<code class="sig-prename descclassname">tablesalt.revenue.multisharing.</code><code class="sig-name descname">share_calculation</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">operator_legs</span></em>, <em class="sig-param"><span class="n">usage_legs</span></em>, <em class="sig-param"><span class="n">zone_properties</span></em>, <em class="sig-param"><span class="n">border_stations</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tablesalt.revenue.multisharing.share_calculation" title="Permalink to this definition">¶</a></dt>
+<dd><p>calculate the shares for</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-tablesalt.revenue.operatorvalidation">
+<span id="tablesalt-revenue-operatorvalidation-module"></span><h2>tablesalt.revenue.operatorvalidation module<a class="headerlink" href="#module-tablesalt.revenue.operatorvalidation" title="Permalink to this headline">¶</a></h2>
+<p>Working file for operator leg validation</p>
+<dl class="py function">
+<dt id="tablesalt.revenue.operatorvalidation.aggregated_zone_operators">
+<code class="sig-prename descclassname">tablesalt.revenue.operatorvalidation.</code><code class="sig-name descname">aggregated_zone_operators</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">vals</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tablesalt.revenue.operatorvalidation.aggregated_zone_operators" title="Permalink to this definition">¶</a></dt>
+<dd><p>perform the aggregation</p>
+<dl class="simple">
+<dt>vals:</dt><dd><dl class="simple">
+<dt>a list or tuple of tuples of the form:</dt><dd><p>((n_zones[0], op_id[0]), (n_zones[1], op_id[1]),….(n_zones[n], op_id[n]))</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt id="tablesalt.revenue.operatorvalidation.contains_border">
+<code class="sig-prename descclassname">tablesalt.revenue.operatorvalidation.</code><code class="sig-name descname">contains_border</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">stoplegs</span></em>, <em class="sig-param"><span class="n">border_stations</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tablesalt.revenue.operatorvalidation.contains_border" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="simple">
+<dt>stoplegs:</dt><dd><p>tuple of legified stop id legs</p>
+</dd>
+<dt>border_stations:</dt><dd><p>dict of border stations</p>
+</dd>
+</dl>
+<p>returns boolean
+True if</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="tablesalt.revenue.operatorvalidation.impute_leg">
+<code class="sig-prename descclassname">tablesalt.revenue.operatorvalidation.</code><code class="sig-name descname">impute_leg</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">zone_leg</span></em>, <em class="sig-param"><span class="n">vis_zones</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tablesalt.revenue.operatorvalidation.impute_leg" title="Permalink to this definition">¶</a></dt>
+<dd><p>for the two touched zones on a zone leg,
+fill in the zones that the leg travels through</p>
+<dl class="simple">
+<dt>zone_leg:</dt><dd><p>the tuple of zones to impute</p>
+</dd>
+<dt>vis_zones:</dt><dd><p>the tuple of visited_zones</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt id="tablesalt.revenue.operatorvalidation.impute_zone_legs">
+<code class="sig-prename descclassname">tablesalt.revenue.operatorvalidation.</code><code class="sig-name descname">impute_zone_legs</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">trip_zone_legs</span></em>, <em class="sig-param"><span class="n">visited_zones</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tablesalt.revenue.operatorvalidation.impute_zone_legs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt id="tablesalt.revenue.operatorvalidation.legops">
+<code class="sig-prename descclassname">tablesalt.revenue.operatorvalidation.</code><code class="sig-name descname">legops</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">new_legs</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tablesalt.revenue.operatorvalidation.legops" title="Permalink to this definition">¶</a></dt>
+<dd><p>just legify the output from determin_operator</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="tablesalt.revenue.operatorvalidation.needs_assignment_check">
+<code class="sig-prename descclassname">tablesalt.revenue.operatorvalidation.</code><code class="sig-name descname">needs_assignment_check</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">oplegs</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tablesalt.revenue.operatorvalidation.needs_assignment_check" title="Permalink to this definition">¶</a></dt>
+<dd><p>return boolean
+True if there needs to be an operator check
+False otherwise</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="tablesalt.revenue.operatorvalidation.operators_in_touched_">
+<code class="sig-prename descclassname">tablesalt.revenue.operatorvalidation.</code><code class="sig-name descname">operators_in_touched_</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">tzones</span></em>, <em class="sig-param"><span class="n">zonelegs</span></em>, <em class="sig-param"><span class="n">oplegs</span></em>, <em class="sig-param"><span class="n">border_zones</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tablesalt.revenue.operatorvalidation.operators_in_touched_" title="Permalink to this definition">¶</a></dt>
+<dd><p>determine the operators in the zones that are touched
+returns a dictionary:</p>
+<dl class="simple">
+<dt>tzones:</dt><dd><p>a tuple of the zones touched by
+a rejsekort tap on a trip</p>
+</dd>
+<dt>zonelegs:</dt><dd><p>a legified tuple of zones</p>
+</dd>
+<dt>oplegs:</dt><dd><p>a legified tuple of operators</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt id="tablesalt.revenue.operatorvalidation.procprop">
+<code class="sig-prename descclassname">tablesalt.revenue.operatorvalidation.</code><code class="sig-name descname">procprop</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">properties</span></em>, <em class="sig-param"><span class="n">border_stations</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tablesalt.revenue.operatorvalidation.procprop" title="Permalink to this definition">¶</a></dt>
+<dd><p>process_properties frim multisharing</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="tablesalt.revenue.operatorvalidation.removeCoTr">
+<code class="sig-prename descclassname">tablesalt.revenue.operatorvalidation.</code><code class="sig-name descname">removeCoTr</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">val</span></em>, <em class="sig-param"><span class="n">CoTr</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tablesalt.revenue.operatorvalidation.removeCoTr" title="Permalink to this definition">¶</a></dt>
+<dd><p>remove the checkout - checkin again (CoTr) legs</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-tablesalt.revenue">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-tablesalt.revenue" title="Permalink to this headline">¶</a></h2>
+<p>TBST Trafik, Bygge, og Bolig -styrelsen</p>
+<p>Package for revenue distribution
+based on pendler kombi rejsekort</p>
+<p>The goal is to use pendler kombi rejsekort users
+as a proxy for the more traditional pendler cards
+to determine the average zone shares for operators
+for each zone combination that pendler users may have</p>
+<p>Author: Alan Jones <a class="reference external" href="mailto:alkj&#37;&#52;&#48;tbst&#46;dk">alkj<span>&#64;</span>tbst<span>&#46;</span>dk</a>, <a class="reference external" href="mailto:alanksjones&#37;&#52;&#48;gmail&#46;com">alanksjones<span>&#64;</span>gmail<span>&#46;</span>com</a></p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2021, Alan Jones
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
