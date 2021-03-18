@@ -15,15 +15,17 @@ in which a user taps in or out
 from itertools import chain, groupby
 from collections import Counter
 from functools import lru_cache
-from typing import Tuple, Union, Optional
+from typing import Tuple, Union, Optional, Dict, Any
 import pkg_resources
 
-import pandas as pd
-import numpy as np
+import pandas as pd  #type: ignore
+import numpy as np  #type: ingnore
+from networkx.classes.graph import Graph
 
 from tablesalt.common import triptools
 from tablesalt.common.io import mappers
 from tablesalt.topology import stationoperators
+from tablesalt.topology.zonegraph import ZoneGraph
 
 # put these in lines in a config
 OPGETTER = stationoperators.StationOperators(
@@ -35,7 +37,7 @@ rev_model_dict = {v:k for k, v in mappers['model_dict'].items()}
 CO_TR = (rev_model_dict['Co'], rev_model_dict['Tr'])
 
 
-COMPANY_FACTOR = 1
+COMPANY_FACTOR: int = 1
 # TODO load from config
 SOLO_ZONE_PRIS = {
     'th': {
@@ -83,7 +85,7 @@ def _determine_region(zone_sequence: Tuple[int, ...]) -> str:
     return "dsb"
 
 
-def load_border_stations(): # put this in TBSTtopology
+def load_border_stations() -> Dict[int, Tuple[int, ...]]: # put this in TBSTtopology
     "load the border stations dataset from package"
     fp = pkg_resources.resource_filename(
         'tablesalt',
@@ -101,45 +103,33 @@ def load_border_stations(): # put this in TBSTtopology
 
     s_dsb = [x - 90000 for x in mappers['s_uic']]
     inborder = set(s_dsb).intersection(border_dict)
-    inborder = {k + 90000: border_dict[k] for k in inborder}
+    inborder_added = {k + 90000: border_dict[k] for k in inborder}
 
-    return {**border_dict, **inborder}
+    return {**border_dict, **inborder_added}
 
 BORDER_STATIONS = load_border_stations()
 
 @lru_cache(2**16)
-def _is_bus(stopid):
+def _is_bus(stopid: int) -> bool:
 
 
     return (stopid > stationoperators.MAX_RAIL_UIC or
             stopid < stationoperators.MIN_RAIL_UIC)
 
 @lru_cache(2**16)
-def impute_leg(g, zone_leg):
-    """
-    for the two touched zones on a zone leg,
-    fill in the zones that the leg travels through
-
-    parameters
-    ----------
-    zone_leg:
-        the tuple of zones to impute
-    vis_zones:
-        the tuple of visited_zones
-
-    """
+def impute_leg(g: Graph, zone_leg: Tuple[int, int]):
 
 
     return g.shortest_path(*zone_leg)[0]
 
 @lru_cache(2**16)
-def impute_zone_legs(g, trip_zone_legs):
+def impute_zone_legs(g: Graph, trip_zone_legs):
 
     return tuple(impute_leg(g, leg)
                  for leg in trip_zone_legs)
 
 @lru_cache(2**16)
-def get_touched_zones(zone_sequence) -> Tuple[int, ...]:
+def get_touched_zones(zone_sequence: Tuple[int, ...]) -> Tuple[int, ...]:
     """
     get the zones in which the card has been checked,
     preserving the order of taps
@@ -157,7 +147,7 @@ def get_touched_zones(zone_sequence) -> Tuple[int, ...]:
     return tuple(touched)
 
 @lru_cache(2**16)
-def to_legs(sequence):
+def to_legs(sequence: Tuple[int, ...]) ->Tuple[int, ...]:
 
     return triptools.sep_legs(sequence)
 
@@ -179,9 +169,6 @@ def _chain_vals(vals):
         )
     return visited_zones
 
-def _border_legs():
-
-    return
 
 class ZoneProperties():
     "ZoneProperties"
@@ -189,30 +176,29 @@ class ZoneProperties():
     VISITED_CACHE = {}
 
     def __init__(self,
-                 graph,
+                 graph: ZoneGraph,
                  zone_sequence: Tuple[int, ...],
                  stop_sequence: Tuple[int, ...],
-                 region: Optional[str] = 'sjælland') -> None:
-
+                 region: Optional[str] = 'sjælland'
+                 ) -> None:
         """
         Class to determine how many zones are travelled through,
         whether a border zone is touched, how the border affects the
         total number or zones, etc
 
-        Parameters
-        ----------
-        graph : ZoneGraph
-            DESCRIPTION.
-        zone_sequence : TYPE
-            DESCRIPTION.
-        stop_sequence : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
+        :param graph: an instance of the zonegraph class
+        :type graph: ZoneGraph
+        :param zone_sequence: a tuple of the zone sequence of a trip
+        :type zone_sequence: Tuple[int, ...]
+        :param stop_sequence:  a tuple of the stop sequence of a trip
+        :type stop_sequence: Tuple[int, ...]
+        :param region: the region to use, defaults to 'sjælland'
+        :type region: Optional[str], optional
+        :return: ''
+        :rtype: None
 
         """
+
 
         self.graph = graph
         # self.ring_dict = self.graph.ring_dict(region)
@@ -230,28 +216,24 @@ class ZoneProperties():
         if any(x in BORDER_STATIONS for x in chain(*self.stop_legs)):
             self.border_trip = True
 
-        if self.border_trip:
-            self.border_legs = self._border_touch_legs()
+        self.border_legs = self._border_touch_legs() if \
+            self.border_trip else self.border_legs
 
         self.touched_zones = get_touched_zones(self.zone_sequence)
         self.touched_zone_legs = to_legs(self.touched_zones)
 
     def _border_touch_legs(self) -> Tuple[int, ...]:
-        """
-        return the card touch positions on the trip
-        as a tuple
-        """
+        """return the card touch positions on the trip
+        as a tuple"""
 
         return tuple(i for i, j in enumerate(self.stop_legs)
                      if any(x in BORDER_STATIONS for x in j))
 
 
     def _visited_zones_on_leg(self, zone_leg: Tuple[int, int]) -> None:
-        """
-        for a tuple of start and end zone
+        """for a tuple of start and end zone
         find the zones travelled through
-        and update the cache
-        """
+        and update the cache"""
 
         if len(set(zone_leg)) == 1:
             visited = (zone_leg[0],) # note tuple
@@ -267,12 +249,12 @@ class ZoneProperties():
                 visited = all_short_paths[0]
         self.VISITED_CACHE[zone_leg] = visited
 
-    def get_visited_zones(self, zone_legs) -> Tuple[Union[int, Tuple[int, ...]], ...]:
-        """
-        visited zones is a list of the zones visited on a trip,
-        in order, but removing adjacent duplicate zones
-
-        """
+    def get_visited_zones(
+            self,
+            zone_legs: Tuple[Tuple[int, int], ...]
+            ) -> Tuple[Union[int, Tuple[int, ...]], ...]:
+        """visited zones is a list of the zones visited on a trip,
+        in order, but removing adjacent duplicate zones"""
 
         vals = []
         for leg in zone_legs:
@@ -291,7 +273,7 @@ class ZoneProperties():
         return tuple(visited_zones)
 
 
-    def _borderless_properties(self):
+    def _borderless_properties(self) -> Dict[str, Any]:
 
         visited_zones = self.get_visited_zones(self.touched_zone_legs)
 
@@ -360,8 +342,14 @@ class ZoneProperties():
 
         return self._borderless_properties()
 
-    def property_dict(self):
-        "returns a dictionary of the zone properties for the trip"
+    def property_dict(self) -> Dict[str, Any]:
+        """
+        Return the zone property dictionary for the trip
+
+        :return: dictionary of trip properties
+        :rtype: Dict[str, Any]
+
+        """
 
         if not self.border_trip:
             return self._borderless_properties()
@@ -388,22 +376,26 @@ def legops(new_legs):
             out.append((x[0], x[1]))
     return tuple(out)
 
-def operators_in_touched_(tzones, zonelegs, oplegs):
+def operators_in_touched_(
+        tzones: Tuple[int, ...],
+        zonelegs: Tuple[Tuple[int, ...]],
+        oplegs: Tuple[Tuple[int, ...]]
+        ) -> Dict[int, Tuple[int, ...]]:
     """
     determine the operators in the zones that are touched
     returns a dictionary:
 
-    parameters
-    -----------
-    tzones:
-        a tuple of the zones touched by
-        a rejsekort tap on a trip
-    zonelegs:
-        a legified tuple of zones
-    oplegs:
-        a legified tuple of operators
+    :param tzones: a tuple of the zones touched by a rejsekort tap on a trip
+    :type tzones: Tuple[int, ...]
+    :param zonelegs: a legified tuple of zones
+    :type zonelegs: Tuple[Tuple[int, ...]]
+    :param oplegs: a legified tuple of operators
+    :type oplegs: Tuple[Tuple[int, ...]]
+    :return: Tuple[Tuple[int, ...]]
+    :rtype: Dict[int, Tuple[int, ...]]:
 
     """
+
     ops_in_touched = {}
     for tzone in tzones:
         ops = []
@@ -445,7 +437,7 @@ class ZoneSharer(ZoneProperties):
 
     def __init__(
             self,
-            graph,
+            graph: ZoneGraph,
             zone_sequence: Tuple[int, ...],
             stop_sequence: Tuple[int, ...],
             operator_sequence: Tuple[int, ...],
@@ -521,7 +513,18 @@ class ZoneSharer(ZoneProperties):
         self.SHARE_CACHE[val] = shares
         return shares
 
-    def share_calculation(self, val): # val is a property dict
+    def share_calculation(self, val: Dict[str, Any]):
+        """
+        Calculate the zone shares for the operators on the trip
+
+        :param val: property_dict from ZoneProperties
+        :type val: Dict[str, Any]
+        :return: DESCRIPTION
+        :rtype: TYPE
+
+        """
+
+
         """
         Calculate the zone shares for the operators on the trip
 
@@ -570,6 +573,14 @@ class ZoneSharer(ZoneProperties):
         return share
 
     def share(self):
+        """
+        Share the zone work between the operators on the trip
+
+        :return: DESCRIPTION
+        :rtype: TYPE
+
+        """
+
 
         val = tuple(
             (self.stop_sequence, self.operator_sequence, self.usage_sequence)
