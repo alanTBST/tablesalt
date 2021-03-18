@@ -7,22 +7,12 @@ Created on Sun Nov 24 13:38:57 2019
 """
 #standard imports
 import json
-import pkg_resources
 from itertools import chain, permutations
-from typing import (
-    Any,
-    AnyStr,
-    Dict,
-    Optional,
-    Tuple,
-    List,
-    Union,
-    Set
-    )
+from typing import Any, AnyStr, Dict, List, Optional, Set, Tuple, Union
 
-import h5py #type: ignore
-import pandas as pd #type: ignore
-
+import h5py  # type: ignore
+import pandas as pd  # type: ignore
+import pkg_resources
 from tablesalt.common.io import mappers
 
 M_RANGE: Set[int] = set(range(8603301, 8603400))

@@ -8,34 +8,23 @@ Created on Mon Mar  2 12:08:07 2020
 
 import json
 import os
-import pkg_resources
 import zipfile
 from io import BytesIO
-from itertools import groupby, chain
+from itertools import chain, groupby
 from operator import itemgetter
 from pathlib import Path
-from typing import (
-    AnyStr,
-    Dict,
-    Optional,
-    Union,
-    Tuple,
-    Set,
-    Any,
-    List
-)
+from typing import Any, AnyStr, Dict, List, Optional, Set, Tuple, Union
 
-import geopandas as gpd # type: ignore
-import numpy as np # type: ignore
-import pandas as pd # type: ignore
-import requests # type: ignore
-import shapely # type: ignore
-
+import geopandas as gpd  # type: ignore
+import numpy as np  # type: ignore
+import pandas as pd  # type: ignore
+import pkg_resources
+import requests  # type: ignore
+import shapely  # type: ignore
+from shapely import wkt  # type: ignore
 from shapely.geometry.linestring import LineString  # type: ignore
-from shapely.geometry.polygon import Polygon  # type: ignore
 from shapely.geometry.point import Point
-from shapely import wkt # type: ignore
-
+from shapely.geometry.polygon import Polygon  # type: ignore
 from tablesalt.common.io import mappers
 
 FILE_PATH = Union[str, bytes, 'os.PathLike[Any]']

@@ -8,14 +8,13 @@ Class to create an undirected graph
 of the tariffzones in Denmark
 """
 
-import pkg_resources
-from typing import Optional, Generator, Tuple, Dict
+from typing import Dict, Generator, Optional, Tuple
 
-import pandas as pd
 import networkx as nx
+import pandas as pd
+import pkg_resources
 
 from tablesalt.topology.tools import EdgeMaker
-
 
 REGION_ZONES = {
     'hovedstaden': (1000, 1100), # 200
