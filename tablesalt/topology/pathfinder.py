@@ -19,7 +19,7 @@ from typing import Tuple, Union, Optional, Dict, Any
 import pkg_resources
 
 import pandas as pd  #type: ignore
-import numpy as np  #type: ingnore
+import numpy as np  #type: ignore
 from networkx.classes.graph import Graph
 
 from tablesalt.common import triptools
