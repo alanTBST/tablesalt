@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import (
     AnyStr,
     Dict,
-    Mapping,
     Optional,
     Union,
     Tuple,
@@ -26,15 +25,17 @@ from typing import (
     List
 )
 
-import geopandas as gpd
-import numpy as np
-import pandas as pd
-import requests
-import shapely
-from shapely.geometry import MultiPolygon, Point
-from shapely import wkt
+import geopandas as gpd # type: ignore
+import numpy as np # type: ignore
+import pandas as pd # type: ignore
+import requests # type: ignore
+import shapely # type: ignore
 
-#from tablesalt.common import check_dw_for_table, insert_query, make_connection
+from shapely.geometry.linestring import LineString  # type: ignore
+from shapely.geometry.polygon import Polygon  # type: ignore
+from shapely.geometry.point import Point
+from shapely import wkt # type: ignore
+
 from tablesalt.common.io import mappers
 
 FILE_PATH = Union[str, bytes, 'os.PathLike[Any]']
@@ -131,6 +132,14 @@ class _GTFSloader:
         }
 
     def __init__(self) -> None:
+        """
+        Class to load gtfs data
+
+        :return: ''
+        :rtype: None
+
+        """
+
 
         self._route_agency = None
         self._route_shapes = None
@@ -146,6 +155,10 @@ class _GTFSloader:
         if self._agency_ids is None:
             self.load_agency()
         return self._agency_ids
+
+    # @agency_ids.setter
+    # def agency_ids(self) -> None:
+    #     pass
 
     @property
     def id_agency(self) -> Dict[int, str]:
@@ -167,7 +180,7 @@ class _GTFSloader:
         return self._route_shapes
 
     @property
-    def shape_lines(self) -> Dict[int, shapely.geometry.linestring.LineString]:
+    def shape_lines(self) -> Dict[int, LineString]:
         if self._shape_linestrings is None:
             self._process_shapes(
                 self.load_shapes(return_value=True)
@@ -177,7 +190,7 @@ class _GTFSloader:
     @property
     def route_linestrings(
         self
-        ) -> Dict[int, Tuple[shapely.geometry.linestring.LineString, ...]]:
+        ) -> Dict[int, Tuple[LineString, ...]]:
 
         if self._route_linestrings is None:
             shape_lines = self.shape_lines
@@ -218,7 +231,9 @@ class _GTFSloader:
         """
         if filepath is None:
             filepath = self.DEFAULT_GTFS_LOC
-        agency = pd.read_csv(os.path.join(filepath, 'agency.txt'))
+
+        fp = Path(filepath) / 'agency.txt'
+        agency = pd.read_csv(fp)
         id_agency = dict(
             zip(agency.loc[:, 'agency_id'], agency.loc[:, 'agency_name'])
             )
@@ -242,7 +257,7 @@ class _GTFSloader:
 
     def load_shapes(
         self,
-        filepath: FILE_PATH = None,
+        filepath: Optional[FILE_PATH] = None,
         return_value: Optional[bool] = False
         ) -> pd.core.frame.DataFrame:
         """
@@ -432,7 +447,13 @@ class TakstZones:
                 )
             )
     def __init__(self) -> None:
+        """
+        A class for interacting with the TakstZone spatial data
 
+        :return: ''
+        :rtype: None
+
+        """
         pass
 
 
@@ -443,16 +464,14 @@ class TakstZones:
         """
         Load the tariffzones geospatial data.
 
-        Parameters
-        ----------
-        takst : str, optional
+        :param takst: the takstset to load, defaults to 'sjælland'
+        :type takst: Optional[str], optional
+        :raises NotImplementedError: if the region is not supported
+        :return: a geodataframe of the tariffzones
+        :rtype: geopandas.GeoDataFrame
 
-
-        Returns
-        -------
-        gdf : geopandas.GeoDataFrame
-            a geodataframe of the tariffzones.
         """
+
         if not takst == 'sjælland':
             raise NotImplementedError(
                 f"takst {takst} is not supported yet"
@@ -461,7 +480,8 @@ class TakstZones:
         gdf = gpd.read_file(self.DEFAULT_ZONE_LOC)
         gdf.columns = [x.lower() for x in gdf.columns]
         gdf.loc[:, 'businesske'] = gdf.loc[:, 'businesske'].apply(
-            lambda x: int('1'+ x.zfill(4)[1:]))
+            lambda x: int('1'+ x.zfill(4)[1:])
+            )
 
         gdf.rename(columns={'businesske': 'natzonenum'}, inplace=True)
 
@@ -473,12 +493,11 @@ class TakstZones:
         """
         Load and return a dataframe of stops in Denmark.
 
-        Returns
-        -------
-        stops_gdf : geopandas.GeoDataFrame
-            a geo dataframe of rejseplan stop places.
+        :return: a geo dataframe of rejseplan stop places
+        :rtype: geopandas.GeoDataFrame
 
         """
+
         fp = self.DEFAULT_STOPS_LOC
         try:
             with open(fp, 'r') as f:
@@ -513,7 +532,7 @@ class TakstZones:
         return stops_gdf
 
     @staticmethod
-    def _set_stog_location(df):
+    def _set_stog_location(df: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
 
         s_stops = mappers['s_uic']
         corr_s_stops = [x - 90000 for x in s_stops]
@@ -527,6 +546,15 @@ class TakstZones:
         self,
         region: Optional[str] = 'sjælland'
         ) -> Dict[int, int]:
+        """
+        Return a mapping of stopids to zoneids
+
+        :param region: the region to get a map for, defaults to 'sjælland'
+        :type region: Optional[str], optional
+        :return: a dictionary with stopids as keys and zoneids as values
+        :rtype: Dict[int, int]
+
+        """
 
         stops = self.load_stops_data()
         stops = self._set_stog_location(stops)
@@ -537,7 +565,7 @@ class TakstZones:
             zip(joined.loc[:, 'UIC'],  joined.loc[:, 'natzonenum'])
             )
     @staticmethod
-    def _neighbour_dict(region):
+    def _neighbour_dict(region: str) -> Dict[int, Any]:
         """Load and convert neighbours dset to dict (adj list)"""
 
         fp = pkg_resources.resource_filename(
@@ -557,7 +585,8 @@ class TakstZones:
 
         neighbours_dict = {
             k: tuple(x for x in v if zone_min < x < zone_max)
-            for k, v in neighbours_dict.items() if zone_min < k < zone_max
+            for k, v in neighbours_dict.items() if
+            zone_min < k < zone_max
             }
         return neighbours_dict
 
@@ -638,11 +667,21 @@ class RejseplanLoader(_GTFSloader):
 class EdgeMaker(_GTFSloader):
 
     def __init__(self) -> None:
+        """
+        Class to create edges for a network graph from GTFS data
+
+        :return: ''
+        :rtype: None
+
+        """
+
         super().__init__()
         self.zones = TakstZones()
 
-
-    def _shape_proc(self, mode: Optional[str] = None):
+    def _shape_proc(
+            self,
+            mode: Optional[str] = None
+            ) -> Tuple[Dict[int, Tuple[int, ...]], Dict[int, Polygon]]:
 
         zones = self.zones.load_tariffzones()
         shape_frame = self.shapes_to_gdf()
@@ -693,8 +732,8 @@ class EdgeMaker(_GTFSloader):
                 'rev_idx': rev_idx}
     @staticmethod
     def _get_start_zone(
-        start_point: shapely.geometry.point.Point,
-        zone_polygons: Dict[int, shapely.geometry.polygon.Polygon]
+        start_point: Point,
+        zone_polygons: Dict[int, Polygon]
         ) -> int:
 
         for zone, poly in zone_polygons.items():
@@ -709,13 +748,13 @@ class EdgeMaker(_GTFSloader):
     def _find_shape_edges(
         start_zone: int,
         zone_ids: Set[int],
-        zone_polygons: Dict[int, shapely.geometry.polygon.Polygon],
+        zone_polygons: Dict[int, Polygon],
         points: List[shapely.geometry.point.Point],
         neigh_dict: Dict[int, Tuple[int]]
         ) -> Set[Tuple[int, ...]]:
 
         finished_zones = set()
-        edges = set()
+        edges: Set[Tuple[int, ...]] = set()
         current_zone = start_zone
         for pt in points:
             if pt.within(zone_polygons[current_zone]):
@@ -738,7 +777,10 @@ class EdgeMaker(_GTFSloader):
         return edges
 
 
-    def make_edges(self, mode: Optional[str] = None):
+    def make_edges(
+            self,
+            mode: Optional[str] = None
+            ) -> Dict[str, Union[np.ndarray, Dict[int, int]]]:
 
         neigh_dict = self.zones._neighbour_dict('sjælland') # for now
         shape_zones, zone_polys = self._shape_proc(mode)
@@ -753,11 +795,17 @@ class EdgeMaker(_GTFSloader):
 
             init_point = as_points[0]
             try:
-                start_zone = self._get_start_zone(init_point, zone_id_poly)
+                start_zone = self._get_start_zone(
+                    init_point, zone_id_poly
+                    )
             except ValueError:
                 continue
             shape_edges = self._find_shape_edges(
-                start_zone, zone_ids, zone_id_poly, as_points, neigh_dict
+                start_zone,
+                zone_ids,
+                zone_id_poly,
+                as_points,
+                neigh_dict
                 )
             all_shape_edges[shape_id] = shape_edges
 
