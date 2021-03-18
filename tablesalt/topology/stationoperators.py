@@ -23,7 +23,6 @@ from typing import (
 import h5py #type: ignore
 import pandas as pd #type: ignore
 
-
 from tablesalt.common.io import mappers
 
 M_RANGE: Set[int] = set(range(8603301, 8603400))
@@ -34,6 +33,7 @@ MAX_RAIL_UIC: int = 9999999
 
 
 def _load_default_config() -> Dict[str, str]:
+
     fp = pkg_resources.resource_filename(
     'tablesalt', 'resources/config/operator_config.json'
     )
@@ -100,6 +100,7 @@ def _load_operator_settings(
 def load_bus_station_connectors() -> Dict[int, int]:
     """
     Load the bus stops station array from the support data
+
     :return: DESCRIPTION
     :rtype: Dict[int, int]
 
