@@ -23,7 +23,7 @@ class TableArgParser:
         'products': ArgTuple(
             '-p',
             '--products',
-            'path to input pendler products csv',
+            'path to input pendler products csv files',
             True,
             pathlib.Path,
             None
@@ -31,7 +31,7 @@ class TableArgParser:
         'zones': ArgTuple(
             '-z',
             '--zones',
-            'path to input zones csv',
+            'path to input zones csv files',
             True,
             pathlib.Path,
             None
@@ -71,7 +71,7 @@ class TableArgParser:
         'rabattrin': ArgTuple(
            '-r',
            '--rabattrin',
-           'path to out directory for the datastores',
+           'the rabattrin to use',
            False,
            int,
            None
@@ -100,21 +100,13 @@ class TableArgParser:
         A Basic argument parser for scripts in tablesalt. Allows only a
         specific subset of arguments that make sense in this context.
 
-        Parameters
-        ----------
-        *args : str
-            The arguments allowed in the argparser.
-        description : Optional[str], optional
-            A description of the argument. The default is None.
-
-        Raises
-        ------
-        ValueError
-            DESCRIPTION.
-
-        Returns
-        -------
-        None
+        :param *args: The arguments allowed in the argparser
+        :type *args: str
+        :param description: A description of the argument, defaults to None
+        :type description: Optional[str], optional
+        :raises ValueError: if the given argument is not supported
+        :return: ''
+        :rtype: None
 
         """
 
@@ -142,13 +134,14 @@ class TableArgParser:
                 required=opt.required,
                 default=opt.default
                 )
+
     def parse(self) -> Dict[str, Union[int, pathlib.Path, str]]:
         """
-        Parse the command line arguments
-        Returns
-        -------
-        Dict
-            DESCRIPTION.
+        Parse the given arguments
+
+        :return: dictionary of arguments and values
+        :rtype: Dict[str, Union[int, pathlib.Path, str]]
 
         """
+
         return vars(self.parser.parse_args())
