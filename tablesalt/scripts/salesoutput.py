@@ -8,18 +8,17 @@ import ast
 import glob
 import json
 import os
-import pickle
 import pkg_resources
+import pickle
 from itertools import chain
 from operator import itemgetter
-from typing import Dict, Tuple, List
 from pathlib import Path
+from typing import Dict, List, Tuple
 
 import msgpack
 import pandas as pd
 
 from tablesalt.preprocessing.parsing import TableArgParser
-
 
 THIS_DIR = Path(__file__).parent
 

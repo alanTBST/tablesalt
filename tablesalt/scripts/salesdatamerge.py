@@ -9,13 +9,12 @@ import ast
 import difflib
 import glob
 import os
-
 from argparse import ArgumentParser
 from pathlib import Path
-from typing import List, Dict, AnyStr, Tuple, Set, Any
+from typing import Any, AnyStr, Dict, List, Set, Tuple
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 

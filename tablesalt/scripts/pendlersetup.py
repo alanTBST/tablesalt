@@ -58,23 +58,22 @@ Created on Sat Mar 14 18:07:24 2020
 # standard imports
 import ast
 from datetime import datetime
-from multiprocessing import Pool
+from functools import partial
 # from multiprocessing.pool import ThreadPool
 from itertools import groupby
-from functools import partial
+from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
 
-#third party imports
-import numpy as np
 import lmdb
+import numpy as np
 
-#package imports
 from tablesalt import StoreReader
-from tablesalt.season import users
 from tablesalt.common import make_store
-from tablesalt.preprocessing import find_datastores, db_paths
+from tablesalt.preprocessing import db_paths, find_datastores
 from tablesalt.preprocessing.parsing import TableArgParser
+from tablesalt.season import users
+
 
 def get_pendler_trips(pendler_cards, tripcarddb, userdb):
     """

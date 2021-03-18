@@ -10,9 +10,6 @@ Created on Mon Sep  9 15:51:11 2019
 
 @author: alkj, email: alkj@tbst.dk, alanksjones@gmail.com
 
-
-
-
 This script calls the api that creates the
 zonemaps on the DOT site for pendler data
 
@@ -26,8 +23,8 @@ convert as required
 
 """
 
-import urllib
 import json
+import urllib
 from itertools import combinations
 from multiprocessing.pool import ThreadPool
 

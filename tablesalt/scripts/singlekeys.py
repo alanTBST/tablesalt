@@ -11,27 +11,29 @@ import glob
 import os
 import pickle
 from functools import partial
-from itertools import groupby, chain
+from itertools import chain, groupby
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
 from typing import Set
 
-
 import lmdb
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-# from turbodbc import connect, make_options
 
 from tablesalt import StoreReader
+from tablesalt.common.connections import make_connection
+from tablesalt.common.triptools import split_list
+from tablesalt.preprocessing.parsing import TableArgParser
+from tablesalt.preprocessing.tools import db_paths, find_datastores
 from tablesalt.running import WindowsInhibitor
 from tablesalt.topology import ZoneGraph
 from tablesalt.topology.tools import TakstZones
-from tablesalt.common.triptools import split_list
-from tablesalt.common.connections import make_connection
-from tablesalt.preprocessing.tools import find_datastores, db_paths
-from tablesalt.preprocessing.parsing import TableArgParser
+
+
+# from turbodbc import connect, make_options
+
 
 
 THIS_DIR = Path(__file__).parent

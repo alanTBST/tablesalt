@@ -8,10 +8,10 @@ import ast
 import os
 import pickle
 from datetime import datetime
-from operator import itemgetter
 from functools import partial
-from itertools import groupby, chain
+from itertools import chain, groupby
 from multiprocessing import Pool
+from operator import itemgetter
 from pathlib import Path
 
 import lmdb
@@ -19,10 +19,11 @@ import numpy as np
 from tqdm import tqdm
 
 from tablesalt import StoreReader
-from tablesalt.preprocessing.tools import find_datastores, db_paths
-from tablesalt.topology.tools import TakstZones
-from tablesalt.topology import ZoneGraph
 from tablesalt.preprocessing.parsing import TableArgParser
+from tablesalt.preprocessing.tools import db_paths, find_datastores
+from tablesalt.topology import ZoneGraph
+from tablesalt.topology.tools import TakstZones
+
 
 THIS_DIR = Path(__file__).parent
 
