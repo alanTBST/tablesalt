@@ -7,43 +7,15 @@ Created on Fri Mar  6 11:44:06 2020
 Class to create an undirected graph
 of the tariffzones in Denmark
 """
-#standard imports
-import os
+
 import pkg_resources
-from itertools import groupby, chain
-from collections import Counter
-from operator import itemgetter
 from typing import Optional, Generator, Tuple, Dict
 
-
-#third party imports
 import pandas as pd
-import numpy as np
 import networkx as nx
 
-# package imports
-from tablesalt.topology.tools import TakstZones, EdgeMaker
+from tablesalt.topology.tools import EdgeMaker
 
-
-REGIONS = {
-    'hovedstaden',
-    'sjælland',
-    'vestsjælland',
-    'sydsjælland',
-    # 'fyn',
-    # 'jylland',
-    # 'nordjylland',
-    # 'midtjylland',
-    # 'sydjylland',
-    # 'sydjyllandvest',
-    # 'sydjyllandøst',
-    # 'sydjyllandsyd'
-    }
-
-def _determine_region_zones():
-    """determine the zones that are in each region from shp"""
-
-    return
 
 REGION_ZONES = {
     'hovedstaden': (1000, 1100), # 200
@@ -67,38 +39,7 @@ REGION_ZONES = {
     # 'bornholm': (6000, 6100) # 240
     }
 
-
-def _legify(v):
-    # TODO : put legify in TBSTtrips? TBSTtools TBSTutils?
-    return tuple((v[i], v[i+1]) for i in range(len(v)-1))
-
-
-def _neighbour_dict(region):
-    """Load and convert neighbours dset to dict (adj list)"""
-
-    fp = pkg_resources.resource_filename(
-        'tablesalt', os.path.join('resources', 'networktopodk', 'national_neighbours.csv')
-        )
-    neighbours = pd.read_csv(
-        fp,
-        header=None, index_col=0
-        )
-
-    zone_min, zone_max = REGION_ZONES[region]
-
-    neighbours = neighbours.fillna(0)
-    neighbours = neighbours.astype(int)
-    neighbours.loc[:, 'tup'] = neighbours.apply(tuple, axis=1)
-    neighbours_dict = neighbours.loc[:, 'tup'].to_dict()
-
-    neighbours_dict = {
-        k: tuple(x for x in v if zone_min < x < zone_max)
-        for k, v in neighbours_dict.items() if zone_min < k < zone_max
-        }
-    return neighbours_dict
-
-
-def _ringzone_dict(region):
+def _ringzone_dict(region: str) -> Dict[Tuple[int, int], int]:
 
     fp = pkg_resources.resource_filename(
         'tablesalt', 'resources/networktopodk/national_ringzone.csv'
@@ -119,46 +60,10 @@ def _ringzone_dict(region):
     ringzone = {(k[0], int(k[1])): int(v) for k, v in ringzone.items()}
     return ringzone
 
-def _neighbour_edges(neighbours):
-
-    n_edges = set()
-    for k, v in neighbours.items():
-        start_set = {(k, x) for x in v}
-        n_edges.update(start_set)
-
-    return n_edges
-
-
-def _shared_neighbours(edge, ndict):
-
-    node1 = set(ndict[edge[0]])
-    node2 = set(ndict[edge[1]])
-    return node1.intersection(node2)
-
-def _load_tripzones(region_stops, region_zonemap):
-    # if this doesn't exist download from rejseplan
-
-    fp = pkg_resources.resource_filename(
-    'tablesalt', 'resources/networktopodk/stop_times.txt'
-    )
-    stoptimes = pd.read_csv(
-        fp, encoding='iso-8859-1',
-        usecols=['trip_id', 'stop_id', 'stop_sequence']
-        )
-
-    stoptimes = stoptimes.query("stop_id in @region_stops").values
-    counts = Counter(stoptimes[:, 0])
-    twomin = [x for x, y in counts.items() if y >= 2]
-    stoptimes = stoptimes[np.isin(stoptimes[:, 0], twomin)]
-    stoptimes = stoptimes[np.lexsort((stoptimes[:, 2], stoptimes[:, 0]))]
-    stopzones = [region_zonemap[x] for x in stoptimes[:, 1]]
-    trip_zones = zip(stoptimes[:, 0], stopzones)
-
-    return trip_zones
 
 class ZoneGraph():
 
-    PATH_CACHE = {}
+    PATH_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
 
     def __init__(
             self,
@@ -178,14 +83,10 @@ class ZoneGraph():
 
         """
 
-
         self.region = region
         self.data = EdgeMaker().make_edges(mode)
-
-        self.columns = self.data['idx']
-        self.rows = self.data['idx']
-        self.rev_columns = self.data['rev_idx']
-        self.rev_rows =  self.data['rev_idx']
+        self.columns = self.rows = self.data['idx']
+        self.rev_columns = self.rev_rows = self.data['rev_idx']
         self.graph = nx.from_numpy_matrix(self.data['adj_array'])
         self._ringzone_dict = _ringzone_dict(self.region)
         self.SHORTEST_PATHS_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
