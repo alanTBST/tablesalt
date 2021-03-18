@@ -64,8 +64,6 @@ def sep_legs(val):
     trip = tuple(trip)
     return trip
 
-def legify():
-    return
 
 def create_legs(ddict):
     """
