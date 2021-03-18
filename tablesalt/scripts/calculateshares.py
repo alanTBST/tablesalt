@@ -4,28 +4,27 @@ Created on Thu Dec  5 09:51:04 2019
 
 @author: alkj
 """
-#standard imports
 
 import os
 import pickle
-from itertools import groupby, chain
 from functools import partial
+from itertools import chain, groupby
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
-#third party imports
+
 import numpy as np
 from tqdm import tqdm
 
-# module imports
-from tablesalt.running import WindowsInhibitor
 from tablesalt import StoreReader
-from tablesalt.common.io import mappers
-from tablesalt.preprocessing.tools import find_datastores, db_paths
-from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.common import make_store
-from tablesalt.topology.tools import TakstZones
+from tablesalt.common.io import mappers
+from tablesalt.preprocessing.parsing import TableArgParser
+from tablesalt.preprocessing.tools import db_paths, find_datastores
+from tablesalt.running import WindowsInhibitor
 from tablesalt.topology import ZoneGraph, ZoneSharer
+from tablesalt.topology.tools import TakstZones
+
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
 

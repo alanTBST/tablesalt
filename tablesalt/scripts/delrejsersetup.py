@@ -95,50 +95,34 @@ Created on Sat Mar 14 18:07:24 2020
 
 # =============================================================================
 """
-# standard imports
-import os
-import zipfile
-from threading import Thread
-from datetime import datetime
-import time
-import json
-import site
 
+import json
+import os
+import site
+import time
+import zipfile
+from datetime import datetime
 from itertools import groupby
 from multiprocessing import Process, Queue
 from operator import itemgetter
-from typing import (
-    ByteString,
-    Iterator,
-    List,
-    Dict,
-    Tuple,
-    Optional,
-    AnyStr,
-    Union,
-    Any
-    )
+from threading import Thread
+from typing import (Any, AnyStr, ByteString, Dict, Iterator, List, Optional,
+                    Tuple, Union)
 
-# third party imports
-import numpy as np       #type: ignore
-import pandas as pd      #type: ignore
-import h5py              #type: ignore
-import msgpack           #type: ignore
-from tqdm import tqdm    #type: ignore
+import h5py  # type: ignore
+import msgpack  # type: ignore
+import numpy as np  # type: ignore
+import pandas as pd  # type: ignore
+from tqdm import tqdm  # type: ignore
 
-# this package imports
-from tablesalt.common.io import mappers
 from tablesalt.common import make_store
-from tablesalt.running import WindowsInhibitor
+from tablesalt.common.io import mappers
 from tablesalt.preprocessing.parsing import TableArgParser
-from tablesalt.preprocessing.tools import (
-    setup_directories,
-    get_zips,
-    check_all_file_headers,
-    col_index_dict,
-    get_columns,
-    sumblocks
-    )
+from tablesalt.preprocessing.tools import (check_all_file_headers,
+                                           col_index_dict, get_columns,
+                                           get_zips, setup_directories,
+                                           sumblocks)
+from tablesalt.running import WindowsInhibitor
 
 
 # =============================================================================

@@ -9,25 +9,25 @@ TBST - Trafik, Bygge, og Bolig -styrelsen
 """
 
 import ast
-import os
 import glob
-from pathlib import Path
-from operator import itemgetter
-from itertools import groupby, chain
+import os
+import pkg_resources
 from collections import defaultdict
 from datetime import datetime
-from typing import List, Dict, Tuple, Union
-import pkg_resources
+from itertools import chain, groupby
+from operator import itemgetter
+from pathlib import Path
+from typing import Dict, List, Tuple, Union
 
 import lmdb
 import msgpack
 import numpy as np
-from tqdm import tqdm
 import pandas as pd
+from tqdm import tqdm
 
-from tablesalt.season.users import PendlerKombiUsers
-from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
+from tablesalt.preprocessing.tools import db_paths, find_datastores
+from tablesalt.season.users import PendlerKombiUsers
 from pendlerkeys import find_no_pay
 
 THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent

@@ -8,29 +8,16 @@ Classes for manipulating Pendler Product data sets
 """
 
 import os
-import pkg_resources
 from collections import Counter
 from itertools import groupby
 from operator import itemgetter
 from pathlib import Path
-from typing import (
-    TypeVar,
-    Optional,
-    Any,
-    Sequence,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Set,
-    Union,
-    Tuple
-    )
+from typing import (Any, Dict, Iterable, Iterator, List, Optional, Sequence,
+                    Set, Tuple, TypeVar, Union)
 
-import msgpack        #type: ignore
-import pandas as pd   #type: ignore
-
-
+import msgpack  # type: ignore
+import pandas as pd  # type: ignore
+import pkg_resources
 
 ZONE = Dict[str, Union[int, str]]
 ZONES = Sequence[ZONE]
@@ -122,9 +109,7 @@ def _process_dynamic_cards(date_dict):
 
     return dyn_dict
 
-# prodzones: Dict,
-#                    product_dates: Dict,
-#                    dynamic: Optional[bool] = True
+
 def _process_cards(prodzones,
                    product_dates,
                    dynamic): # -> Dict[int, Dict]:
@@ -156,11 +141,7 @@ def _process_cards(prodzones,
 
     return _process_dynamic_cards(dates)
 
-# self,
-#                  year: int,
-#                  products_path: FILE_PATH,
-#                  product_zones_path: FILE_PATH,
-#                  min_valid_days: Optional[int] = 14
+
 class _PendlerInput():
     """
     Class that loads and processes the input pendlerkombi data
