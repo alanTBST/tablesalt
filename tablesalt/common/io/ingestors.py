@@ -77,6 +77,7 @@ class _DelrejserInspector:
     def _get_path_type(self) -> str:
         """
         Get the type of path that is passed to __init__
+
         :raises InvalidPathContent: if the path doesn't have the right content
         :return: the type of path given
         :rtype: str
@@ -641,7 +642,7 @@ def _data_producer(data_generator: DataGenerator, queue) -> None:
     """
 
 
-    generator = data_generator.generate(1_500_000)
+    generator = data_generator.generate(500_000)
     for x in generator:
         queue.put(x)
         time.sleep(0.01)
@@ -671,7 +672,7 @@ def _data_consumer(queue, base_path: str) -> None:
             continue
         path = _determine_path(res)
         write_path = Path(base_path) / path
-        make_store(res, write_path)
+        make_store(res, str(write_path))
 
 def delrejser_setup(input_path: str, output_path: str) -> None:
     """
@@ -725,6 +726,6 @@ def delrejser_setup(input_path: str, output_path: str) -> None:
 if __name__ == "__main__":
     parser = TableArgParser('input_dir', 'output_dir')
     args = parser.parse()
-    input_dir = Path(args['input_dir'])
-    output_dir = Path(args['output_dir'])
+    input_dir = args['input_dir']
+    output_dir = args['output_dir']
     delrejser_setup(input_dir, output_dir)
