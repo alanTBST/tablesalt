@@ -725,6 +725,6 @@ def delrejser_setup(input_path: str, output_path: str) -> None:
 if __name__ == "__main__":
     parser = TableArgParser('input_dir', 'output_dir')
     args = parser.parse()
-    input_dir = args['input_dir']
-    output_dir = args['output_dir']
+    input_dir = Path(args['input_dir'])
+    output_dir = Path(args['output_dir'])
     delrejser_setup(input_dir, output_dir)
