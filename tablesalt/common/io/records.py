@@ -198,12 +198,9 @@ class StopRecord(Record):
         """
         legs = self.legs()
         return {i: j[0] for i, j in enumerate(legs) if j[0]==j[1]}
+    start = origin
+    end = destination
 
-    def start(self):
-        return self.origin
-
-    def end(self):
-        return self.origin
 
 class TimeRecord(Record):
     """TimeRecord"""
@@ -546,6 +543,7 @@ class OperatorRecord(Record):
         return self.end_operator
 
 class PriceRecord(Record):
+
     def __init__(
             self,
             tripkey: Union[bytes, str, int],
@@ -565,11 +563,13 @@ class PriceRecord(Record):
 
         self.tripkey = tripkey
         self.data = data
+
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({int(self.tripkey)}, {self.data})'
 
     def __hash__(self):
         return hash(self.tripkey)
+
     @property
     def paid(self) -> float:
         """

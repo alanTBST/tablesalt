@@ -37,7 +37,6 @@ MODEL_MAP = {v:k for k, v in mappers['model_dict'].items()}
 CARD_MAP = mappers['card_id']
 
 
-
 class InvalidPathContent(Exception):
     "error for content in path problems"
     pass
@@ -193,13 +192,6 @@ class _DelrejserInspector:
                     )
         return first
 
-# def _zipfile_generator():
-
-#     return
-
-# def _textfile_generator():
-
-#     return
 class DataGenerator(_DelrejserInspector):
     """
     DataGenerator class to get data from files
@@ -229,7 +221,8 @@ class DataGenerator(_DelrejserInspector):
             ) -> pd._libs.parsers.TextReader:
 
         return TextReader(
-            file_handle, encoding='iso-8859-1',
+            file_handle,
+            encoding='iso-8859-1',
             usecols=[self.column_index[x] for x in self.columns]
             )
 
@@ -642,7 +635,7 @@ def _data_producer(data_generator: DataGenerator, queue) -> None:
     """
 
 
-    generator = data_generator.generate(500_000)
+    generator = data_generator.generate(1_000_000)
     for x in generator:
         queue.put(x)
         time.sleep(0.01)
@@ -668,7 +661,7 @@ def _data_consumer(queue, base_path: str) -> None:
             if res is None:
                 break
         else:
-            time.sleep(0.05)
+            time.sleep(0.02)
             continue
         path = _determine_path(res)
         write_path = Path(base_path) / path
@@ -688,33 +681,31 @@ def delrejser_setup(input_path: str, output_path: str) -> None:
     """
 
     generators = [
-        StopDataGenerator
+        StopDataGenerator,
+        TimeDataGenerator,
+        PriceDataGenerator,
+        PassengerDataGenerator,
+        OperatorGenerator,
+        TripUserGenerator
         ]
-    tripuser = TripUserGenerator(input_path)
-    stopdata = StopDataGenerator(input_path)
-    timedata = TimeDataGenerator(input_path)
-    pricedata = PriceDataGenerator(input_path)
-    pasdata = PassengerDataGenerator(input_path)
-    opdata = OperatorGenerator(input_path)
 
     the_queue = Queue()
-    st = time.time()
-
     # producers
-    p1 = Process(target=_data_producer, args=(stopdata, the_queue))
-    p2 = Process(target=_data_producer, args=(timedata, the_queue))
-    p3 = Process(target=_data_producer, args=(pricedata, the_queue))
-    p4 = Process(target=_data_producer, args=(pasdata, the_queue))
-    p5 = Process(target=_data_producer, args=(opdata, the_queue))
-    p6 = Process(target=_data_producer, args=(tripuser, the_queue))
+    producers = []
+    for gen in generators:
+        gener = gen(input_path)
+        p = Process(target=_data_producer, args=(gener, the_queue))
+        producers.append(p)
 
-    producers = [p1, p2, p4, p5, p6, p3]
+    st = time.time()
     # consumer
     t1 = Thread(target=_data_consumer, args=(the_queue, output_path))
 
     for p in producers:
         p.start()
+
     t1.start()
+
     for p in producers:
         p.join()
     the_queue.put(None)
