@@ -189,9 +189,9 @@ class _BaseStore:
 
         """
 
-
         self.path = path
         self.env = None
+
     def __enter__(self):
         self.env = lmdb.open(str(self.path))
         return self.env
@@ -254,16 +254,22 @@ class _BaseStore:
                         flags.append(v in record)
             elif k in start_kws:
                 if v is not None:
-                    if isinstance(v, (tuple, list, set)):
-                        flags.append(any(x == record.start() for x in v))
-                    else:
-                        flags.append(v == record.start())
+                    try:
+                        if isinstance(v, (tuple, list, set)):
+                            flags.append(any(x == record.start() for x in v))
+                        else:
+                            flags.append(v == record.start())
+                    except TripOrderError:
+                        pass
             elif k in end_kws:
                 if v is not None:
-                    if isinstance(v, (tuple, list, set)):
-                        flags.append(any(x == record.end() for x in v))
-                    else:
-                        flags.append(v == record.end())
+                    try:
+                        if isinstance(v, (tuple, list, set)):
+                            flags.append(any(x == record.end() for x in v))
+                        else:
+                            flags.append(v == record.end())
+                    except TripOrderError:
+                        pass
             else:
                 raise ValueError(f"argument {k} not recognised")
 
