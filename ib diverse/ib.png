@@ -1,0 +1,53 @@
+digraph G {
+	graph [bb="0,0,87,34.5",
+		nodesep=.1,
+		rankdir=LR,
+		ranksep=.1
+	];
+	node [height=.1,
+		label="\N",
+		penwidth=0.5,
+		shape=box,
+		width=.1
+	];
+	{
+		graph [rank=same];
+		node2391029338416		 [color="#444443",
+			fillcolor="#D9E6F5",
+			fontcolor="#444443",
+			fontname=Helvetica,
+			height=0.47222,
+			label=<<table BORDER="0" CELLPADDING="0" CELLBORDER="1" CELLSPACING="0">
+<tr><td cellspacing="0" colspan="3" cellpadding="0" bgcolor="#D9E6F5" border="1" sides="b" align="center"><font color="#444443" FACE="Times-Italic" point-size="11">globals</font></td></tr>
+<tr><td colspan="3" cellpadding="1" border="0" bgcolor="#D9E6F5"></td></tr><tr><td port="A_label" cellspacing="0" cellpadding="0" bgcolor="#D9E6F5" border="1" sides="r" align="right"><font face="Helvetica" color="#444443" point-size="11">A </font></td>
+<td cellspacing="0" cellpadding="0" border="0"></td><td port="A" cellspacing="0" cellpadding="1" bgcolor="#D9E6F5" border="0" align="left"><font color="#444443" point-size="11">    </font></td>
+</tr>
+</table>
+>,
+			margin=0.03,
+			pos="20.5,17.5",
+			style=filled,
+			width=0.56944];
+	}
+	node2391057876112	 [fontcolor="#444443",
+		fontname=Helvetica,
+		height=0.26389,
+		label=<<table BORDER="0" CELLPADDING="0" CELLBORDER="1" CELLSPACING="0">
+<tr><td cellspacing="0" cellpadding="3" bgcolor="#fefecd" border="0" align="center"><font color="#444443" point-size="10">1</font></td>
+<td cellspacing="0" cellpadding="3" bgcolor="#fefecd" border="0" align="center"><font color="#444443" point-size="10">3</font></td>
+<td cellspacing="0" cellpadding="3" bgcolor="#fefecd" border="0" align="center"><font color="#444443" point-size="10">5</font></td>
+</tr>
+</table>
+>,
+		margin=0.01,
+		pos="68,9.5",
+		space=0.0,
+		width=0.52778];
+	node2391029338416:A:c -> node2391057876112	 [arrowsize=.4,
+		arrowtail=dot,
+		color="#444443",
+		dir=both,
+		penwidth=0.5,
+		pos="s,31.5,9.5 e,48.834,9.5 34.932,9.5 37.309,9.5 40.701,9.5 44.398,9.5",
+		tailclip=false];
+}
