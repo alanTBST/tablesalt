@@ -8,12 +8,12 @@ import ast
 import glob
 import json
 import os
-import pkg_resources
 import pickle
+import pkg_resources
 from itertools import chain
 from operator import itemgetter
 from pathlib import Path
-from typing import Dict, List, Tuple, TypedDict, Union
+from typing import Any, Dict, List, Set, Tuple, TypedDict, Union
 
 import msgpack
 import pandas as pd
@@ -61,7 +61,7 @@ class RegionDict(TypedDict, total=False):
 
 STICKET_DICT = Dict[Tuple[int, int], ShareDict]
 PAID_DICT = Dict[int, ShareDict]
-SINGLE_DICT = Dict[str, Dict[str, Union]]
+SINGLE_DICT = Dict[str, Dict[str, Union[RegionDict, STICKET_DICT, PAID_DICT]]]
 
 def _proc_sales(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
     """process the sales dataframe"""
@@ -89,9 +89,8 @@ def _load_sales_data(year: int) -> pd.core.frame.DataFrame:
 
     return _proc_sales(df)
 
-def _get_single_results(year: int,  model: int):
-    """load the single tickets results from the result cache
-    """
+def _get_single_results(year: int,  model: int) -> SINGLE_DICT:
+    """load the single tickets results from the result cache"""
     fp = THIS_DIR / '__result_cache__'/ f'{year}' / 'preprocessed'
 
     singles = list(fp.glob('single_results*'))
@@ -105,9 +104,12 @@ def _get_single_results(year: int,  model: int):
 
     return out
 
-def _sales_ref(frame: pd.core.frame.DataFrame) -> Dict[str, Tuple[int, ...]]:
-    products = set(frame.loc[:, 'produktnavn'])
+IDXS = Dict[str, Tuple[int, ...]]
 
+def _sales_ref(frame: pd.core.frame.DataFrame) -> IDXS:
+    """get the sales NR values for each product name"""
+
+    products = set(frame.loc[:, 'produktnavn'])
     sales_idxs = {}
 
     for prod in products:
@@ -119,10 +121,10 @@ def _sales_ref(frame: pd.core.frame.DataFrame) -> Dict[str, Tuple[int, ...]]:
 
 def _location_ref(
         frame: pd.core.frame.DataFrame
-        ) -> Dict[str, Tuple[int, ...]]:
+        ) -> IDXS:
+    """get the sales NR values for each type of sales equipment"""
 
     sources = set(frame.loc[:, 'salgsmedie'])
-
     location_idxs = {}
 
     for src in sources:
@@ -133,14 +135,18 @@ def _location_ref(
     return location_idxs
 
 
-def _get_location_sales(location_idxs, sales_idxs):
+def _get_location_sales(
+    location_idxs: IDXS,
+    sales_idxs: IDXS
+    ) -> Dict[str, Set[int]]:
+    """get the sales NR for each sales type of sales equipment designated
+    as a starting location"""
 
     wanted_start_locations = {
         k: v for k, v in location_idxs.items() if k in LOCATIONS
         }
 
     single = set()
-
     for name in SINGLE_IDS:
         try:
             single.update(set(sales_idxs[name]))
@@ -152,8 +158,11 @@ def _get_location_sales(location_idxs, sales_idxs):
 
     return location_sales
 
-def _get_location_results(location: str, results):
-
+def _get_location_results(
+    location: str,
+    results: SINGLE_DICT
+    ) -> SINGLE_DICT:
+    """subset the results for the given sales location"""
 
     operator = LOCATIONS[location]
     result_keys = set(RESULT_MAP[operator])
@@ -165,20 +174,24 @@ def _get_location_results(location: str, results):
 
     return res_dict
 
-def _method_resolution_operator(res, length):
-
+def _method_resolution_operator(
+    results: SINGLE_DICT,
+    ticket_length: str
+    ) -> List[Tuple[str, str, str]]:
+    """create the method resolution order for
+    single tickets with starting operator reqquirement"""
 
     mro = []
     any_start = []
     paid = []
     paid_any = []
 
-    for k, v in res.items():
-        if length == 'short':
+    for k, v in results.items():
+        if ticket_length == 'short':
             start_op = [(k, x, 'short_ring') for x in v if x != 'all']
             start_any = [(k, x, 'short_ring')for x in v if x == 'all']
 
-        if length == 'long':
+        if ticket_length == 'long':
             start_op = [(k, x, 'long') for x in v if x != 'all'] + \
                 [(k, x, 'long')for x in v if x == 'all']
 
@@ -193,14 +206,18 @@ def _method_resolution_operator(res, length):
         paid.extend(start_op_paid)
         paid_any.extend(start_any_paid)
 
-    if length == 'long':
+    if ticket_length == 'long':
         mro = sorted(mro, key=itemgetter(1, 0))
     mro = mro + any_start + paid + paid_any
     # if any(any(x == 'dr_byen' for x in y) for y in mro):
     #     mro = [x for x in mro if any(y == 'dr_byen' for y in x)]
     return mro
 
-def _filter_mro(record, mro):
+def _filter_mro(
+    record: Tuple[Any, ...],
+    mro: List[Tuple[str, str, str]]
+    ) -> List[Tuple[str, str, str]]:
+    """filter out the specific takst starting operators for movia"""
 
     if record.takstsæt == 'th':
         mro = [x for x in mro if 'Movia_S' not in x and 'Movia_V' not in x]
@@ -213,14 +230,13 @@ def _filter_mro(record, mro):
 
 
 def _join_note(notelist: List[str]) -> str:
-
+    """join the list of notes to form a string"""
     return ''.join(
         ('_'.join(j) + r'->' if i!=len(notelist)-1 else '_'.join(j)
-         for i, j in enumerate(notelist)
-         )
+         for i, j in enumerate(notelist))
         )
 
-def _resolve_tickets(record):
+def _resolve_tickets(record: Tuple[Any, ...]) -> Tuple[Tuple[int, int], Tuple[int, int]]:
 
     startzone = record.startzone
     paid_zones = record.betaltezoner
@@ -239,26 +255,25 @@ def _resolve_tickets(record):
     except ValueError:
         endzone = 0 # endzone not needed
 
-
     paid_zones = int(paid_zones)
 
     ring_ticket = startzone, paid_zones
-    ft_ticket = startzone, endzone
-    return ring_ticket, ft_ticket
+    from_to_ticket = startzone, endzone
+    return ring_ticket, from_to_ticket
 
 def _match_single_operator(record, res, mro, trip_threshhold):
 
 
     mro = _filter_mro(record, mro)
-    ring_ticket, ft_ticket = _resolve_tickets(record)
+    ring_ticket, from_to_ticket = _resolve_tickets(record)
 
-    if '1001/1003' in ring_ticket or '1001/1003' in ft_ticket:
+    if '1001/1003' in ring_ticket or '1001/1003' in from_to_ticket:
         mro_dr = [x for x in mro if any(y == 'dr_byen' for y in x)]
         mro_other = [x for x in mro if x not in mro_dr]
         mro = mro_dr + mro_other
 
         ring_ticket = int(ring_ticket[0][:4]), ring_ticket[1]
-        ft_ticket = int(ft_ticket[0][:4]), ft_ticket[1]
+        from_to_ticket = int(from_to_ticket[0][:4]), from_to_ticket[1]
 
     note = []
     for method in mro:
@@ -271,7 +286,7 @@ def _match_single_operator(record, res, mro, trip_threshhold):
         if 'short_ring' in method or 'long_ring' in method:
             r = d.get(ring_ticket, {})
         elif 'long' in method:
-            r = d.get(ft_ticket, {})
+            r = d.get(from_to_ticket, {})
         else:
             r = d.get(ring_ticket[1], {})
 
