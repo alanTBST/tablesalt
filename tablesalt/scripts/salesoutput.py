@@ -13,7 +13,7 @@ import pickle
 from itertools import chain
 from operator import itemgetter
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, TypedDict, Union
 
 import msgpack
 import pandas as pd
@@ -23,7 +23,7 @@ from tablesalt.preprocessing.parsing import TableArgParser
 THIS_DIR = Path(__file__).parent
 
 def _load_outconfig():
-
+    """load the configuration for sales output"""
     fp = THIS_DIR / 'salesoutconfig.json'
     with open(fp, 'r') as f:
         config = json.load(f)
@@ -44,7 +44,27 @@ RESULT_MAP = {
     'movia': ('Movia_H', 'Movia_S', 'Movia_V')
     }
 
-def _proc_sales(frame):
+# for type checking
+class ShareDict(TypedDict, total=False):
+    dsb: float
+    first: float
+    movia: float
+    stog: float
+    n_trips: int
+    metro: float
+
+class RegionDict(TypedDict, total=False):
+    tv: ShareDict
+    ts: ShareDict
+    dsb: ShareDict
+    th: ShareDict
+
+STICKET_DICT = Dict[Tuple[int, int], ShareDict]
+PAID_DICT = Dict[int, ShareDict]
+SINGLE_DICT = Dict[str, Dict[str, Union]]
+
+def _proc_sales(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
+    """process the sales dataframe"""
 
     frame.loc[:, 'valgtezoner'] = frame.loc[:, 'valgtezoner'].apply(
         lambda x: tuple(sorted(ast.literal_eval(x)))
@@ -59,6 +79,7 @@ def _proc_sales(frame):
 
 
 def _load_sales_data(year: int) -> pd.core.frame.DataFrame:
+    """load and process the merged sales data csv"""
 
     fp = (THIS_DIR / '__result_cache__' /
           f'{year}' / 'preprocessed' /
@@ -69,21 +90,15 @@ def _load_sales_data(year: int) -> pd.core.frame.DataFrame:
     return _proc_sales(df)
 
 def _get_single_results(year: int,  model: int):
-
-
+    """load the single tickets results from the result cache
+    """
     fp = THIS_DIR / '__result_cache__'/ f'{year}' / 'preprocessed'
 
     singles = list(fp.glob('single_results*'))
-
     singles = [x for x in singles if f'model_{model}' in x.name]
-
     out = {}
     for i in range(3): # using r0, r1, r2
-
         fmatch = [x for x in singles if f'r{i}' in x.name][0]
-        # times = [os.path.getmtime(x) for x in fmatch]
-        # min_id = np.argmin(times) # find latest entry
-        # fp = fmatch[min_id]
         with open(fmatch, 'rb') as f:
             res = pickle.load(f)
         out[f'rabat{i}'] = res
@@ -139,6 +154,7 @@ def _get_location_sales(location_idxs, sales_idxs):
 
 def _get_location_results(location: str, results):
 
+
     operator = LOCATIONS[location]
     result_keys = set(RESULT_MAP[operator])
     result_keys.add('all')
@@ -150,6 +166,7 @@ def _get_location_results(location: str, results):
     return res_dict
 
 def _method_resolution_operator(res, length):
+
 
     mro = []
     any_start = []
