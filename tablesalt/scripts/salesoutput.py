@@ -15,10 +15,10 @@ from operator import itemgetter
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple, TypedDict, Union
 
-import msgpack
-import pandas as pd
+import msgpack #type: ignore
+import pandas as pd #type: ignore
 
-from tablesalt.preprocessing.parsing import TableArgParser
+from tablesalt.preprocessing.parsing import TableArgParser #type: ignore
 
 THIS_DIR = Path(__file__).parent
 
@@ -236,7 +236,9 @@ def _join_note(notelist: List[str]) -> str:
          for i, j in enumerate(notelist))
         )
 
-def _resolve_tickets(record: Tuple[Any, ...]) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+def _resolve_tickets(
+    record: Tuple[Any, ...]
+    ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
 
     startzone = record.startzone
     paid_zones = record.betaltezoner
@@ -794,7 +796,8 @@ def _other_tickets(
 
     results = _load_other_results(year, model)
     results = results['alltrips']
-
+    small_ids: Set[int]
+    big_ids: Set[int]
     small_ids = set().union(*[set(sales_idxs.get(x, set())) for x in CITY_SMALL])
     big_ids = set().union(*[set(sales_idxs.get(x, set())) for x in CITY_LARGE])
 
