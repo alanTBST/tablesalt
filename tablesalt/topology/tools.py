@@ -23,7 +23,7 @@ import requests  # type: ignore
 import shapely  # type: ignore
 from shapely import wkt  # type: ignore
 from shapely.geometry.linestring import LineString  # type: ignore
-from shapely.geometry.point import Point
+from shapely.geometry.point import Point # type: ignore
 from shapely.geometry.polygon import Polygon  # type: ignore
 from tablesalt.common.io import mappers
 
@@ -123,12 +123,7 @@ class _GTFSloader:
     def __init__(self) -> None:
         """
         Class to load gtfs data
-
-        :return: ''
-        :rtype: None
-
         """
-
 
         self._route_agency = None
         self._route_shapes = None
@@ -141,6 +136,11 @@ class _GTFSloader:
 
     @property
     def agency_ids(self) -> Dict[str, Tuple[int, ...]]:
+        """return the agency -> id mapping
+
+        :return: a dictionary with the agency name as key and it's id as value
+        :rtype: Dict[str, Tuple[int, ...]]
+        """
         if self._agency_ids is None:
             self.load_agency()
         return self._agency_ids
@@ -151,18 +151,34 @@ class _GTFSloader:
 
     @property
     def id_agency(self) -> Dict[int, str]:
+        """return the id -> agency mapping
+
+        :return: a dictionary with the agency id as key and its name as value
+        :rtype: Dict[int, str]
+        """
         if self._id_agency is None:
             self.load_agency()
         return self._id_agency
 
     @property
     def route_agency(self) -> Dict[str, int]:
+        """return the route id -> agency id mapping
+
+        :return: a dictionary with the route id as key and the agency id as values
+        :rtype: Dict[str, int]
+        """
         if self._route_agency is None:
             self.load_routes()
         return self._route_agency
 
     @property
     def route_shapes(self) -> Dict[str, Tuple[int, ...]]:
+        """return the route id -> shapeid mapping
+
+        :return: a dictionary with the route id as keys and a tuple of the
+        corresponding shape ids as values
+        :rtype: Dict[str, Tuple[int, ...]]
+        """
         if self._route_shapes is None:
             trips = self.load_trips()
             self._process_trips(trips)
@@ -170,6 +186,11 @@ class _GTFSloader:
 
     @property
     def shape_lines(self) -> Dict[int, LineString]:
+        """return the shape id -> linestring mapping
+
+        :return: a dictionary with the shape id as key and linestrings values
+        :rtype: Dict[int, LineString]
+        """
         if self._shape_linestrings is None:
             self._process_shapes(
                 self.load_shapes(return_value=True)
@@ -270,6 +291,11 @@ class _GTFSloader:
         self,
         shapes: pd.core.frame.DataFrame
         ) -> None:
+        """create the self._shape_linestrings attribute
+
+        :param shapes: [description]
+        :type shapes: pd.core.frame.DataFrame
+        """
 
         shapes = shapes.sort_values(['shape_id', 'shape_pt_sequence'])
         shapes = shapes.itertuples(name=None, index=False)
@@ -300,6 +326,11 @@ class _GTFSloader:
         self._shape_linestrings = shape_lines
 
     def shapes_to_gdf(self) -> gpd.geodataframe.GeoDataFrame:
+        """convert the
+
+        :return: [description]
+        :rtype: gpd.geodataframe.GeoDataFrame
+        """
 
         route_shapes = self.route_shapes
         rs_frame = pd.DataFrame.from_dict(
@@ -322,13 +353,14 @@ class _GTFSloader:
         filepath: Optional[AnyStr] = None,
         return_value: Optional[bool] = False
         ) -> pd.core.frame.DataFrame:
-        """
-        Load the routes.txt file as a dataframe
+        """Load the routes.txt file as a dataframe
 
-        Returns
-        -------
-        routes : pd.DataFrame
-            A dataframe of the routes.txt data.
+        :param filepath: [description], defaults to None
+        :type filepath: Optional[AnyStr], optional
+        :param return_value: [description], defaults to False
+        :type return_value: Optional[bool], optional
+        :return: [description]
+        :rtype: pd.core.frame.DataFrame
         """
         if filepath is None:
             filepath = self.DEFAULT_GTFS_LOC
@@ -521,7 +553,14 @@ class TakstZones:
         return stops_gdf
 
     @staticmethod
-    def _set_stog_location(df: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
+    def _set_stog_location(stops_df: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
+        """create the data for stog stations ie UIC = 869xxxx
+
+        :param stops_df: dataframe
+        :type stops_df: pd.core.frame.DataFrame
+        :return: stops data
+        :rtype: pd.core.frame.DataFrame
+        """
 
         s_stops = mappers['s_uic']
         corr_s_stops = [x - 90000 for x in s_stops]
@@ -549,12 +588,12 @@ class TakstZones:
         stops = self._set_stog_location(stops)
         zones = self.load_tariffzones(takst=region)
         joined = gpd.sjoin(stops, zones)
-
+        # NOTE: decide on whether border stations should be
         return dict(
             zip(joined.loc[:, 'UIC'],  joined.loc[:, 'natzonenum'])
             )
     @staticmethod
-    def _neighbour_dict(region: str) -> Dict[int, Any]:
+    def neighbour_dict(region: str) -> Dict[int, Any]:
         """Load and convert neighbours dset to dict (adj list)"""
 
         fp = pkg_resources.resource_filename(
@@ -771,7 +810,7 @@ class EdgeMaker(_GTFSloader):
             mode: Optional[str] = None
             ) -> Dict[str, Union[np.ndarray, Dict[int, int]]]:
 
-        neigh_dict = self.zones._neighbour_dict('sjælland') # for now
+        neigh_dict = self.zones.neighbour_dict('sjælland') # for now
         shape_zones, zone_polys = self._shape_proc(mode)
 
         all_shape_edges = {}
