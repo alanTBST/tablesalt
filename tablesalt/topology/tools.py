@@ -23,7 +23,7 @@ import requests  # type: ignore
 import shapely  # type: ignore
 from shapely import wkt  # type: ignore
 from shapely.geometry.linestring import LineString  # type: ignore
-from shapely.geometry.point import Point
+from shapely.geometry.point import Point # type: ignore
 from shapely.geometry.polygon import Polygon  # type: ignore
 from tablesalt.common.io import mappers
 
@@ -123,12 +123,7 @@ class _GTFSloader:
     def __init__(self) -> None:
         """
         Class to load gtfs data
-
-        :return: ''
-        :rtype: None
-
         """
-
 
         self._route_agency = None
         self._route_shapes = None
@@ -141,6 +136,11 @@ class _GTFSloader:
 
     @property
     def agency_ids(self) -> Dict[str, Tuple[int, ...]]:
+        """return the agency -> id mapping
+
+        :return: a dictionary with the agency name as key and it's id as value
+        :rtype: Dict[str, Tuple[int, ...]]
+        """
         if self._agency_ids is None:
             self.load_agency()
         return self._agency_ids
@@ -151,18 +151,34 @@ class _GTFSloader:
 
     @property
     def id_agency(self) -> Dict[int, str]:
+        """return the id -> agency mapping
+
+        :return: a dictionary with the agency id as key and its name as value
+        :rtype: Dict[int, str]
+        """
         if self._id_agency is None:
             self.load_agency()
         return self._id_agency
 
     @property
     def route_agency(self) -> Dict[str, int]:
+        """return the route id -> agency id mapping
+
+        :return: a dictionary with the route id as key and the agency id as values
+        :rtype: Dict[str, int]
+        """
         if self._route_agency is None:
             self.load_routes()
         return self._route_agency
 
     @property
     def route_shapes(self) -> Dict[str, Tuple[int, ...]]:
+        """return the route id -> shapeid mapping
+
+        :return: a dictionary with the route id as keys and a tuple of the
+        corresponding shape ids as values
+        :rtype: Dict[str, Tuple[int, ...]]
+        """
         if self._route_shapes is None:
             trips = self.load_trips()
             self._process_trips(trips)
@@ -170,6 +186,11 @@ class _GTFSloader:
 
     @property
     def shape_lines(self) -> Dict[int, LineString]:
+        """return the shape id -> linestring mapping
+
+        :return: a dictionary with the shape id as key and linestrings values
+        :rtype: Dict[int, LineString]
+        """
         if self._shape_linestrings is None:
             self._process_shapes(
                 self.load_shapes(return_value=True)
@@ -270,6 +291,11 @@ class _GTFSloader:
         self,
         shapes: pd.core.frame.DataFrame
         ) -> None:
+        """create the self._shape_linestrings attribute
+
+        :param shapes: [description]
+        :type shapes: pd.core.frame.DataFrame
+        """
 
         shapes = shapes.sort_values(['shape_id', 'shape_pt_sequence'])
         shapes = shapes.itertuples(name=None, index=False)
@@ -300,6 +326,11 @@ class _GTFSloader:
         self._shape_linestrings = shape_lines
 
     def shapes_to_gdf(self) -> gpd.geodataframe.GeoDataFrame:
+        """convert the
+
+        :return: [description]
+        :rtype: gpd.geodataframe.GeoDataFrame
+        """
 
         route_shapes = self.route_shapes
         rs_frame = pd.DataFrame.from_dict(
@@ -322,13 +353,14 @@ class _GTFSloader:
         filepath: Optional[AnyStr] = None,
         return_value: Optional[bool] = False
         ) -> pd.core.frame.DataFrame:
-        """
-        Load the routes.txt file as a dataframe
+        """Load the routes.txt file as a dataframe
 
-        Returns
-        -------
-        routes : pd.DataFrame
-            A dataframe of the routes.txt data.
+        :param filepath: [description], defaults to None
+        :type filepath: Optional[AnyStr], optional
+        :param return_value: [description], defaults to False
+        :type return_value: Optional[bool], optional
+        :return: [description]
+        :rtype: pd.core.frame.DataFrame
         """
         if filepath is None:
             filepath = self.DEFAULT_GTFS_LOC
@@ -521,7 +553,14 @@ class TakstZones:
         return stops_gdf
 
     @staticmethod
-    def _set_stog_location(df: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
+    def _set_stog_location(stops_df: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
+        """create the data for stog stations ie UIC = 869xxxx
+
+        :param stops_df: dataframe
+        :type stops_df: pd.core.frame.DataFrame
+        :return: stops data
+        :rtype: pd.core.frame.DataFrame
+        """
 
         s_stops = mappers['s_uic']
         corr_s_stops = [x - 90000 for x in s_stops]
@@ -549,12 +588,12 @@ class TakstZones:
         stops = self._set_stog_location(stops)
         zones = self.load_tariffzones(takst=region)
         joined = gpd.sjoin(stops, zones)
-
+        # NOTE: decide on whether border stations should be
         return dict(
             zip(joined.loc[:, 'UIC'],  joined.loc[:, 'natzonenum'])
             )
     @staticmethod
-    def _neighbour_dict(region: str) -> Dict[int, Any]:
+    def neighbour_dict(region: str) -> Dict[int, Any]:
         """Load and convert neighbours dset to dict (adj list)"""
 
         fp = pkg_resources.resource_filename(
@@ -771,7 +810,7 @@ class EdgeMaker(_GTFSloader):
             mode: Optional[str] = None
             ) -> Dict[str, Union[np.ndarray, Dict[int, int]]]:
 
-        neigh_dict = self.zones._neighbour_dict('sjælland') # for now
+        neigh_dict = self.zones.neighbour_dict('sjælland') # for now
         shape_zones, zone_polys = self._shape_proc(mode)
 
         all_shape_edges = {}
@@ -801,172 +840,3 @@ class EdgeMaker(_GTFSloader):
         all_edges = set.union(*all_shape_edges.values())
 
         return self._edges_to_array(all_edges)
-
-
-# def create_stops_spatial_table(stops_df, schema='Rejseplanen'):
-#     """
-#     Make a spatial table in MS SQL Server for rplan stops.
-
-#     Parameters
-#     ----------
-#     stops_df : pandas.DataFrame
-#         DESCRIPTION.
-
-#     Returns
-#     -------
-#     badqs : list
-#         a list of the records that could not be created
-#         in the data warehouse
-
-#     """
-#     createquery = (
-#         f"CREATE TABLE [{schema}].[StoppeSteder] ("
-#         "uic int, station nvarchar(50), lat_utm32N int, "
-#         "long_utm32N int, "
-#         "geom geography"
-#         ")"
-#         )
-
-#     tups = stops_df.loc[:, (
-#         'UIC', 'Name', 'lat_utm32N',
-#         'long_utm32N', 'geometry'
-#         )]
-
-#     tups.loc[:, 'geometry'] = \
-#         tups.loc[:, 'geometry'].apply(
-#             lambda x: f"geography::STGeomFromText('{x.to_wkt()}', 32632)"
-#             )
-#     tups = tups.itertuples(name=None, index=False)
-#     qry = insert_query('Rejseplanen', 'stops', 5)
-
-#     badqs = []
-#     with make_connection() as con:
-#         cursor = con.cursor()
-#         try:
-#             cursor.execute(createquery)
-#             con.commit()
-#         except:
-#             pass
-#         for tup in tups:
-#             try:
-#                 cursor.execute(qry, tup)
-#             except Exception:
-#                 badqs.append(tup)
-#         con.commit()
-#         cursor.close()
-#     return badqs
-
-
-# def create_zonemap_table(mapdf, schema='Rejseplanen'):
-#     """
-#     Make zonemap table in MS SQL Server.
-
-#     Parameters
-#     ----------
-#     mapdf : pandas.DataFrame
-#         DESCRIPTION.
-#     schema : str, optional
-#         the db schema to use.
-#         The default is 'Rejseplanen'.
-
-#     Returns
-#     -------
-#     None.
-
-#     """
-#     createquery = (
-#         f"CREATE TABLE [{schema}].[stopzonemap] ("
-#         "uic int, natzonenum int)"
-#         )
-#     tups = mapdf.itertuples(index=False, name=None)
-
-#     with make_connection() as con:
-#         cursor = con.cursor()
-#         cursor.execute(createquery)
-#         con.commit()
-#         # cursor.commit()
-#         cursor.executemany(
-#             f"INSERT INTO [{schema}].[stopzonemap] VALUES (?, ?)",
-#             tups
-#             )
-#         con.commit()
-#         cursor.close()
-
-
-# def create_zones_spatial_table(tzones_df, schema='Rejseplanen'):
-#     """
-#     Create the tariff zones spatial table in MS SQL Server.
-
-#     Parameters
-#     ----------
-#     tzones_df : geopandas.GeoDataFrame
-#         geodataframe of the national tariff zones.
-#     schema : str, optional
-#         the schema to save the table in.
-#         The default is 'Rejseplanen'.
-
-#     Returns
-#     -------
-#     None.
-
-#     """
-#     createquery = (f"CREATE TABLE [{schema}].[zones] ("
-#                    "operator_id int, natzonenum int, "
-#                    "geom geography)")
-#     with make_connection() as con:
-#         cursor = con.cursor()
-#         cursor.execute(createquery)
-#         con.commit()
-
-#     tups = tzones_df.loc[:, (
-#         'operator', 'natzonenum',
-#         'geom_transformed'
-#         )]
-
-#     tups.loc[:, 'ismulti'] = \
-#         tups.loc[:, 'geom_transformed'].apply(
-#             lambda x: isinstance(x, MultiPolygon))
-#     multipoly = tups.loc[tups.loc[:, 'ismulti'] is True]
-#     poly = tups.loc[tups.loc[:, 'ismulti'] is False]
-#     multipoly = multipoly.drop('ismulti', axis=1)
-#     poly = poly.drop('ismulti', axis=1)
-
-#     poly.loc[:, 'geom_transformed'] = \
-#         poly.loc[:, 'geom_transformed'].apply(
-#             lambda x: f"geography::STPolyFromText('{x.to_wkt()}', 32632)")
-
-#     multipoly.loc[:, 'geom_transformed'] = \
-#         multipoly.loc[:, 'geom_transformed'].apply(
-#             lambda x: f"geography::STMPolyFromText('{x.to_wkt()}', 32632)")
-
-#     poly_tups = poly.itertuples(name=None, index=False)
-#     multipoly_tups = multipoly.itertuples(name=None, index=False)
-
-#     # qry = _insert_query(schema, 'tariff_zones', 3)
-#     qry = lambda x: (
-#         f"INSERT INTO [{schema}].[tariff_zones] "
-#         f"VALUES ({x[0]}, '{x[1]}', {x[2]})"
-#         )
-
-#     badqs = []
-#     with make_connection() as con:
-#         cursor = con.cursor()
-#         for tup in poly_tups:
-#             try:
-#                 cursor.execute(qry(tup))
-#             except Exception:
-#                 badqs.append((tup, qry(tup)))
-#         con.commit()
-#         cursor.close()
-
-#     with make_connection() as con:
-#         cursor = con.cursor()
-#         for tup in multipoly_tups:
-#             try:
-#                 cursor.execute(qry(tup))
-#             except Exception:
-#                 badqs.append((tup, qry(tup)))
-#         con.commit()
-#         cursor.close()
-
-#     return badqs
