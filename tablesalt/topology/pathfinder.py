@@ -20,7 +20,7 @@ import pkg_resources
 
 import pandas as pd  #type: ignore
 import numpy as np  #type: ignore
-from networkx.classes.graph import Graph
+from networkx.classes.graph import Graph #type: ignore
 
 from tablesalt.common import triptools
 from tablesalt.common.io import mappers
@@ -38,7 +38,7 @@ CO_TR = (rev_model_dict['Co'], rev_model_dict['Tr'])
 
 
 COMPANY_FACTOR: int = 1
-# TODO load from config
+#TODO load from config
 SOLO_ZONE_PRIS = {
     'th': {
         'dsb': 6.38,
@@ -75,6 +75,14 @@ SOLO_ZONE_PRIS = {
     }
 
 def _determine_region(zone_sequence: Tuple[int, ...]) -> str:
+    """return a string representation of the region given a sequence
+    of zone numbers
+
+    :param zone_sequence: a sequence of zones
+    :type zone_sequence: Tuple[int, ...]
+    :return: a contraction of the region/takstsæt
+    :rtype: str
+    """
 
     if all(x < 1100 for x in zone_sequence):
         return "th"
@@ -86,7 +94,7 @@ def _determine_region(zone_sequence: Tuple[int, ...]) -> str:
 
 
 def load_border_stations() -> Dict[int, Tuple[int, ...]]: # put this in TBSTtopology
-    "load the border stations dataset from package"
+    "load the border stations dataset from package resources"
     fp = pkg_resources.resource_filename(
         'tablesalt',
         'resources/revenue/borderstations.xlsx'
@@ -112,19 +120,37 @@ BORDER_STATIONS = load_border_stations()
 @lru_cache(2**16)
 def _is_bus(stopid: int) -> bool:
 
-
     return (stopid > stationoperators.MAX_RAIL_UIC or
             stopid < stationoperators.MIN_RAIL_UIC)
 
 @lru_cache(2**16)
-def impute_leg(g: Graph, zone_leg: Tuple[int, int]):
+def impute_leg(g: Graph, zone_leg: Tuple[int, int]) -> Tuple[int, ...]:
+    """fill in the total zone path of a zone leg
 
+    :param g: a networkx graph
+    :type g: Graph
+    :param zone_leg: a tuple of the zone leg eg (1001, 1004)
+    :type zone_leg: Tuple[int, int]
+    :return: a filled in zone path
+    :rtype: Tuple[int, ...]
+    """
 
     return g.shortest_path(*zone_leg)[0]
 
 @lru_cache(2**16)
-def impute_zone_legs(g: Graph, trip_zone_legs):
+def impute_zone_legs(
+    g: Graph,
+    trip_zone_legs: Tuple[Tuple[int, int], ...]
+    ) ->  Tuple[Tuple[int, ...], ...]:
+    """fill in the paths of the trip zone legs
 
+    :param g: a networkx graph
+    :type g: Graph
+    :param trip_zone_legs: tuple of zone leg tuples eg ((1001, 1004), (1004,1001))
+    :type trip_zone_legs: Tuple[Tuple[int, int], ...]
+    :return: a tuple of filled in zone paths
+    :rtype: Tuple[Tuple[int, ...], ...]
+    """
     return tuple(impute_leg(g, leg)
                  for leg in trip_zone_legs)
 
@@ -148,11 +174,18 @@ def get_touched_zones(zone_sequence: Tuple[int, ...]) -> Tuple[int, ...]:
 
 @lru_cache(2**16)
 def to_legs(sequence: Tuple[int, ...]) ->Tuple[int, ...]:
+    """convert a tuple to leg form
 
+    :param sequence: a tuple of zones, stops, etc
+    :type sequence: Tuple[int, ...]
+    :return: the legified form
+    :rtype: Tuple[int, ...]
+    """
     return triptools.sep_legs(sequence)
 
 @lru_cache(2**16)
 def _to_legs_stops(stop_legs):
+    """convert to legs and map the bus id to station if possible"""
     return tuple(
             (leg[0], OPGETTER.BUS_ID_MAP.get(leg[1])) if
             (not _is_bus(leg[0]) and _is_bus(leg[1])) else leg
@@ -161,7 +194,7 @@ def _to_legs_stops(stop_legs):
 
 @lru_cache(2**16)
 def _chain_vals(vals):
-
+    """chain zones together for legs removing duplicates at end"""
     lvals = len(vals)
     visited_zones = tuple(
         chain(*[j[:-1] if i != lvals - 1 else j
@@ -274,6 +307,11 @@ class ZoneProperties():
 
 
     def _borderless_properties(self) -> Dict[str, Any]:
+        """get the properties if the trip does not touch a border station
+
+        :return: a dictionary of properties
+        :rtype: Dict[str, Any]
+        """
 
         visited_zones = self.get_visited_zones(self.touched_zone_legs)
 
@@ -306,6 +344,8 @@ class ZoneProperties():
 
 
     def _bordered_properties(self):
+        """get the properties of the trip if it touches a border station
+        """
 
         zone_legs = []
         for legnr, zone_leg in enumerate(self.zone_legs):
@@ -356,17 +396,13 @@ class ZoneProperties():
 
         return self._bordered_properties()
 
-
-
 def _remove_idxs(idxs, legs):
-
+    """remove an item from a sequence of legs"""
 
     return tuple(j for i, j in enumerate(legs) if i not in idxs)
 
 def legops(new_legs):
-    """
-    just legify the output from determin_operator
-    """
+    """just legify the output from determin_operator"""
 
     out = []
     for x in new_legs:
@@ -382,8 +418,7 @@ def operators_in_touched_(
         oplegs: Tuple[Tuple[int, ...]]
         ) -> Dict[int, Tuple[int, ...]]:
     """
-    determine the operators in the zones that are touched
-    returns a dictionary:
+    determine the operators in the zones that are touched by the user
 
     :param tzones: a tuple of the zones touched by a rejsekort tap on a trip
     :type tzones: Tuple[int, ...]
@@ -443,25 +478,20 @@ class ZoneSharer(ZoneProperties):
             operator_sequence: Tuple[int, ...],
             usage_sequence: Tuple[int, ...]
             ) -> None:
-        """
-        Main class to determine the zone shares for each operator
+        """Main class to determine the zone shares for each operator
         on a trip.
 
-        Parameters
-        ----------
-        graph : ZoneGraph
-            the zonegraph that is created from the shapes.txt and
-            takst zones polygons.
-        zone_sequence : Tuple[int, ...]
-            a tuple of zone numbers from the delrejser data.
-        stop_sequence : Tuple[int, ...]
-            a tuple of stop ids from the delrejser data.
-        operator_sequence : Tuple[int, ...]
-            a tuple of operator ids corr. to the operator names.
-        usage_sequence : Tuple[int, ...]
-            a tuple of model ids .
-
-
+        :param graph: the zonegraph that is created from the shapes.txt and
+            takst zones polygons
+        :type graph: ZoneGraph
+        :param zone_sequence: a tuple of zone numbers from the delrejser data
+        :type zone_sequence: Tuple[int, ...]
+        :param stop_sequence: a tuple of stop ids from the delrejser data
+        :type stop_sequence: Tuple[int, ...]
+        :param operator_sequence: a tuple of operator ids corr. to the operator names
+        :type operator_sequence: Tuple[int, ...]
+        :param usage_sequence: a tuple of model ids
+        :type usage_sequence: Tuple[int, ...]
         """
 
         super().__init__(graph, zone_sequence, stop_sequence)
@@ -479,10 +509,13 @@ class ZoneSharer(ZoneProperties):
 
 
     def _is_single(self) -> bool:
-
+        """has only one operator"""
         return len(set(chain(*self.operator_legs))) == 1
 
     def _remove_cotr(self) -> None:
+        """remove all of the legs that are cotr touches
+        for each relevant attribute
+        """
 
         if CO_TR not in self.usage_legs:
             return
@@ -497,6 +530,7 @@ class ZoneSharer(ZoneProperties):
         self.usage_legs = _remove_idxs(cotr_idxs, self.usage_legs)
 
     def _station_operators(self):
+        """get the operators at the visited stations"""
 
         oplegs = tuple(
             OPGETTER.station_pair(*x, format='operator_id')
@@ -506,6 +540,7 @@ class ZoneSharer(ZoneProperties):
         return oplegs
 
     def _share_single(self, val):
+        """assign the single operator the zones"""
         shares = (
             self.property_dict()['total_travelled_zones'],
             OP_MAP[self.operator_sequence[0]]
@@ -513,35 +548,21 @@ class ZoneSharer(ZoneProperties):
         self.SHARE_CACHE[val] = shares
         return shares
 
-    def share_calculation(self, val: Dict[str, Any]):
+    def share_calculation(
+        self,
+        val: Dict[str, Any]
+        ) -> Union[Tuple[int, str], Tuple[Tuple[int, str], ...]]:
         """
         Calculate the zone shares for the operators on the trip
 
         :param val: property_dict from ZoneProperties
         :type val: Dict[str, Any]
-        :return: DESCRIPTION
-        :rtype: TYPE
-
-        """
-
-
-        """
-        Calculate the zone shares for the operators on the trip
-
-        Parameters
-        ----------
-        val : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        TYPE
-            DESCRIPTION.
+        :return: the zone shares for the trip
+        :rtype: Union[Tuple[int, str], Tuple[Tuple[int, str], ...]]
 
         """
 
         out = {}
-        # zone_counts = Counter(val['visited_zones'])
 
         for i, imputed_leg in enumerate(val['imputed_zone_legs']):
             for zone in imputed_leg:
@@ -550,7 +571,6 @@ class ZoneSharer(ZoneProperties):
                         out[zone] = 1, self.operator_legs[i][0]
                     else:
                         counts = Counter(val['ops_in_touched'][zone])
-
                         try:
                             out[zone] = tuple((v/val['nlegs_in_touched'][zone], k) for
                                               k, v in counts.items())
@@ -563,6 +583,9 @@ class ZoneSharer(ZoneProperties):
 
     @staticmethod
     def _standardise(share):
+        """remove the takstsæt from movia operators
+            eg 'movia_h' -> 'movia'
+        """
 
         if isinstance(share[0], int):
             # removes _h, _s, _v from Movia_H, ...
@@ -575,15 +598,11 @@ class ZoneSharer(ZoneProperties):
     def share(self):
         """
         Share the zone work between the operators on the trip
-
-        :return: DESCRIPTION
-        :rtype: TYPE
-
         """
-
-
         val = tuple(
-            (self.stop_sequence, self.operator_sequence, self.usage_sequence)
+            (self.stop_sequence,
+            self.operator_sequence,
+            self.usage_sequence)
             )
         try:
             return self._standardise(self.SHARE_CACHE[val])
@@ -638,6 +657,7 @@ class ZoneSharer(ZoneProperties):
 
     @staticmethod
     def _weight_solo(share_tuple, solo_price_map):
+        """weight the shares by the solo zoner pris"""
 
         if not isinstance(share_tuple[0], tuple):
             share_tuple = (share_tuple, )
@@ -667,7 +687,7 @@ class ZoneSharer(ZoneProperties):
         return weighted_solo
 
     def solo_zone_price(self):
-
+        """return the shares weighted by solo zone price"""
         shares = self.share()
 
         solo_prices = SOLO_ZONE_PRIS[self.region]
@@ -676,38 +696,3 @@ class ZoneSharer(ZoneProperties):
             return self._standardise(self._weight_solo(shares, solo_prices))
         except TypeError:
             return shares
-
-def shrink_search(graph, start, goal, ringzones, distance_buffer=2):
-    """
-    subset the graph based on a given distance_buffer of zones
-    Not used yet
-
-    parameters
-    -----------
-    graph:
-        a networkx graph of zones
-    start:
-        the start zone in national format
-    goal:
-        the desired end zone in national format
-    ringzones:
-        the ringzone dictionary
-    distance_buffer:
-        a number of zones to buffer around the search path
-        int
-        default=2
-
-
-    """
-
-    distance = ringzones[(start, goal)]
-    distance += distance_buffer
-    sub_rings = {k:v for k, v in ringzones.items()
-                 if k[0] == start and v <= distance}
-    sub_zones = set(chain(*sub_rings.keys()))
-    new_graph = {k:v for k, v in graph.items() if
-                 k in sub_zones}
-    new_graph = {k:set(x for x in v if x in sub_zones) for
-                 k, v in new_graph.items()}
-
-    return new_graph
