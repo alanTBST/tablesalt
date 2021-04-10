@@ -564,9 +564,9 @@ class TakstZones:
 
         s_stops = mappers['s_uic']
         corr_s_stops = [x - 90000 for x in s_stops]
-        corr_stops = df.query("UIC in @corr_s_stops").copy(deep=True)
+        corr_stops = stops_df.query("UIC in @corr_s_stops").copy(deep=True)
         corr_stops.loc[:, 'UIC'] = corr_stops.loc[:, 'UIC'] + 90_000
-        out_frame = pd.concat([df, corr_stops])
+        out_frame = pd.concat([stops_df, corr_stops])
 
         return out_frame
 
