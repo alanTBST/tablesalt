@@ -45,7 +45,7 @@ setup(name='tablesalt',
       install_requires=['pandas', 'shapely', 'lmdb', 'msgpack',
                         'requests', 'pyodbc', 'h5py', 'geopandas',
                         'pyproj', 'setuptools-git', 'networkx',
-                        'xlrd'],
+                        'xlrd',],
       include_package_data=True,
       zip_safe=True)
 
