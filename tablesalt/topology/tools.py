@@ -27,6 +27,7 @@ from shapely.geometry.point import Point # type: ignore
 from shapely.geometry.polygon import Polygon  # type: ignore
 from tablesalt.common.io import mappers
 
+
 FILE_PATH = Union[str, bytes, 'os.PathLike[Any]']
 
 REGIONS = {
@@ -201,7 +202,12 @@ class _GTFSloader:
     def route_linestrings(
         self
         ) -> Dict[int, Tuple[LineString, ...]]:
+        """return the route names and linestrings dictionary
 
+        :return: a dictionary with the route names as keys and a tuple
+            of shapely Linestrings as values
+        :rtype: Dict[int, Tuple[LineString, ...]]
+        """
         if self._route_linestrings is None:
             shape_lines = self.shape_lines
             self._route_linestrings = {
@@ -226,18 +232,19 @@ class _GTFSloader:
         filepath: Optional[AnyStr] = None,
         return_value: Optional[bool] = False
         ) -> Tuple[Dict[int, str], Dict[str, Tuple[int, ...]]]:
-        """
-        Laod and return agency.txt data as a tuple of two
+        """Load and return agency.txt data as a tuple of two
         dictionaries
 
-        Returns
-        -------
-        id_agency : dict
-            agency dict with the agency id as the key and the
-            agency name as the value.
-        agency_id : dict
-            the agency name is the key and the values are tuples
-            of the ids. Some agencies may have more than one id
+
+
+
+        :param filepath: the path to the agency.txt file if not using the default, defaults to None
+        :type filepath: Optional[AnyStr], optional
+        :param return_value: whether to return a value or not, defaults to False
+        :type return_value: Optional[bool], optional
+        :return:{'id_agency': {agency_id: agency_name}
+                {'agency_id': {agency_name: tuple(agency_id}}
+        :rtype: Tuple[Dict[int, str], Dict[str, Tuple[int, ...]]]
         """
         if filepath is None:
             filepath = self.DEFAULT_GTFS_LOC
@@ -270,13 +277,14 @@ class _GTFSloader:
         filepath: Optional[FILE_PATH] = None,
         return_value: Optional[bool] = False
         ) -> pd.core.frame.DataFrame:
-        """
-        Load the shapes.txt file as a dataframe
+        """load the shapes.txt data into a dataframe
 
-        Returns
-        -------
-        pandas.DataFrame
-            A dataframe of the shape.txt data.
+        :param filepath: the path to the  defaults to None
+        :type filepath: Optional[FILE_PATH], optional
+        :param return_value: [description], defaults to False
+        :type return_value: Optional[bool], optional
+        :return: [description]
+        :rtype: pd.core.frame.DataFrame
         """
         if filepath is None:
             filepath = self.DEFAULT_GTFS_LOC
@@ -326,9 +334,9 @@ class _GTFSloader:
         self._shape_linestrings = shape_lines
 
     def shapes_to_gdf(self) -> gpd.geodataframe.GeoDataFrame:
-        """convert the
+        """convert the shapes point data to a geodataframe
 
-        :return: [description]
+        :return: a geopandas geodataframe of the shapes data
         :rtype: gpd.geodataframe.GeoDataFrame
         """
 
@@ -355,11 +363,12 @@ class _GTFSloader:
         ) -> pd.core.frame.DataFrame:
         """Load the routes.txt file as a dataframe
 
-        :param filepath: [description], defaults to None
+        :param filepath: the path to the routes.txt if not using the default,
+            defaults to None
         :type filepath: Optional[AnyStr], optional
-        :param return_value: [description], defaults to False
+        :param return_value: to return data or not, defaults to False
         :type return_value: Optional[bool], optional
-        :return: [description]
+        :return: a dataframe of the routes data
         :rtype: pd.core.frame.DataFrame
         """
         if filepath is None:
@@ -391,7 +400,13 @@ class _GTFSloader:
         self,
         filepath: Optional[AnyStr] = None
         ) -> pd.core.frame.DataFrame:
+        """load the trips.txt data
 
+        :param filepath: path to trips.txt if not using default, defaults to None
+        :type filepath: Optional[AnyStr], optional
+        :return: a trips dataframe
+        :rtype: pd.core.frame.DataFrame
+        """
         if filepath is None:
             filepath = self.DEFAULT_GTFS_LOC
 
@@ -410,7 +425,11 @@ class _GTFSloader:
             self,
             trips: pd.core.frame.DataFrame
             ) -> None:
+        """process the trips dataframe
 
+        :param trips: a dataframe loaded with self.load_trips
+        :type trips: pd.core.frame.DataFrame
+        """
         trips = trips.fillna(0)
         trips = trips.drop_duplicates()
         trips = trips[['route_id', 'shape_id']]
@@ -428,7 +447,13 @@ class _GTFSloader:
         self,
         filepath: Optional[AnyStr] = None
         ) -> pd.core.frame.DataFrame:
+        """load the stoptimes.txt data
 
+        :param filepath: [description], defaults to None
+        :type filepath: Optional[AnyStr], optional
+        :return: [description]
+        :rtype: pd.core.frame.DataFrame
+        """
         if filepath is None:
             filepath = self.DEFAULT_GTFS_LOC
 
@@ -575,7 +600,7 @@ class TakstZones:
         region: Optional[str] = 'sjælland'
         ) -> Dict[int, int]:
         """
-        Return a mapping of stopids to zoneids
+        Return a mapping of stopids to zone ids
 
         :param region: the region to get a map for, defaults to 'sjælland'
         :type region: Optional[str], optional
@@ -588,13 +613,13 @@ class TakstZones:
         stops = self._set_stog_location(stops)
         zones = self.load_tariffzones(takst=region)
         joined = gpd.sjoin(stops, zones)
-        # NOTE: decide on whether border stations should be
+        # NOTE: decide on whether border stations should be added here
         return dict(
             zip(joined.loc[:, 'UIC'],  joined.loc[:, 'natzonenum'])
             )
     @staticmethod
     def neighbour_dict(region: str) -> Dict[int, Any]:
-        """Load and convert neighbours dset to dict (adj list)"""
+        """Load and convert neighbours dset to a dictionary"""
 
         fp = pkg_resources.resource_filename(
             'tablesalt', 'resources/networktopodk/national_neighbours.csv'
@@ -692,7 +717,7 @@ class RejseplanLoader(_GTFSloader):
         return
 
 
-class EdgeMaker(_GTFSloader):
+class EdgeMaker():
 
     def __init__(self) -> None:
         """
@@ -705,16 +730,25 @@ class EdgeMaker(_GTFSloader):
 
         super().__init__()
         self.zones = TakstZones()
+        self.loader = _GTFSloader()
 
     def _shape_proc(
             self,
             mode: Optional[str] = None
             ) -> Tuple[Dict[int, Tuple[int, ...]], Dict[int, Polygon]]:
+        """[summary]
+
+        :param mode: [description], defaults to None
+        :type mode: Optional[str], optional
+        :return: [description]
+        :rtype: Tuple[Dict[int, Tuple[int, ...]], Dict[int, Polygon]]
+        """
 
         zones = self.zones.load_tariffzones()
-        shape_frame = self.shapes_to_gdf()
+        shape_frame = self.loader.shapes_to_gdf()
+
         if mode is not None:
-            wanted_routes = self.route_types(str)
+            wanted_routes = self.loader.route_types(str)
             wanted_routes = {k for k, v in wanted_routes.items() if mode in v}
             shape_frame = shape_frame.query("route_id in @wanted_routes")
 
@@ -740,7 +774,15 @@ class EdgeMaker(_GTFSloader):
 
         return shape_zones, zone_polys
     @staticmethod
-    def _edges_to_array(edges):
+    def _edges_to_array(edges: Set[Tuple[int, int]]) ->  Dict[str, Union[np.ndarray, Dict[int, int]]]:
+        """return the output for the ZoneGraph class in zonegraph
+
+        :param edges: edges found for all shapes
+        :type edges: Set[Tuple[int, int]]
+        :return: a dictionary of the adjacency array for a graph and mappings
+            for the array columns to zone numbers
+        :rtype: Dict[str, Union[np.ndarray, Dict[int, int]]]
+        """
 
         array_indices = sorted(set(chain(*edges)))
         idx = {j:i for i, j in enumerate(array_indices)}
@@ -763,7 +805,16 @@ class EdgeMaker(_GTFSloader):
         start_point: Point,
         zone_polygons: Dict[int, Polygon]
         ) -> int:
+        """find the starting zone of the first point of a Linestring
 
+        :param start_point: the starting point to check
+        :type start_point: Point
+        :param zone_polygons: dictionary of zone polygons
+        :type zone_polygons: Dict[int, Polygon]
+        :raises ValueError: if the starting point is not in any of the given zones
+        :return: the zone number of the starting point
+        :rtype: int
+        """
         for zone, poly in zone_polygons.items():
             pinp = start_point.within(poly)
             if pinp:
@@ -780,6 +831,21 @@ class EdgeMaker(_GTFSloader):
         points: List[shapely.geometry.point.Point],
         neigh_dict: Dict[int, Tuple[int]]
         ) -> Set[Tuple[int, ...]]:
+        """find the edges created by a list of points in a shape/line
+
+        :param start_zone: the starting zone
+        :type start_zone: int
+        :param zone_ids: the set zone numbers in the shape
+        :type zone_ids: Set[int]
+        :param zone_polygons: a dictionary of shapely polygons for each zone number
+        :type zone_polygons: Dict[int, Polygon]
+        :param points: a list of shapely points
+        :type points: List[shapely.geometry.point.Point]
+        :param neigh_dict: hte dictionary of neighbour zones
+        :type neigh_dict: Dict[int, Tuple[int]]
+        :return: return the set of edges create by the list of points
+        :rtype: Set[Tuple[int, ...]]
+        """
 
         finished_zones = set()
         edges: Set[Tuple[int, ...]] = set()
@@ -809,7 +875,16 @@ class EdgeMaker(_GTFSloader):
             self,
             mode: Optional[str] = None
             ) -> Dict[str, Union[np.ndarray, Dict[int, int]]]:
+        """create a set of edges for the zone graph
 
+        :param mode: 'rail' or 'bus', defaults to None
+        :type mode: Optional[str], optional
+        :return: a dictionary with data for the zone graph
+            {'adj_array': an adjacency array for the networkx graph,
+            'idx': dictionary of mapping zone numbers to col idxs,
+            'rev_idx': a reverse mapping of col idxs to zone numbers}
+        :rtype: Dict[str, Union[np.ndarray, Dict[int, int]]]
+        """
         neigh_dict = self.zones.neighbour_dict('sjælland') # for now
         shape_zones, zone_polys = self._shape_proc(mode)
 
@@ -818,7 +893,7 @@ class EdgeMaker(_GTFSloader):
 
             zone_ids = set(shape_zones[shape_id]) # v
             zone_id_poly = {k: v for k, v in zone_polys.items() if k in zone_ids}
-            lstring = self.shape_lines[shape_id]
+            lstring = self.loader.shape_lines[shape_id]
             as_points = [Point(x) for x in lstring.coords]
 
             init_point = as_points[0]
