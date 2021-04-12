@@ -23,7 +23,11 @@ MAX_RAIL_UIC: int = 9999999
 
 
 def _load_default_config() -> Dict[str, str]:
+    """load the operator configuration from the package
 
+    :return: a dictionary of network names and operators servicing them
+    :rtype: Dict[str, str]
+    """
     fp = pkg_resources.resource_filename(
     'tablesalt', 'resources/config/operator_config.json'
     )
@@ -38,7 +42,11 @@ def _load_default_config() -> Dict[str, str]:
 def _load_operator_configuration(
     config_file: Optional[AnyStr] = None
     ) -> Dict[str, str]:
+    """load the operator configuration from the package
 
+    :return: a dictionary of network lines and operators servicing them
+    :rtype: Dict[str, str]
+    """
 
     if config_file is None:
         config_dict = _load_default_config()
@@ -52,12 +60,13 @@ def _load_operator_settings(
     config_file: Optional[AnyStr] = None
     ) -> Dict[str, str]:
     """
+    load the operator config file and process it for the given network lines
 
-    :param *lines: DESCRIPTION
+    :param *lines: a line or lines to load
     :type *lines: str
-    :param config_file: DESCRIPTION, defaults to None
+    :param config_file: path to a config file if not using default, defaults to None
     :type config_file: Optional[AnyStr], optional
-    :return: DESCRIPTION
+    :return: the operator settings
     :rtype: Dict[str, str]
 
     """
@@ -91,7 +100,7 @@ def load_bus_station_connectors() -> Dict[int, int]:
     """
     Load the bus stops station array from the support data
 
-    :return: DESCRIPTION
+    :return: a mapping of bus top numbers to station uic numbers
     :rtype: Dict[int, int]
 
     """
@@ -105,7 +114,11 @@ def load_bus_station_connectors() -> Dict[int, int]:
 
 def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
 
+    """load the passenger stations data
 
+    :return: a dataframe of stations and operators used to query
+    :rtype: pd.core.frame.DataFrame
+    """
     fp = pkg_resources.resource_filename(
             'tablesalt',
             'resources/networktopodk/operator_stations.csv'
@@ -262,6 +275,14 @@ class StationOperators():
             }
 
     def _get_operator(self, uic_number: int) -> Tuple[str, ...]:
+        """return the operators that survice the station
+
+        :param uic_number: the stop uic number
+        :type uic_number: int
+        :raises KeyError: if the station/stop is not found
+        :return:  a tuple of operators that service the stop
+        :rtype: Tuple[str, ...]
+        """
         try:
             return self._lookup[uic_number]
         except KeyError:
@@ -270,7 +291,14 @@ class StationOperators():
         raise KeyError("uic number not found")
 
     def _get_line(self, uic_number: int) -> Tuple[str, ...]:
+        """return the line names that the station is on
 
+        :param uic_number: the stop uic number
+        :type uic_number: int
+        :raises KeyError: if the station/stop is not found
+        :return: a tuple of line names that the stop is on
+        :rtype: Tuple[str, ...]
+        """
         minidict = {
             v: k for k, v in self._settings['config'].items()
             if k in self.lines
@@ -283,8 +311,16 @@ class StationOperators():
         raise KeyError("uic number not found")
 
     def _get_operator_id(self, uic_number: int) -> Tuple[int, ...]:
+        """[summary]
+
+        :param uic_number: [description]
+        :type uic_number: int
+        :raises KeyError: [description]
+        :return: [description]
+        :rtype: Tuple[int, ...]
+        """
         try:
-            # 1 is movia_H
+            # 1 is movia_H, this must be made generic
             return tuple(
                 self._settings['operator_ids'].get(x, 1) for x in self._lookup[uic_number]
                 )
@@ -350,7 +386,14 @@ class StationOperators():
         return fdict[format]
 
 
-    def _check_bus_location(self, bus_stop_id) -> int:
+    def _check_bus_location(self, bus_stop_id: int) -> int:
+        """map a bus id to a station if possible, else 0
+
+        :param bus_stop_id: the stop number
+        :type bus_stop_id: int
+        :return: the mapped station number or 0 if no mapping exists
+        :rtype: int
+        """
 
         return self.BUS_ID_MAP.get(bus_stop_id, 0)
 
@@ -359,6 +402,13 @@ class StationOperators():
         start_ops: Tuple[str, ...],
         end_ops: Tuple[str, ...]
         ) -> Tuple[str, ...]:
+
+        """return the possible operator strings that can service the
+        a start and end point
+
+        :return: [description]
+        :rtype: [type]
+        """
 
         intersect = set(start_ops).intersection(set(end_ops))
         if len(intersect) == 1:
@@ -378,6 +428,18 @@ class StationOperators():
         start_ops: Tuple[int, ...],
         end_ops: Tuple[int, ...]
         ) -> Tuple[int, ...]:
+        """return the possibe operator ids that can service
+        a start and end point
+
+        :param start_uic: [description]
+        :type start_uic: int
+        :param start_ops: [description]
+        :type start_ops: Tuple[int, ...]
+        :param end_ops: [description]
+        :type end_ops: Tuple[int, ...]
+        :return: [description]
+        :rtype: Tuple[int, ...]
+        """
 
 
         intersect = set(start_ops).intersection(set(end_ops))
@@ -403,6 +465,18 @@ class StationOperators():
         start_ops: Tuple[str, ...],
         end_ops: Tuple[str, ...]
         ) -> Tuple[str, ...]:
+        """return the possible lines that can service
+        a start and end point
+
+        :param start_uic: the stop number of
+        :type start_uic: int
+        :param start_ops: the possible operators at the start
+        :type start_ops: Tuple[str, ...]
+        :param end_ops: the possible operators at the end
+        :type end_ops: Tuple[str, ...]
+        :return: the possible lines
+        :rtype: Tuple[str, ...]
+        """
 
         intersect = set(start_ops).intersection(set(end_ops))
         if len(intersect) == 1:
@@ -439,10 +513,22 @@ class StationOperators():
         :return: the operators serving the given station pair
         :rtype: Tuple[int, ...]
 
+        :Example:
+        ----------
+        to return the possbible operators servicing a leg from copenhagen central
+        station to helsingør station
+
+        >>> op_getter = StationOperators('kystbanen', 'suburban', 'fjernregional', 'local', 'metro')
+        >>> op_getter.station_pair(8600626, 8600669, format='line')
+            ('kystbanen',)
+        >>> opgetter.station_pair(8600626, 8600669, format='operator')
+            ('first',)
+        >>> opgetter.station_pair(8600626, 8600669, format='operator_id')
+            (8,)
         """
 
         try:
-            return self.ID_CACHE[(start_uic, end_uic)]
+            return self.ID_CACHE[(start_uic, end_uic, format)]
         except KeyError:
             pass
 
@@ -474,7 +560,7 @@ class StationOperators():
         returnval: Union[Tuple[int, ...], Tuple[str, ...]]
         returnval = fdict[format]
         if format == 'operator_id':
-            self.ID_CACHE[(start_uic, end_uic)] = returnval
+            self.ID_CACHE[(start_uic, end_uic, format)] = returnval
         return returnval
 
 
