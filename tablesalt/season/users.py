@@ -12,7 +12,8 @@ from collections import Counter
 from itertools import groupby
 from operator import itemgetter
 from pathlib import Path
-from typing import (Any, Dict, Iterable, Iterator, List, Optional, Sequence,
+from typing import (Any, Dict, Iterable, Iterator,
+                    List, Optional, Sequence,
                     Set, Tuple, TypeVar, Union)
 
 import msgpack  # type: ignore
@@ -38,9 +39,12 @@ def _load_zonerelations() -> Dict[int, Dict[str, RELATION]]:
     return zonerelations
 
 
-def _zones_to_paid(zonerel) -> Dict[Tuple[int, ...], int]:
-    """create zones: npaid dict"""
-    outdict = {}
+def _zones_to_paid(
+    zonerel: Dict[int, Dict[str, RELATION]]
+    ) -> Dict[Tuple[int, ...], int]:
+    """create zones -> npaid dict
+    from the zone relation dictionary"""
+    outdict: Dict[Tuple[int, ...], int] = {}
     # zones: ZONE
     for _, v in zonerel.items():
         try:
@@ -52,9 +56,9 @@ def _zones_to_paid(zonerel) -> Dict[Tuple[int, ...], int]:
 
     return outdict
 
-# group: Sequence
-def _split_period_indices(group) -> List[int]:
-    """find the indices of the group that indicate a period change"""
+def _split_period_indices(group: List[Any]) -> List[int]:
+    """find the indices of the group that indicate a change in valid zones
+    from one period to the next"""
     s_indx = []
     for i, j in enumerate(group):
         try:
@@ -67,7 +71,14 @@ def _split_period_indices(group) -> List[int]:
 
 
 def _process_static_cards(date_dict):
+    """process the cards that have the same set of valid zones for
+    all of their periods. This are called static cards
 
+    :param date_dict: [description]
+    :type date_dict: [type]
+    :return: [description]
+    :rtype: [type]
+    """
     stat_dict = {}
     for key, group in groupby(date_dict, key=itemgetter(0)):
         grp = list(group)
@@ -80,7 +91,14 @@ def _process_static_cards(date_dict):
 
 
 def _process_dynamic_cards(date_dict):
+    """process the cards that have differing sets of valid zones for their
+    periods. These are called dynamic cards
 
+    :param date_dict: [description]
+    :type date_dict: [type]
+    :return: [description]
+    :rtype: [type]
+    """
     dyn_dict = {}
 
     for key, group in groupby(date_dict, key=itemgetter(0)):
@@ -112,8 +130,9 @@ def _process_dynamic_cards(date_dict):
 
 def _process_cards(prodzones,
                    product_dates,
-                   dynamic): # -> Dict[int, Dict]:
+                   dynamic: bool): # -> Dict[int, Dict]:
     """
+    process the cards to return a dictionary
     return a  dictionary that has the cardnum as the key
     and values as dictionary:
             0: {'start': timestamp0, 'end':timestamp0, 'zones0': valid zones for period 0},
@@ -143,34 +162,23 @@ def _process_cards(prodzones,
 
 
 class _PendlerInput():
-    """
-    Class that loads and processes the input pendlerkombi data
-    for the pendler revenue distribution models
-    """
+
     def __init__(self,
                  year: int,
                  products_path: str,
                  product_zones_path: str,
                  min_valid_days: Optional[int] = 14) -> None:
+        """Class that loads and processes the input pendlerkombi data
+        for the pendler revenue distribution models
 
-        """
-
-
-        Parameters
-        ----------
-        year : TYPE
-            DESCRIPTION.
-        min_valid_days : TYPE, optional
-            DESCRIPTION. The default is 14.
-        products_path : TYPE, optional
-            DESCRIPTION. The default is None.
-        product_zones_path : TYPE, optional
-            DESCRIPTION. The default is None.
-
-        Returns
-        -------
-        None.
-
+        :param year: the year of analysis
+        :type year: int
+        :param products_path: the path to the rejsekort pendler products csv
+        :type products_path: str
+        :param product_zones_path: the path to the rejskort pendler valid zones csv
+        :type product_zones_path: str
+        :param min_valid_days: the minimum validity in days to use, defaults to 14
+        :type min_valid_days: Optional[int], optional
         """
 
         self.year = year
@@ -179,35 +187,24 @@ class _PendlerInput():
         self.product_zones_path: str = product_zones_path
         self.paid_zones = _zones_to_paid(_load_zonerelations())
 
-        self.products = self._load_product_validity()
+        self.products = self._load_valid_pendler_data()
         self.product_zones = self._get_product_zones(self.products)
         self.product_dates = self._get_product_dates(self.products)
 
 
-    def _load_product_validity(self) -> pd.core.frame.DataFrame:
-        """
-        load the dataframe of period products
-        parameters
-        ----------------
-        year:
-            the year of the end of the card validities
+    def _load_valid_pendler_data(self) -> pd.core.frame.DataFrame:
+        """load the required pendler kombi products data
 
-        min_days:
-            the minimumn number of days a card can be valid for
-            default=14 days
-
-        pendler_filepath:
-            the path of the PeriodeProdukt csv file
-            default path is ..inputdata/PeriodProdukt.csv
-
+        :return: a dataframe with valid pendler kombi products for the year
+        :rtype: pd.core.frame.DataFrame
         """
 
         col1 = ['EncryptedCardEngravedID', 'SeasonPassID',
-                     'Fareset', 'PsedoFareset',
-                     'SeasonPassName', 'SeasonPassZones',
-                     'ValidityStartDT', 'ValidityEndDT',
-                     'ValidDays', 'FromZoneNr',
-                     'ToZoneNr', 'PassagerType']
+                'Fareset', 'PsedoFareset',
+                'SeasonPassName', 'SeasonPassZones',
+                'ValidityStartDT', 'ValidityEndDT',
+                'ValidDays', 'FromZoneNr',
+                'ToZoneNr', 'PassagerType']
 
         try:
             pendler_product = pd.read_csv(
@@ -215,7 +212,7 @@ class _PendlerInput():
                 encoding='iso-8859-1',
                 sep=';',
                 usecols= col1,
-                dtype={'EncryptedCardEngravedID':str, 'SeasonPassID':int}
+                dtype={'EncryptedCardEngravedID': str, 'SeasonPassID':int}
                 )
         except ValueError:
             pendler_product = pd.read_csv(
@@ -225,8 +222,6 @@ class _PendlerInput():
                 usecols= col1,
                 dtype={'EncryptedCardEngravedID':str, 'SeasonPassID':int}
                 )
-
-
 
         pendler_product = pendler_product.fillna(0)
         pendler_product.loc[:, ('FromZoneNr', 'ToZoneNr')] = \
@@ -251,61 +246,59 @@ class _PendlerInput():
 
     def _get_product_zones(
             self,
-            pendler_validity #: pd.core.frame.DataFrame
+            valid_pendler: pd.core.frame.DataFrame
         ): #-> Dict:
+        """load the pendler valid zone data
+
+        :param valid_pendler: dataframe of valid pendler data
+        :type valid_pendler: pd.core.frame.DataFrame
+        :return: a mapping of cardnum-seasonpass -> valid zones
+        :rtype: Dict
         """
-        load the data that gives each zone that a card is valid in
-
-        returns a dictionary of
-
-        parameters
-        ------------
-        pendler_validity:
-            a dataframe of pendler cards loaded from _load_product_validity()
-
-        """
-        pendler_product_zones = pd.read_csv(
+        pendler_zones = pd.read_csv(
             self.product_zones_path,
             sep=';'
             )
-        pendler_product_zones['key'] = list(zip(
-            pendler_product_zones['EncryptedCardEngravedID'],
-            pendler_product_zones['SeasonPassID']
+        pendler_zones['key'] = list(zip(
+            pendler_zones['EncryptedCardEngravedID'],
+            pendler_zones['SeasonPassID']
             ))
 
-        pendler_validity['key'] = list(zip(
-            pendler_validity['EncryptedCardEngravedID'],
-            pendler_validity['SeasonPassID']))
+        valid_pendler['key'] = list(zip(
+            valid_pendler['EncryptedCardEngravedID'],
+            valid_pendler['SeasonPassID']))
 
-        pendler_product_zones = pendler_product_zones.loc[
-            pendler_product_zones.loc[:, 'key'].isin(pendler_validity['key'])
+        pendler_zones = pendler_zones.loc[
+            pendler_zones.loc[:, 'key'].isin(valid_pendler['key'])
             ]
 
-        pendler_product_zones = \
-        pendler_product_zones.sort_values(
+        pendler_zones = \
+        pendler_zones.sort_values(
             ['EncryptedCardEngravedID', 'SeasonPassID']
             )
-        pendler_product_zones = \
-        pendler_product_zones.itertuples(name=None, index=False)
+        pendler_zones = \
+        pendler_zones.itertuples(name=None, index=False)
 
         return {key: tuple(x[2] for x in group) for key, group in
-                groupby(pendler_product_zones, key=itemgetter(0, 1))}
+                groupby(pendler_zones, key=itemgetter(0, 1))}
 
     @staticmethod
-    def _get_product_dates(pendler_validity): # -> Dict:
+    def _get_product_dates(valid_pendler: pd.core.frame.DataFrame): # -> Dict[Tuple[str, int], Tuple[]]:
+        """transform the 'ValidityStartDT' and 'ValidityEndDT'
+        to a dictionary for each season pass
+
+        :param valid_pendler: [description]
+        :type valid_pendler: [type]
+        :return: pd.core.frame.DataFrame
+        :rtype: Dict[Tuple[str, int], Tuple[]]
         """
-        return a ddict of key=(cardnum, seasonpassid) and the start and end dates of
-        the card
-        parameters
-        -----------
-        pendler_validity:
-            dataframe read from load_product_validity
-        """
-        product_dates = \
-        pendler_validity.loc[:, ('EncryptedCardEngravedID', 'SeasonPassID',
-                                 'ValidityStartDT', 'ValidityEndDT')]
+        product_dates = valid_pendler.loc[
+            :, ('EncryptedCardEngravedID', 'SeasonPassID',
+                'ValidityStartDT', 'ValidityEndDT')
+                ]
         product_dates = product_dates.sort_values(
-            ['EncryptedCardEngravedID', 'SeasonPassID'])
+            ['EncryptedCardEngravedID', 'SeasonPassID']
+            )
         product_dates = product_dates.itertuples(name=None, index=False)
 
         return {key: tuple((x[2], x[3]) for x in group) for key, group in
@@ -314,7 +307,7 @@ class _PendlerInput():
     @staticmethod
     def _find_dynamic_validity(vzone_dict):
         """
-        return a set of the card numbers that have changing zone validities
+        return a set of the card numbers that have changing sets of valid zones
 
         parameter
         -----------
@@ -352,7 +345,6 @@ class _PendlerInput():
 
         return static_card_zones, dynamic_card_zones
 
-
     def get_user_data(self, users='all'):
         """
         load the pendler user data
@@ -375,7 +367,6 @@ class _PendlerInput():
             raise ValueError(
                 "users argument must be one of: 'all', 'static', 'dynamic'"
                 )
-
 
         if users == 'all':
 
