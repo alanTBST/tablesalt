@@ -24,6 +24,8 @@ ZONE = Dict[str, Union[int, str]]
 ZONES = Sequence[ZONE]
 RELATION = Union[str, int, float, ZONES]
 
+
+
 def _load_zonerelations() -> Dict[int, Dict[str, RELATION]]:
     """load the zone relations data"""
     fpath = pkg_resources.resource_filename(
@@ -379,19 +381,11 @@ class _PendlerInput():
                               dynamic=False)
 
 class PendlerKombiUsers():
-    """
-    Class that adds functionality to the
-    input from PendlerInput()
 
-    It allows for easier subsetting of users
-    based on valid zones, valid time periods/seasonpass ids, etc.
-    """
-
-    REGIONS = {
+    REGIONS: Dict[str, Tuple[int, int]] = {
         'sydsjælland': (1200, 1300),
         'vestsjælland': (1100, 1200),
         'hovedstad': (1000, 1100),
-        'sjælland': (1000, 1300)
         }
     def __init__(
         self,
@@ -480,18 +474,12 @@ class PendlerKombiUsers():
         return passenger_type_keys
 
     def _find_users_with_zones(self, chosen_zones: Iterable[int] = None):
-        """
-        for the input chosen_zones, find the users
-        that have those valid zones
+        """subset the users based on chosen zones
 
-        parameter
-        ---------
-        chosen_zones:
-            a set of tariff zones for the desired users
-            if chosen_zones is None, returns users that
-            have all zones
-
-        returns a set of tuples (cardum, seasonpass num)
+        :param chosen_zones: an iterable of nationa zone numbers, defaults to None
+        :type chosen_zones: Iterable[int], optional
+        :return: users that have the given valid chosen_zones
+        :rtype: Set
         """
         if not isinstance(chosen_zones, set):
             chosen_zones = set(chosen_zones)
@@ -510,15 +498,15 @@ class PendlerKombiUsers():
 
         return zones_userset
 
-    def _subset_users(self, chosen_zones):
-        """
-
-        create a subset of the users dictionary for
+    def _subset_users(self, chosen_zones: Iterable[int]):
+        """create a subset of the users dictionary for
         the users and the periods of they have the chosen zones
 
-        returns a three tuple: user_subset, n_users, n_period_cards
+        :param chosen_zones: [description]
+        :type chosen_zones: Iterable[int]
+        :return: a three tuple (user_subset, n_users, n_period_cards)
+        :rtype: Tuple
         """
-
         zones_userset = self._find_users_with_zones(chosen_zones)
 
         zones_userset = sorted(
@@ -544,7 +532,7 @@ class PendlerKombiUsers():
         x, y = self.REGIONS[region]
         return x < zonenum < y
 
-    def _subset_takst(self, prodzones, takst):
+    def _subset_takst(self, prodzones: Dict[Tuple[str, int], Tuple[int, ...]], takst: str):
         # *takst - list(takst) for mulit takstset
 
         if takst in self.REGIONS:
@@ -570,10 +558,82 @@ class PendlerKombiUsers():
     def get_data(
         self,
         paid_zones: Optional[int] = None,
-        ptype = None,
+        ptype: Optional[str] = None,
         takst: Optional[str] = None,
         user_group: Optional[str] = 'all'
         ):
+        """get the required pendler kombi data from the dataset
+        with desired filters
+
+        :param paid_zones: the number of paid zones a user has, defaults to None
+        :type paid_zones: Optional[int], optional
+        :param ptype: the passenger type of the user, defaults to None with returns all users
+            valid passenger types are:
+                'Voksen' -> adult
+                'Pensionist' -> pensioner
+                'Ung' -> youth
+                'Barn' -> child
+                'Handicap' -> disabled
+        :type ptype: Optional[str], optional
+        :param takst: the takstsæt, defaults to None
+        :type takst: Optional[str], optional
+        :param user_group: 'static', 'dynamic' or 'all' users, defaults to 'all'
+        :type user_group: Optional[str], optional
+        :raises ValueError: if an invalid user_group is entered
+        :return: The pendler kombi users for the given filters
+        :rtype: Dict
+
+        :Example:
+        If we want the user data for 2019 and only youth users
+        >>> user_dict = PendlerKombiUsers(2019, 'PeriodeProdukt.csv', 'Zoner.csv')
+        >>> youth_users = user_dict.get_data(ptype='Ung')
+        >>> youth_users
+        {'46464333443241444144383435413538': {2065413: {'end': Timestamp('2019-03-04 00:00:00'),
+                                                'start': Timestamp('2019-02-03 00:00:00'),
+                                                'zones': (1001,
+                                                          1002,
+                                                          1032,
+                                                          1043)},
+                                              2073335: {'end': Timestamp('2019-04-03 00:00:00'),
+                                                'start': Timestamp('2019-03-05 00:00:00'),
+                                                'zones': (1001, 1002)}},
+          '46454545363437423530454532393833': {2114847: {'end': Timestamp('2019-09-09 00:00:00'),
+                                                'start': Timestamp('2019-08-11 00:00:00'),
+                                                'zones': (1001, 1002)}},...
+
+        If we want youth users that have paid for 11 zones.
+        >>> youth_users_paid_11 = user_dict.get_data(ptype='Ung', paid_zones=1)
+        >>> youth_users_paid_11
+        {'33323231434144303845393136443539': {2120236: {'end': Timestamp('2019-10-02 00:00:00'),
+                                                'start': Timestamp('2019-09-03 00:00:00'),
+                                                'zones': (1001,
+                                                          1002,
+                                                          1003,
+                                                          1006,
+                                                          1007,
+                                                          1009,
+                                                          1030,
+                                                          1031,
+                                                          1034,
+                                                          1035,
+                                                          1041,
+                                                          1042,
+                                                          1045,
+                                                          1051,
+                                                          1053,
+                                                          1061,
+                                                          1063,
+                                                          1071,
+                                                          1074,
+                                                          1082,
+                                                          1085,
+                                                          1093,
+                                                          1094)}}}
+        You'll notice that there are more than eleven valid zones for this user.
+        This is a result of the fare system for pendler tickets in which users that
+        pay for 9 or more zones tend to get access to more physical zones than paid for
+        as they are allowed to travel multiple routes to their destination zone
+        """
 
         prodzones = self.input_data.product_zones
 
@@ -588,6 +648,7 @@ class PendlerKombiUsers():
                 k: v for k, v in prodzones.items() if k in pas_valid
                 }
         if takst is not None:
+            takst = takst.lower()
             prodzones = self._subset_takst(prodzones, takst)
 
         if user_group == 'all':
@@ -611,7 +672,11 @@ class PendlerKombiUsers():
             return stat
 
         if user_group == 'dynamic':
-            dyn = _process_cards(dynamic_card_zones, self.input_data.product_dates, dynamic=True)
+            dyn = _process_cards(
+                dynamic_card_zones,
+                self.input_data.product_dates,
+                dynamic=True
+                )
 
             return dyn
 
@@ -625,14 +690,11 @@ class PendlerKombiUsers():
 
         raise NotImplementedError('Not available yet')
 
-    def subset_zones(self, zones=None):
+    def subset_zones(self, zones: Optional[Iterable[int]] = None):
         """
-        subset the user dictionary based on
-        the input zones
-        parameters
-        -----------
-        zones: set, tuple, list
-            the valid zones of wanted users
+        subset the user dictionary based on the given zones
+
+        :param zones: the valid zones of wanted users
 
         """
         # if not stats:
