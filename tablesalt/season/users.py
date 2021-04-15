@@ -12,7 +12,8 @@ from collections import Counter
 from itertools import groupby
 from operator import itemgetter
 from pathlib import Path
-from typing import (Any, Dict, Iterable, Iterator, List, Optional, Sequence,
+from typing import (Any, Dict, Iterable, Iterator,
+                    List, Optional, Sequence,
                     Set, Tuple, TypeVar, Union)
 
 import msgpack  # type: ignore
@@ -22,6 +23,8 @@ import pkg_resources
 ZONE = Dict[str, Union[int, str]]
 ZONES = Sequence[ZONE]
 RELATION = Union[str, int, float, ZONES]
+
+
 
 def _load_zonerelations() -> Dict[int, Dict[str, RELATION]]:
     """load the zone relations data"""
@@ -38,9 +41,12 @@ def _load_zonerelations() -> Dict[int, Dict[str, RELATION]]:
     return zonerelations
 
 
-def _zones_to_paid(zonerel) -> Dict[Tuple[int, ...], int]:
-    """create zones: npaid dict"""
-    outdict = {}
+def _zones_to_paid(
+    zonerel: Dict[int, Dict[str, RELATION]]
+    ) -> Dict[Tuple[int, ...], int]:
+    """create zones -> npaid dict
+    from the zone relation dictionary"""
+    outdict: Dict[Tuple[int, ...], int] = {}
     # zones: ZONE
     for _, v in zonerel.items():
         try:
@@ -52,9 +58,9 @@ def _zones_to_paid(zonerel) -> Dict[Tuple[int, ...], int]:
 
     return outdict
 
-# group: Sequence
-def _split_period_indices(group) -> List[int]:
-    """find the indices of the group that indicate a period change"""
+def _split_period_indices(group: List[Any]) -> List[int]:
+    """find the indices of the group that indicate a change in valid zones
+    from one period to the next"""
     s_indx = []
     for i, j in enumerate(group):
         try:
@@ -67,12 +73,19 @@ def _split_period_indices(group) -> List[int]:
 
 
 def _process_static_cards(date_dict):
+    """process the cards that have the same set of valid zones for
+    all of their periods. This are called static cards
 
+    :param date_dict: [description]
+    :type date_dict: [type]
+    :return: [description]
+    :rtype: [type]
+    """
     stat_dict = {}
     for key, group in groupby(date_dict, key=itemgetter(0)):
         grp = list(group)
         p_dict = {}
-        for i, j in enumerate(grp):
+        for _, j in enumerate(grp):
             p_dict[j[1]] = {'start': j[3], 'end':j[4], 'zones': j[2]}
         stat_dict[key] = p_dict
 
@@ -80,7 +93,14 @@ def _process_static_cards(date_dict):
 
 
 def _process_dynamic_cards(date_dict):
+    """process the cards that have differing sets of valid zones for their
+    periods. These are called dynamic cards
 
+    :param date_dict: [description]
+    :type date_dict: [type]
+    :return: [description]
+    :rtype: [type]
+    """
     dyn_dict = {}
 
     for key, group in groupby(date_dict, key=itemgetter(0)):
@@ -112,8 +132,9 @@ def _process_dynamic_cards(date_dict):
 
 def _process_cards(prodzones,
                    product_dates,
-                   dynamic): # -> Dict[int, Dict]:
+                   dynamic: bool = False): # -> Dict[int, Dict]:
     """
+    process the cards to return a dictionary
     return a  dictionary that has the cardnum as the key
     and values as dictionary:
             0: {'start': timestamp0, 'end':timestamp0, 'zones0': valid zones for period 0},
@@ -143,34 +164,23 @@ def _process_cards(prodzones,
 
 
 class _PendlerInput():
-    """
-    Class that loads and processes the input pendlerkombi data
-    for the pendler revenue distribution models
-    """
+
     def __init__(self,
                  year: int,
                  products_path: str,
                  product_zones_path: str,
                  min_valid_days: Optional[int] = 14) -> None:
+        """Class that loads and processes the input pendlerkombi data
+        for the pendler revenue distribution models
 
-        """
-
-
-        Parameters
-        ----------
-        year : TYPE
-            DESCRIPTION.
-        min_valid_days : TYPE, optional
-            DESCRIPTION. The default is 14.
-        products_path : TYPE, optional
-            DESCRIPTION. The default is None.
-        product_zones_path : TYPE, optional
-            DESCRIPTION. The default is None.
-
-        Returns
-        -------
-        None.
-
+        :param year: the year of analysis
+        :type year: int
+        :param products_path: the path to the rejsekort pendler products csv
+        :type products_path: str
+        :param product_zones_path: the path to the rejskort pendler valid zones csv
+        :type product_zones_path: str
+        :param min_valid_days: the minimum validity in days to use, defaults to 14
+        :type min_valid_days: Optional[int], optional
         """
 
         self.year = year
@@ -179,35 +189,24 @@ class _PendlerInput():
         self.product_zones_path: str = product_zones_path
         self.paid_zones = _zones_to_paid(_load_zonerelations())
 
-        self.products = self._load_product_validity()
+        self.products = self._load_valid_pendler_data()
         self.product_zones = self._get_product_zones(self.products)
         self.product_dates = self._get_product_dates(self.products)
 
 
-    def _load_product_validity(self) -> pd.core.frame.DataFrame:
-        """
-        load the dataframe of period products
-        parameters
-        ----------------
-        year:
-            the year of the end of the card validities
+    def _load_valid_pendler_data(self) -> pd.core.frame.DataFrame:
+        """load the required pendler kombi products data
 
-        min_days:
-            the minimumn number of days a card can be valid for
-            default=14 days
-
-        pendler_filepath:
-            the path of the PeriodeProdukt csv file
-            default path is ..inputdata/PeriodProdukt.csv
-
+        :return: a dataframe with valid pendler kombi products for the year
+        :rtype: pd.core.frame.DataFrame
         """
 
         col1 = ['EncryptedCardEngravedID', 'SeasonPassID',
-                     'Fareset', 'PsedoFareset',
-                     'SeasonPassName', 'SeasonPassZones',
-                     'ValidityStartDT', 'ValidityEndDT',
-                     'ValidDays', 'FromZoneNr',
-                     'ToZoneNr', 'PassagerType']
+                'Fareset', 'PsedoFareset',
+                'SeasonPassName', 'SeasonPassZones',
+                'ValidityStartDT', 'ValidityEndDT',
+                'ValidDays', 'FromZoneNr',
+                'ToZoneNr', 'PassagerType']
 
         try:
             pendler_product = pd.read_csv(
@@ -215,7 +214,7 @@ class _PendlerInput():
                 encoding='iso-8859-1',
                 sep=';',
                 usecols= col1,
-                dtype={'EncryptedCardEngravedID':str, 'SeasonPassID':int}
+                dtype={'EncryptedCardEngravedID': str, 'SeasonPassID':int}
                 )
         except ValueError:
             pendler_product = pd.read_csv(
@@ -225,8 +224,6 @@ class _PendlerInput():
                 usecols= col1,
                 dtype={'EncryptedCardEngravedID':str, 'SeasonPassID':int}
                 )
-
-
 
         pendler_product = pendler_product.fillna(0)
         pendler_product.loc[:, ('FromZoneNr', 'ToZoneNr')] = \
@@ -251,84 +248,79 @@ class _PendlerInput():
 
     def _get_product_zones(
             self,
-            pendler_validity #: pd.core.frame.DataFrame
+            valid_pendler: pd.core.frame.DataFrame
         ): #-> Dict:
+        """load the pendler valid zone data
+
+        :param valid_pendler: dataframe of valid pendler data
+        :type valid_pendler: pd.core.frame.DataFrame
+        :return: a mapping of cardnum-seasonpass -> valid zones
+        :rtype: Dict
         """
-        load the data that gives each zone that a card is valid in
-
-        returns a dictionary of
-
-        parameters
-        ------------
-        pendler_validity:
-            a dataframe of pendler cards loaded from _load_product_validity()
-
-        """
-        pendler_product_zones = pd.read_csv(
+        pendler_zones = pd.read_csv(
             self.product_zones_path,
             sep=';'
             )
-        pendler_product_zones['key'] = list(zip(
-            pendler_product_zones['EncryptedCardEngravedID'],
-            pendler_product_zones['SeasonPassID']
+        pendler_zones['key'] = list(zip(
+            pendler_zones['EncryptedCardEngravedID'],
+            pendler_zones['SeasonPassID']
             ))
 
-        pendler_validity['key'] = list(zip(
-            pendler_validity['EncryptedCardEngravedID'],
-            pendler_validity['SeasonPassID']))
+        valid_pendler['key'] = list(zip(
+            valid_pendler['EncryptedCardEngravedID'],
+            valid_pendler['SeasonPassID']))
 
-        pendler_product_zones = pendler_product_zones.loc[
-            pendler_product_zones.loc[:, 'key'].isin(pendler_validity['key'])
+        pendler_zones = pendler_zones.loc[
+            pendler_zones.loc[:, 'key'].isin(valid_pendler['key'])
             ]
 
-        pendler_product_zones = \
-        pendler_product_zones.sort_values(
+        pendler_zones = \
+        pendler_zones.sort_values(
             ['EncryptedCardEngravedID', 'SeasonPassID']
             )
-        pendler_product_zones = \
-        pendler_product_zones.itertuples(name=None, index=False)
+        pendler_zones = \
+        pendler_zones.itertuples(name=None, index=False)
 
         return {key: tuple(x[2] for x in group) for key, group in
-                groupby(pendler_product_zones, key=itemgetter(0, 1))}
+                groupby(pendler_zones, key=itemgetter(0, 1))}
 
     @staticmethod
-    def _get_product_dates(pendler_validity): # -> Dict:
+    def _get_product_dates(valid_pendler: pd.core.frame.DataFrame): # -> Dict[Tuple[str, int], Tuple[]]:
+        """transform the 'ValidityStartDT' and 'ValidityEndDT'
+        to a dictionary for each season pass
+
+        :param valid_pendler: [description]
+        :type valid_pendler: [type]
+        :return: pd.core.frame.DataFrame
+        :rtype: Dict[Tuple[str, int], Tuple[]]
         """
-        return a ddict of key=(cardnum, seasonpassid) and the start and end dates of
-        the card
-        parameters
-        -----------
-        pendler_validity:
-            dataframe read from load_product_validity
-        """
-        product_dates = \
-        pendler_validity.loc[:, ('EncryptedCardEngravedID', 'SeasonPassID',
-                                 'ValidityStartDT', 'ValidityEndDT')]
+        product_dates = valid_pendler.loc[
+            :, ('EncryptedCardEngravedID', 'SeasonPassID',
+                'ValidityStartDT', 'ValidityEndDT')
+                ]
         product_dates = product_dates.sort_values(
-            ['EncryptedCardEngravedID', 'SeasonPassID'])
+            ['EncryptedCardEngravedID', 'SeasonPassID']
+            )
         product_dates = product_dates.itertuples(name=None, index=False)
 
         return {key: tuple((x[2], x[3]) for x in group) for key, group in
                 groupby(product_dates, key=itemgetter(0, 1))}
 
     @staticmethod
-    def _find_dynamic_validity(vzone_dict):
-        """
-        return a set of the card numbers that have changing zone validities
+    def _find_dynamic_validity(vzone_dict: Dict[Tuple[str, int], Tuple[int, ...]]) -> Set[str]:
+        """return the set of card numbers that have changing sets of valid zones
 
-        parameter
-        -----------
-        vzone_dict:
-            a dictionary of the valid zones for the period cards
-                key=(cardnum, seasonpassid), val=(zone(1), ..., zone(n))
-                from _get_product_zones()
+        :param vzone_dict: a dictionary of the valid zones for the period cards
+        :type vzone_dict: Dict[Tuple[str, int], Tuple[int, ...]]
+        :return: a set of card numbers
+        :rtype: Set[str]
         """
         cards_seen = set()
         cardszones_seen = set()
         exceptions = set()
         for k, val in vzone_dict.items():
-            cardzone = k[0], val
             card = k[0]
+            cardzone = card, val
             if card in cards_seen and not cardzone in cardszones_seen:
                 exceptions.add(card)
             cards_seen.add(card)
@@ -352,30 +344,20 @@ class _PendlerInput():
 
         return static_card_zones, dynamic_card_zones
 
+    def get_user_data(self, users: str = 'all'): #Dict[]
+        """return the desired user card data
 
-    def get_user_data(self, users='all'):
-        """
-        load the pendler user data
-
-        parameters
-        ------------
-        users : str
-            the subset of user data to load
-            values:
-                all: returns all the valid users for the input year
-                dynamic: returns users that have changing validity zones
-                         during different validity periods
-                static: returns users that have a constant set of valid zones
-                        over all their validity periods
-
-        paid_zones : int
-        ptype : str
+        :param users: the subset of users to return, defaults to 'all'
+            options ['all', 'static', 'dynamic']
+        :type users: str, optional
+        :raises ValueError: if users is not in ['all', 'static', 'dynamic']
+        :return: user card data
+        :rtype: Dict
         """
         if users not in ['all', 'static', 'dynamic']:
             raise ValueError(
                 "users argument must be one of: 'all', 'static', 'dynamic'"
                 )
-
 
         if users == 'all':
 
@@ -392,65 +374,41 @@ class _PendlerInput():
                 )
 
         if users == 'dynamic':
-            return _process_cards(dynamic_card_zones, self.product_dates)
+            return _process_cards(dynamic_card_zones, self.product_dates, dynamic=True)
 
         return _process_cards(static_card_zones,
                               self.product_dates,
                               dynamic=False)
- # self,
- #        year: int,
- #        products_path: FILE_PATH,
- #        product_zones_path: FILE_PATH,
- #        min_valid_days: Optional[int] = 14,
- #        user_group: Optional[str] = 'all'
+
 class PendlerKombiUsers():
-    """
-    Class that adds functionality to the
-    input from PendlerInput()
 
-    It allows for easier subsetting of users
-    based on valid zones, valid time periods/seasonpass ids, etc.
-    """
-
-    REGIONS = {
+    REGIONS: Dict[str, Tuple[int, int]] = {
         'sydsjælland': (1200, 1300),
         'vestsjælland': (1100, 1200),
-        'hovedstad': (1000, 1100)
+        'hovedstad': (1000, 1100),
         }
     def __init__(
         self,
-        year,
-        products_path,
-        product_zones_path,
+        year: int,
+        products_path: str,
+        product_zones_path: str,
         min_valid_days = 14,
         user_group = 'all'
         ): # -> None:
+        """class to interact with the pendler kombi user data
+
+        :param year: the year of analysis
+        :type year: int
+        :param products_path: the path to the PeriodeProdukt.csv
+        :type products_path: str
+        :param product_zones_path: the path to the Zoner.csv
+        :type product_zones_path: str
+        :param min_valid_days: the minimum valid days for a card to be used,
+                defaults to 14
+        :type min_valid_days: int, optional
+        :param user_group: 'all', 'static or 'dynamic', defaults to 'all'
+        :type user_group: str, optional
         """
-
-
-        Parameters
-        ----------
-        year : int
-            DESCRIPTION.
-        min_valid_days : Optional[int], optional
-            DESCRIPTION. The default is 14.
-        products_path : TYPE, optional
-            DESCRIPTION. The default is None.
-        product_zones_path : TYPE, optional
-            DESCRIPTION. The default is None.
-        user_group : Optional[str], optional
-            DESCRIPTION. The default is 'all'.
-
-        Returns
-        -------
-        None
-            DESCRIPTION.
-
-        """
-
-
-
-
         self.input_data = _PendlerInput(
             year, products_path=products_path,
             product_zones_path=product_zones_path,
@@ -461,17 +419,29 @@ class PendlerKombiUsers():
 
     @staticmethod
     def _valid_season_zones(pprod):
-
+        """return all unique combinations of valid zones
+        """
         return set(pprod.loc[:, 'SeasonPassZones'].unique())
 
 
-    def _paid_filter(self, nzones: int) -> Set:
+    def _paid_filter(self, nzones: int) -> Set[Tuple[int, ...]]:
+        """get the set of valid zones for the given nzones
+
+        :param nzones: the number of paid zones
+        :type nzones: int
+        :return: a set of all valid zones where paid = nzones
+        :rtype: Set[Tuple[int, ...]]
+        """
 
         return {k for k, v in self.input_data.paid_zones.items()
                 if v == nzones}
 
-    def _filter_paid_zones(self, nzones):
+    def _filter_paid_zones(self, nzones: int) -> Dict[Tuple[str, int], Tuple[int,...]]:
+        """filter the season passes by the number of paid zones
 
+        :return: theseason passes that have the desired paid zones
+        :rtype: Diict[Tuple[str, int], Tuple[int,...]]
+        """
         zones = self._paid_filter(nzones)
         valid_paid_keys = {
             k:v for k, v in self.input_data.product_zones.items()
@@ -480,7 +450,15 @@ class PendlerKombiUsers():
 
         return valid_paid_keys
 
-    def _filter_ptype(self, ptype):
+    def _filter_ptype(self, ptype: str) -> Set[Tuple[str, int]]:
+        """return the set of season passes that match the passenger type
+
+        :param ptype: the passenger type
+        :type ptype: str
+        :raises ValueError: if the given passenger type is not in the dataset
+        :return: a set of season passes
+        :rtype: Set[Tuple[str, int]]
+        """
         valid_ptype = set(self.input_data.products['PassagerType'])
 
         if not ptype in valid_ptype:
@@ -495,19 +473,13 @@ class PendlerKombiUsers():
 
         return passenger_type_keys
 
-    def _find_users_with_zones(self, chosen_zones=None):
-        """
-        for the input chosen_zones, find the users
-        that have those valid zones
+    def _find_users_with_zones(self, chosen_zones: Iterable[int] = None):
+        """subset the users based on chosen zones
 
-        parameter
-        ---------
-        chosen_zones:
-            a set of tariff zones for the desired users
-            if chosen_zones is None, returns users that
-            have all zones
-
-        returns a set of tuples (cardum, seasonpass num)
+        :param chosen_zones: an iterable of nationa zone numbers, defaults to None
+        :type chosen_zones: Iterable[int], optional
+        :return: users that have the given valid chosen_zones
+        :rtype: Set
         """
         if not isinstance(chosen_zones, set):
             chosen_zones = set(chosen_zones)
@@ -526,15 +498,15 @@ class PendlerKombiUsers():
 
         return zones_userset
 
-    def _subset_users(self, chosen_zones):
-        """
-
-        create a subset of the users dictionary for
+    def _subset_users(self, chosen_zones: Iterable[int]):
+        """create a subset of the users dictionary for
         the users and the periods of they have the chosen zones
 
-        returns a three tuple: user_subset, n_users, n_period_cards
+        :param chosen_zones: [description]
+        :type chosen_zones: Iterable[int]
+        :return: a three tuple (user_subset, n_users, n_period_cards)
+        :rtype: Tuple
         """
-
         zones_userset = self._find_users_with_zones(chosen_zones)
 
         zones_userset = sorted(
@@ -560,7 +532,7 @@ class PendlerKombiUsers():
         x, y = self.REGIONS[region]
         return x < zonenum < y
 
-    def _subset_takst(self, prodzones, takst):
+    def _subset_takst(self, prodzones: Dict[Tuple[str, int], Tuple[int, ...]], takst: str):
         # *takst - list(takst) for mulit takstset
 
         if takst in self.REGIONS:
@@ -583,19 +555,85 @@ class PendlerKombiUsers():
                 takst_prods[k] = v
         return takst_prods
 
-        # self,
-        # paid_zones: Optional[int] = None,
-        # ptype: Optional[str] = None,
-        # takst: Optional[str] = None,
-        # user_group: Optional[str] = 'all'
-
     def get_data(
         self,
-        paid_zones = None,
-        ptype = None,
-        takst = None,
-        user_group = 'all'
+        paid_zones: Optional[int] = None,
+        ptype: Optional[str] = None,
+        takst: Optional[str] = None,
+        user_group: Optional[str] = 'all'
         ):
+        """get the required pendler kombi data from the dataset
+        with desired filters
+
+        :param paid_zones: the number of paid zones a user has, defaults to None
+        :type paid_zones: Optional[int], optional
+        :param ptype: the passenger type of the user, defaults to None with returns all users
+            valid passenger types are:
+                'Voksen' -> adult
+                'Pensionist' -> pensioner
+                'Ung' -> youth
+                'Barn' -> child
+                'Handicap' -> disabled
+        :type ptype: Optional[str], optional
+        :param takst: the takstsæt, defaults to None
+        :type takst: Optional[str], optional
+        :param user_group: 'static', 'dynamic' or 'all' users, defaults to 'all'
+        :type user_group: Optional[str], optional
+        :raises ValueError: if an invalid user_group is entered
+        :return: The pendler kombi users for the given filters
+        :rtype: Dict
+
+        :Example:
+        If we want the user data for 2019 and only youth users
+        >>> user_dict = PendlerKombiUsers(2019, 'PeriodeProdukt.csv', 'Zoner.csv')
+        >>> youth_users = user_dict.get_data(ptype='Ung')
+        >>> youth_users
+        {'46464333443241444144383435413538': {2065413: {'end': Timestamp('2019-03-04 00:00:00'),
+                                                'start': Timestamp('2019-02-03 00:00:00'),
+                                                'zones': (1001,
+                                                          1002,
+                                                          1032,
+                                                          1043)},
+                                              2073335: {'end': Timestamp('2019-04-03 00:00:00'),
+                                                'start': Timestamp('2019-03-05 00:00:00'),
+                                                'zones': (1001, 1002)}},
+          '46454545363437423530454532393833': {2114847: {'end': Timestamp('2019-09-09 00:00:00'),
+                                                'start': Timestamp('2019-08-11 00:00:00'),
+                                                'zones': (1001, 1002)}},...
+
+        If we want youth users that have paid for 11 zones.
+        >>> youth_users_paid_11 = user_dict.get_data(ptype='Ung', paid_zones=1)
+        >>> youth_users_paid_11
+        {'33323231434144303845393136443539': {2120236: {'end': Timestamp('2019-10-02 00:00:00'),
+                                                'start': Timestamp('2019-09-03 00:00:00'),
+                                                'zones': (1001,
+                                                          1002,
+                                                          1003,
+                                                          1006,
+                                                          1007,
+                                                          1009,
+                                                          1030,
+                                                          1031,
+                                                          1034,
+                                                          1035,
+                                                          1041,
+                                                          1042,
+                                                          1045,
+                                                          1051,
+                                                          1053,
+                                                          1061,
+                                                          1063,
+                                                          1071,
+                                                          1074,
+                                                          1082,
+                                                          1085,
+                                                          1093,
+                                                          1094)}}}
+        You'll notice that there are more than eleven valid zones for this user.
+        This is a result of the fare system for pendler tickets in which users that
+        pay for 9 or more zones tend to get access to more physical zones than paid for
+        as they are allowed to travel multiple routes to their destination zone
+        """
 
         prodzones = self.input_data.product_zones
 
@@ -610,6 +648,7 @@ class PendlerKombiUsers():
                 k: v for k, v in prodzones.items() if k in pas_valid
                 }
         if takst is not None:
+            takst = takst.lower()
             prodzones = self._subset_takst(prodzones, takst)
 
         if user_group == 'all':
@@ -619,17 +658,25 @@ class PendlerKombiUsers():
                         dynamic=False
                         )
         static_card_zones, dynamic_card_zones = \
-            self._split_static_dynamic(
-                self.product_zones,
-                self._find_dynamic_validity(prodzones)
+            self.input_data._split_static_dynamic(
+                self.input_data.product_zones,
+                self.input_data._find_dynamic_validity(prodzones)
                 )
-        stat = _process_cards(static_card_zones, self.input_data.product_dates, dynamic=False)
+        stat = _process_cards(
+            static_card_zones,
+            self.input_data.product_dates,
+            dynamic=False
+            )
 
         if user_group == 'static':
             return stat
 
         if user_group == 'dynamic':
-            dyn = _process_cards(dynamic_card_zones, self.input_data.product_dates, dynamic=True)
+            dyn = _process_cards(
+                dynamic_card_zones,
+                self.input_data.product_dates,
+                dynamic=True
+                )
 
             return dyn
 
@@ -643,14 +690,11 @@ class PendlerKombiUsers():
 
         raise NotImplementedError('Not available yet')
 
-    def subset_zones(self, zones=None):
+    def subset_zones(self, zones: Optional[Iterable[int]] = None):
         """
-        subset the user dictionary based on
-        the input zones
-        parameters
-        -----------
-        zones: set, tuple, list
-            the valid zones of wanted users
+        subset the user dictionary based on the given zones
+
+        :param zones: the valid zones of wanted users
 
         """
         # if not stats:
