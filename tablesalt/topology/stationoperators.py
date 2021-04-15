@@ -66,7 +66,7 @@ def _load_operator_settings(
     :type *lines: str
     :param config_file: path to a config file if not using default, defaults to None
     :type config_file: Optional[AnyStr], optional
-    :return: the operator settings
+    :return: a dict with
     :rtype: Dict[str, str]
 
     """
@@ -110,13 +110,13 @@ def load_bus_station_connectors() -> Dict[int, int]:
     with h5py.File(support_store, 'r') as store:
         bus_map = store['datasets/bus_closest_station'][:]
 
-    return {x[0]: x[1] for x in bus_map}
+    return {busstop: stationstop  for busstop,stationstop,dist in bus_map}
 
 def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
 
     """load the passenger stations data
 
-    :return: a dataframe of stations and operators used to query
+    :return: a dataframe of stations and dummies indicating line used 
     :rtype: pd.core.frame.DataFrame
     """
     fp = pkg_resources.resource_filename(
@@ -144,6 +144,7 @@ def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
 
 
 class StationOperators():
+    
 
     BUS_ID_MAP: Dict[int, int] = load_bus_station_connectors()
 

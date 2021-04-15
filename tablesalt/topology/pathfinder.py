@@ -173,12 +173,12 @@ def get_touched_zones(zone_sequence: Tuple[int, ...]) -> Tuple[int, ...]:
     return tuple(touched)
 
 @lru_cache(2**16)
-def to_legs(sequence: Tuple[int, ...]) ->Tuple[int, ...]:
-    """convert a tuple to leg form
+def to_legs(sequence: Tuple[int, ...]) ->Tuple(Tuple[int, ...]..):
+    """convert a tuple of zones to to leg form
 
     :param sequence: a tuple of zones, stops, etc
     :type sequence: Tuple[int, ...]
-    :return: the legified form
+    :return: the legified form tupels of (start,end)
     :rtype: Tuple[int, ...]
     """
     return triptools.sep_legs(sequence)
