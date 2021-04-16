@@ -29,11 +29,19 @@ release = '0.1'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinx.ext.autodoc', 'autoapi.extension'
+extensions = ['sphinx.ext.autodoc', 'autoapi.extension', 'sphinx.ext.autosummary'
 ]
 # Document Python Code
 autoapi_type = 'python'
-autoapi_dir = '../src'
+autoapi_dirs = '../../tablesalt'
+autoapi_python_class_content = 'both'
+autoclass_content = 'both'
+autodoc_typehints = 'description'
+apidoc_separate_modules = True
+autosummary_generate = True
+apidoc_excluded_paths = ['tests']
+
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
