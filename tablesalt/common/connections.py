@@ -5,7 +5,7 @@ TBST Trafik, Bygge, og Bolig -styrelsen
 Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
 
 """
-
+import os 
 import pkg_resources
 import json
 
@@ -176,6 +176,8 @@ def make_store(d, db_path, start_size=1, size_limit=30):
     """
     MAP_SIZES = {x: x * 1024 *1024 * 1024 for x in range(size_limit + 1)}
     i = start_size
+    if os.name == 'posix':
+        i = size_limit
     while True:
         try:
             _make_key_val(d, db_path, map_size=MAP_SIZES[i])
