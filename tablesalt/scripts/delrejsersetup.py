@@ -8,6 +8,7 @@ Created on Sat Mar 14 18:07:24 2020
 @email: alkj@tbst.dk; alanksjones@gmail.com
 
 # =============================================================================
+
  HELLO THERE!
  -------------
 
@@ -107,7 +108,7 @@ from multiprocessing import Process, Queue
 from operator import itemgetter
 from threading import Thread
 from typing import (Any, AnyStr, ByteString, Dict, Iterator, List, Optional,
-                    Tuple, Union)
+                    Tuple, Union, Generator, Sequence, Iterable)
 
 import h5py  # type: ignore
 import msgpack  # type: ignore
@@ -129,26 +130,25 @@ from tablesalt.running import WindowsInhibitor
 # lmdb creation
 # =============================================================================
 def card_trip_generator(
-        ziplist, col_indices, chunksize, skiprows=0
+        ziplist: List[str], 
+        col_indices: Dict[str, int], 
+        chunksize: int, 
+        skiprows: Optional[int] = 0
         ) -> Iterator[Dict[bytes, bytes]]:
-    """
-    Parameters
-    ----------
-    ziplist : list
-        A list of the zipfiles and contents
-    col_indices : dict
-        a dictionary of column names and corresponding indices.
-    chunksize : int, optional
-        the chunksize to use.
-    skiprows : int, optional
-        the number of rows to skip in the file. The default is 0.
+    """generate the tripkey and card data to place in a key-value store
 
-    Yields
-    -------
-    dict :
-        the generator for the lmbd database.
-
+    :param ziplist: a list of zip files
+    :type ziplist: List[str]
+    :param col_indices: a dictionary of column name -> column index
+    :type col_indices: Dict[str, int]
+    :param chunksize: the number of lines to read at a time
+    :type chunksize: int
+    :param skiprows: the number of rows to skip, defaults to 0
+    :type skiprows: Optional[int], optional
+    :yield: a dictionary of bytes(tripkey) -> bytes(cardnum)
+    :rtype: Iterator[Dict[bytes, bytes]]
     """
+
     wanted_columns = [col_indices['kortnr'], col_indices['turngl']]
 
     for zfile, content in ziplist:
@@ -165,8 +165,23 @@ def card_trip_generator(
                          for k, v in chunk_dict.items()}
             yield byte_dict
 
-def make_tripcard_kvstore(zips, col_indices, location, chunksize):
-    """create the lmdb key-value store for trips and cardnums"""
+def make_tripcard_kvstore(
+    zips: List[str], 
+    col_indices: Dict[str, int], 
+    location: str, 
+    chunksize: int)
+     -> None:
+    """write data to the key-value store
+
+    :param zips: a list of zip files of rejsekort data
+    :type zips: List[str]
+    :param col_indices: [description]
+    :type col_indices: Dict[str, int]
+    :param location: the directory to write the store
+    :type location: str
+    :param chunksize: the number of lines to read at a time
+    :type chunksize: int
+    """
     dbpath = os.path.join(location, 'trip_card_db')
 
     for i, bytedict in enumerate(
@@ -177,33 +192,30 @@ def make_tripcard_kvstore(zips, col_indices, location, chunksize):
 # =============================================================================
 # hdf5
 # =============================================================================
-def delrejser_generator(ziplist, inp_cols, col_indices,
-                        chunksize, skiprows=0):
+def delrejser_generator(
+    ziplist: List[str], 
+    wanted_columns: Iterable[str], 
+    col_indices: Dict[str, int],
+    chunksize: int , skiprows=0
+    ) -> Generator[np.ndarray, None, None]:
+    """generate a numpy array of the given wanted columns
+
+    :param ziplist: a list of zipfile paths
+    :type ziplist: List[str]
+    :param wanted_columns: the columns to read from the zipfiles
+    :type wanted_columns: Iterable[str]
+    :param col_indices: the dictionary of 
+    :type col_indices: Dict[str, int]
+    :param chunksize: the number of lines to read per iteration
+    :type chunksize: int
+    :param skiprows: the number of rows to skip, defaults to 0
+    :type skiprows: int, optional
+    :yield: a numpy array of the data in the given wanted_columns
+    :rtype: Generator[np.ndarray, None, None]
     """
-    Yield a np.ndarray (object) generator of the delrejser dataset
 
-    Parameters
-    ----------
-    zfile : string or path like
-        the path to a zipfile of delrejser data.
-    content : string
-        the name of a file in the zipfile.
-    col_indices : dict
-        a dictionary of column names and corresponding indices.
-    col_dtypes : dict
-        a dictionary of datatypes for the colums.
-    chunksize : int, optional
-        the chunksize to use. The default is 1000000.
-    skiprows : int, optional
-        the number of rows to skip in the file. The default is 0.
 
-    Returns
-    -------
-    gen :  np.ndarray generator
-        the generator for the delrejser file.
-
-    """
-    wanted_columns = [col_indices[x] for x in inp_cols]
+    wanted_columns = [col_indices[x] for x in wanted_columns]
     n_files = len(ziplist)
     content_count = 1
     for zfile, content in ziplist:
@@ -236,14 +248,16 @@ def delrejser_generator(ziplist, inp_cols, col_indices,
         content_count += 1
 
 
-def _resolve_column_orders(input_columns, col_indices):
-
+def _resolve_column_orders(input_columns: List[str], col_indices: Dict[str, int]) -> List[str]:
+    """order the columns"""
     wanted_columns = [(x, col_indices[x]) for x in input_columns]
     wanted_columns = sorted(wanted_columns, key=lambda x: x[1])
     return [x[0] for x in wanted_columns]
 
 
-def format_time(x):
+def format_time(x: str) -> Tuple[int, int, int, int, int, int, int]:
+    """convert a time string to a tuple of integers
+    """
     try:
         time = datetime.fromisoformat(x)
     except AttributeError:
@@ -253,7 +267,7 @@ def format_time(x):
             time.weekday())
 
 
-def trip_application(array, column_order):
+def trip_application(array: np.ndarray, column_order: List[str]) -> Tuple[np.ndarray, np.ndarray]:
     """
     create two sub arrays in a tuple using trip keys and application
     sequence.
@@ -314,7 +328,7 @@ def trip_application(array, column_order):
 
     return np.array(msgreportdate, dtype=np.int64), trip_app_stop
 
-def passenger_information(array: Any, column_order):
+def passenger_information(array: np.ndarray, column_order: List[str]) -> np.ndarray:
     """
     return sub array of tripkey and passenger counts and types
     """
@@ -345,7 +359,7 @@ def passenger_information(array: Any, column_order):
     return key_pas
 
 
-def price_information(array, column_order):
+def price_information(array: np.ndarray, column_order: List[str]) -> np.ndarray:
     """
     return sub array of tripkey, rebates, zones travelled and trip price
     """
@@ -355,15 +369,15 @@ def price_information(array, column_order):
     zonerrejst = column_order.index('zonerrejst')
 
     tprz = array[:, (turngl,
-                      rejsepris,
-                      # tidsrabat,
-                      zonerrejst)]
+                    rejsepris,
+                    zonerrejst)]
+    # tidsrabat not now
 
     tprz = tprz[tprz[:, 1] != 'nan']
     tprz = tprz[tprz[:, 1] != '0']
     tprz = tprz[tprz[:, 1] != 0]
     tpz = np.array(tprz[:, (0, 1, 2)], dtype=np.int64)
-
+    return tpz
     # price = np.zeros(shape=(len(tprz), 1))
 
     # price_list = (x.replace('.', '').strip("'")
@@ -376,7 +390,6 @@ def price_information(array, column_order):
     # price[:, 0] = np.array(price_list, dtype=np.int64)
     # price_info = np.hstack((trz, price))
     # np.array(price_info, dtype=np.int64)
-    return tpz
 
 
 def check_collection_complete(arr_col, key):
@@ -392,15 +405,15 @@ def check_collection_complete(arr_col, key):
         return None
     return unseen
 
-def update_collection(unseen_ids, key):
+def update_collection(unseen_ids, key) -> None:
     """change the io mappers if needed"""
     # TODO put this updating activity in a class
     current_max_key_id = max(mappers[key].values())
 
     package_loc = site.getsitepackages()
     collection_loc = os.path.join(
-        package_loc[1], 'tablesalt', 'common',
-        'io', 'rejsekortcollections.json'
+        package_loc[1], 'tablesalt', 'resources',
+        'rejsekortcollections.json'
         )
     try:
         with open(collection_loc, 'r', encoding='iso-8859-1') as f:
@@ -418,7 +431,9 @@ def update_collection(unseen_ids, key):
         print("skipping mappers update")
 
 
-def contractor_information(array, column_order):
+CONTR_REC = Tuple[int, str, str, str, str, str]
+
+def contractor_information(array: np.ndarray, column_order: List[str]) -> Dict[int, Tuple[CONTR_REC, ...]]:
     """
     return sub array of tripkey, AppSeq, the operators and contractors
     """
@@ -463,7 +478,7 @@ def contractor_information(array, column_order):
 
 
 
-def store_processing(dset, ziplist, col_indices, chunksize):
+def store_processing(dset: str, ziplist: List[str], col_indices: Dict[str, int], chunksize: int):
     """
     Parameters
     ----------
@@ -692,7 +707,6 @@ def main() -> None:
     t3.join()
 
 if __name__ == "__main__":
-
 
     dt = datetime.now()
 
