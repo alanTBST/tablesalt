@@ -130,9 +130,9 @@ from tablesalt.running import WindowsInhibitor
 # lmdb creation
 # =============================================================================
 def card_trip_generator(
-        ziplist: List[str], 
-        col_indices: Dict[str, int], 
-        chunksize: int, 
+        ziplist: List[str],
+        col_indices: Dict[str, int],
+        chunksize: int,
         skiprows: Optional[int] = 0
         ) -> Iterator[Dict[bytes, bytes]]:
     """generate the tripkey and card data to place in a key-value store
@@ -166,11 +166,11 @@ def card_trip_generator(
             yield byte_dict
 
 def make_tripcard_kvstore(
-    zips: List[str], 
-    col_indices: Dict[str, int], 
-    location: str, 
-    chunksize: int)
-     -> None:
+    zips: List[str],
+    col_indices: Dict[str, int],
+    location: str,
+    chunksize: int
+    ) -> None:
     """write data to the key-value store
 
     :param zips: a list of zip files of rejsekort data
@@ -193,8 +193,8 @@ def make_tripcard_kvstore(
 # hdf5
 # =============================================================================
 def delrejser_generator(
-    ziplist: List[str], 
-    wanted_columns: Iterable[str], 
+    ziplist: List[str],
+    wanted_columns: Iterable[str],
     col_indices: Dict[str, int],
     chunksize: int , skiprows=0
     ) -> Generator[np.ndarray, None, None]:
@@ -204,7 +204,7 @@ def delrejser_generator(
     :type ziplist: List[str]
     :param wanted_columns: the columns to read from the zipfiles
     :type wanted_columns: Iterable[str]
-    :param col_indices: the dictionary of 
+    :param col_indices: the dictionary of
     :type col_indices: Dict[str, int]
     :param chunksize: the number of lines to read per iteration
     :type chunksize: int
@@ -248,15 +248,19 @@ def delrejser_generator(
         content_count += 1
 
 
-def _resolve_column_orders(input_columns: List[str], col_indices: Dict[str, int]) -> List[str]:
-    """order the columns"""
+def _resolve_column_orders(
+    input_columns: List[str],
+    col_indices: Dict[str, int]
+    ) -> List[str]:
+    """order the columns by column index"""
     wanted_columns = [(x, col_indices[x]) for x in input_columns]
     wanted_columns = sorted(wanted_columns, key=lambda x: x[1])
     return [x[0] for x in wanted_columns]
 
 
 def format_time(x: str) -> Tuple[int, int, int, int, int, int, int]:
-    """convert a time string to a tuple of integers
+    """convert a time string to a tuple of integers of
+    year, month, day, hour, minute, second, weekday
     """
     try:
         time = datetime.fromisoformat(x)
@@ -267,7 +271,10 @@ def format_time(x: str) -> Tuple[int, int, int, int, int, int, int]:
             time.weekday())
 
 
-def trip_application(array: np.ndarray, column_order: List[str]) -> Tuple[np.ndarray, np.ndarray]:
+def trip_application(
+    array: np.ndarray,
+    column_order: List[str]
+    ) -> Tuple[np.ndarray, np.ndarray]:
     """
     create two sub arrays in a tuple using trip keys and application
     sequence.
@@ -328,9 +335,15 @@ def trip_application(array: np.ndarray, column_order: List[str]) -> Tuple[np.nda
 
     return np.array(msgreportdate, dtype=np.int64), trip_app_stop
 
-def passenger_information(array: np.ndarray, column_order: List[str]) -> np.ndarray:
+def passenger_information(
+    array: np.ndarray,
+    column_order: List[str]
+    ) -> np.ndarray:
     """
     return sub array of tripkey and passenger counts and types
+    cols ->
+    turngl, korttype, passagerantal1, passagerantal2, passagerantal3,
+    passagertype1, passagertype2, passagertype3
     """
     turngl = column_order.index('turngl')
 
@@ -361,7 +374,7 @@ def passenger_information(array: np.ndarray, column_order: List[str]) -> np.ndar
 
 def price_information(array: np.ndarray, column_order: List[str]) -> np.ndarray:
     """
-    return sub array of tripkey, rebates, zones travelled and trip price
+    return sub array of tripkey, zones travelled, price
     """
     turngl = column_order.index('turngl')
     rejsepris = column_order.index('rejsepris')
@@ -372,7 +385,6 @@ def price_information(array: np.ndarray, column_order: List[str]) -> np.ndarray:
                     rejsepris,
                     zonerrejst)]
     # tidsrabat not now
-
     tprz = tprz[tprz[:, 1] != 'nan']
     tprz = tprz[tprz[:, 1] != '0']
     tprz = tprz[tprz[:, 1] != 0]
@@ -393,7 +405,7 @@ def price_information(array: np.ndarray, column_order: List[str]) -> np.ndarray:
 
 
 def check_collection_complete(arr_col, key):
-    """cheack the common.io collection mapper is the same"""
+    """check the common.io collection mapper is the same"""
     test_vals = mappers[key].keys()
     unseen = set()
     for x in arr_col:
@@ -433,9 +445,14 @@ def update_collection(unseen_ids, key) -> None:
 
 CONTR_REC = Tuple[int, str, str, str, str, str]
 
-def contractor_information(array: np.ndarray, column_order: List[str]) -> Dict[int, Tuple[CONTR_REC, ...]]:
+def contractor_information(
+    array: np.ndarray,
+    column_order: List[str]
+    ) -> Dict[int, Tuple[CONTR_REC, ...]]:
     """
-    return sub array of tripkey, AppSeq, the operators and contractors
+    return a dictionary ->
+    key is the tripkey with values as tuples of
+    (appseq, nyudfører, contractorid, ruteid, fradelrejse, tildelrejse)
     """
 
     turngl = column_order.index('turngl')
@@ -476,28 +493,27 @@ def contractor_information(array: np.ndarray, column_order: List[str]) -> Dict[i
 
     return cont_dict
 
+STORE_PROC = Union[Dict[int, Tuple[CONTR_REC, ...]], np.ndarray]
 
+def store_processing(
+    dset: str,
+    ziplist: List[str],
+    col_indices: Dict[str, int],
+    chunksize: int
+    ) -> Generator[Tuple[int, STORE_PROC, str], None, None]:
+    """return the processed given dataset (set) all of the zipfiles
 
-def store_processing(dset: str, ziplist: List[str], col_indices: Dict[str, int], chunksize: int):
-    """
-    Parameters
-    ----------
-    dset : TYPE
-        DESCRIPTION.
-    ziplist : TYPE
-        DESCRIPTION.
-    col_indices : TYPE
-        DESCRIPTION.
-
-    Yields
-    ------
-    i : TYPE
-        DESCRIPTION.
-    TYPE
-        DESCRIPTION.
-    dset : TYPE
-        DESCRIPTION.
-
+    :param dset: the name of the dataset to process
+    ('stoptime', 'passengers', 'price', 'contractor')
+    :type dset: str
+    :param ziplist: a list of zipfile paths
+    :type ziplist: List[str]
+    :param col_indices: the dictionary of columns and indices
+    :type col_indices: Dict[str, int]
+    :param chunksize: the number of lines to read at a time and size of each store
+    :type chunksize: int
+    :yield: the store number, the processed data and the dataset name
+    :rtype: Generator[Tuple[int, STORE_PROC, str], None, None]
     """
     col_dict = {
         'stoptime': [
@@ -541,42 +557,52 @@ def store_processing(dset: str, ziplist: List[str], col_indices: Dict[str, int],
         yield i, func_dict[dset](arr, column_ord), dset
 
 
-def stoptime_producer(ziplist, col_indices, q, chunksize) -> None:
-
+def stoptime_producer(
+    ziplist: List[str],
+    col_indices: Dict[str, int],
+    q: Queue,
+    chunksize: int
+    ) -> None:
+    """iteratively produce the stop and time datasets
+    """
     for x in store_processing('stoptime', ziplist, col_indices, chunksize):
         q.put(x)
         time.sleep(0.1)
 
 
-def price_producer(ziplist, col_indices, q, chunksize) -> None:
-
+def price_producer(
+    ziplist: List[str],
+    col_indices: Dict[str, int],
+    q: Queue,
+    chunksize: int
+    ) -> None:
+    """iteratively produce the price dataset
+    """
     for x in store_processing('price', ziplist, col_indices, chunksize):
         q.put(x)
         time.sleep(0.1)
 
 
-def passengers_producer(ziplist, col_indices, q, chunksize) -> None:
-
+def passengers_producer(
+    ziplist: List[str],
+    col_indices: Dict[str, int],
+    q: Queue,
+    chunksize: int
+    ) -> None:
+    """iteratively produce the passenger dataset
+    """
     for x in store_processing('passengers', ziplist, col_indices, chunksize):
         q.put(x)
         time.sleep(0.1)
 
 
-def contractor_producer(ziplist, col_indices, q, chunksize) -> None:
-    """
-    Parameters
-    ----------
-    ziplist : TYPE
-        DESCRIPTION.
-    col_indices : TYPE
-        DESCRIPTION.
-    q : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    None.
-
+def contractor_producer(
+    ziplist: List[str],
+    col_indices: Dict[str, int],
+    q: Queue,
+    chunksize: int
+    ) -> None:
+    """iteratively produce the contractor dataset
     """
     for x in store_processing(
             'contractor', ziplist, col_indices, chunksize):
@@ -584,8 +610,15 @@ def contractor_producer(ziplist, col_indices, q, chunksize) -> None:
         time.sleep(0.1)
 
 
-def consumer_process(q, location) -> None:
+def consumer_process(q: Queue, location: str) -> None:
+    """consumer for the data for stop, time, price and passenger
+    datasets that writes them to hdf5 files
 
+    :param q: a multiprocessing queue with processed datasets
+    :type q: Queue
+    :param location: the directory to write the data to
+    :type location: str
+    """
     while True:
         if not q.empty():
             res = q.get()
@@ -595,10 +628,9 @@ def consumer_process(q, location) -> None:
             time.sleep(0.1)
             continue
 
-
-        datasets = []
-        out_data = res[1]
-        name = res[2]
+        datasets: List[STORE_PROC] = []
+        out_data: STORE_PROC = res[1]
+        name: str = res[2]
 
         store_path = os.path.join(
             location, f'rkfile{res[0]}.h5'
@@ -622,8 +654,9 @@ def consumer_process(q, location) -> None:
                     )
 
 
-def contractor_consumer(q, location) -> None:
-    """
+def contractor_consumer(q: Queue, location: str) -> None:
+    """consumer for the contractor datasets that writes them to
+    messagepack files in the given location (directory)
     """
     while True:
         if not q.empty():
@@ -646,7 +679,7 @@ def contractor_consumer(q, location) -> None:
 #  Start process for each dataset and put in a queue for each chunk
 # =============================================================================
 def main() -> None:
-    """entry"""
+    """entry function"""
 
     parser = TableArgParser('year', 'chunksize', 'input_dir', 'output_dir')
     args = parser.parse()
@@ -674,13 +707,16 @@ def main() -> None:
                 args=(zips, col_indices, tc_store_path, chunk_size))
     print("procesessing stores")
     p1 = Process(target=stoptime_producer,
-                  args=(zips, col_indices, queue, chunk_size))
+                args=(zips, col_indices, queue, chunk_size))
+
     p2 = Process(target=price_producer,
-                  args=(zips, col_indices, queue, chunk_size))
+                args=(zips, col_indices, queue, chunk_size))
+
     p3 = Process(target=passengers_producer,
-                  args=(zips, col_indices, queue, chunk_size))
+                args=(zips, col_indices, queue, chunk_size))
+
     p4 = Process(target=contractor_producer,
-                  args=(zips, col_indices, contractor_queue, chunk_size))
+                args=(zips, col_indices, contractor_queue, chunk_size))
 
     t2 = Thread(target=consumer_process,
                 args=(queue, hdf_path))
@@ -701,7 +737,7 @@ def main() -> None:
     p2.join()
     p3.join()
     p4.join()
-    queue.put(None)
+    queue.put(None) # put in the sentinel value
     contractor_queue.put(None)
     t2.join()
     t3.join()
