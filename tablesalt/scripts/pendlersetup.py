@@ -64,9 +64,11 @@ from itertools import groupby
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
+from typing import DictList
 
 import lmdb
 import numpy as np
+from pandas import Timestamp
 
 from tablesalt import StoreReader
 from tablesalt.common import make_store
@@ -76,23 +78,6 @@ from tablesalt.season import users
 
 
 def get_pendler_trips(pendler_cards, tripcarddb, userdb):
-    """
-    Filter out non-pendler kombi trips
-
-    Parameters
-    ----------
-    card_trip_fp : str/path
-        path to the CARD_.
-    pendler_cards : dict
-        the pendler user data returned from
-        users._PendlerInput().get_user_data()
-
-    Returns
-    -------
-    list
-        list of tuples.
-
-    """
 
     user_card_nums = {bytes(x, 'utf-8') for x in pendler_cards}
 
@@ -121,22 +106,15 @@ def get_pendler_trips(pendler_cards, tripcarddb, userdb):
     return [x[1] for x in trip_card_dict]
 
 
-def load_store_dates(store, pendler_trip_keys):
-    """
-    load the time information from the hdfstores
+def load_store_dates(store: str, pendler_trip_keys: List[int]) -> Dict[bytes, bytes]:
+    """load the time/date data from the given store
 
-    Parameters
-    ----------
-    store : str/path
-        path to an hdfstore.
-    pendler_trip_keys : list
-        a list of tripkey integers.
-
-    Returns
-    -------
-    tuple
-        tuple of two-tuples of (tripkey, date string).
-
+    :param store: the path of and hdf5 file
+    :type store: str
+    :param pendler_trip_keys: a list of tripkeys that are pendler trips
+    :type pendler_trip_keys: List[int]
+    :return: a dictionary of tripkey -> datestring
+    :rtype: Dict[bytes, bytes]
     """
 
     time_info = StoreReader(store).get_data('time')
@@ -151,28 +129,22 @@ def load_store_dates(store, pendler_trip_keys):
         for x in date_info
         }
 
-def thread_dates(lst_of_stores, pendler_keys, dbpath):
+def thread_dates(
+    lst_of_stores: List[str],
+    pendler_trip_keys: List[int],
+    dbpath: str
+    ) -> None:
+    """load all of the stores in parallel, filter pendler trips and write
+    to key-value store
+
+    :param lst_of_stores: list of paths to hdf5 files
+    :type lst_of_stores: List[str]
+    :param pendler_trip_keys: a list of tripkeys that are pendler trips
+    :type pendler_trip_keys: List[int]
+    :param dbpath: the path of the lmdb key-value store to create
+    :type dbpath: str
     """
-    Load the pendler
-
-    Parameters
-    ----------
-    card_trip_fp : str
-        DESCRIPTION.
-    pendler_cards : dict
-        DESCRIPTION.
-    stores : TYPE
-        DESCRIPTION.
-    n_threads : TYPE, optional
-        DESCRIPTION. The default is 4.
-
-    Returns
-    -------
-    list
-        list of two-tules (tripkey, datetime.date).
-
-    """
-    func = partial(load_store_dates, pendler_trip_keys=pendler_keys)
+    func = partial(load_store_dates, pendler_trip_keys=pendler_trip_keys)
     print("Loading travel dates...")
     with Pool(7) as pool:
         results = pool.imap(func, lst_of_stores)
@@ -190,23 +162,23 @@ def _date_in_window(test_period, test_date):
 
 
 def validate_travel_dates(
-        userdata, userdbpath,
-        kombidatespath, kombivalidpath
-        ):
-    """
-    Validate that a trip occurs in a valid kombi time period
+        userdata: Dict[str, Dict[int, Dict[str, Union[Timestamp, Tuple[int, ...]]]]],
+        userdbpath: str,
+        kombidatespath: str,
+        kombivalidpath: str
+        ) -> None:
+    """Validate that trips occur in the valid date range for each seasonpass
+    write only to ones that do into a key-vaue store
 
-    Parameters
-    ----------
-    travel_dates : TYPE
-        DESCRIPTION.
-    userdata : TYPE
-        DESCRIPTION.
 
-    Returns
-    -------
-    None.
-
+    :param userdata: the dictionary of users and seasonpasses
+    :type userdata: Dict[str, Dict[int, Dict[str, Union[Timestamp, Tuple[int, ...]]]]]
+    :param userdbpath: the path to the user database key-value store
+    :type userdbpath: str
+    :param kombidatespath: the path to the key-value store of kombi dates
+    :type kombidatespath: str
+    :param kombivalidpath: the path to the key value store of valid kombi trips
+    :type kombivalidpath: str
     """
     # =========================================================================
     # load the user trips from lmdb

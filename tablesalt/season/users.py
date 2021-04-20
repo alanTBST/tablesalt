@@ -588,47 +588,50 @@ class PendlerKombiUsers():
         >>> user_dict = PendlerKombiUsers(2019, 'PeriodeProdukt.csv', 'Zoner.csv')
         >>> youth_users = user_dict.get_data(ptype='Ung')
         >>> youth_users
-        {'46464333443241444144383435413538': {2065413: {'end': Timestamp('2019-03-04 00:00:00'),
-                                                'start': Timestamp('2019-02-03 00:00:00'),
-                                                'zones': (1001,
-                                                          1002,
-                                                          1032,
-                                                          1043)},
-                                              2073335: {'end': Timestamp('2019-04-03 00:00:00'),
-                                                'start': Timestamp('2019-03-05 00:00:00'),
-                                                'zones': (1001, 1002)}},
-          '46454545363437423530454532393833': {2114847: {'end': Timestamp('2019-09-09 00:00:00'),
-                                                'start': Timestamp('2019-08-11 00:00:00'),
-                                                'zones': (1001, 1002)}},...
+        | {'46464333443241444144383435413538': {
+        |     2065413: {'end': Timestamp('2019-03-04 00:00:00'),
+        |               'start': Timestamp('2019-02-03 00:00:00'),
+        |               'zones': (1001,
+        |                         1002,
+        |                         1032,
+        |                         1043)},
+        |     2073335: {'end': Timestamp('2019-04-03 00:00:00'),
+        |               'start': Timestamp('2019-03-05 00:00:00'),
+        |               'zones': (1001, 1002)}},
+        |  '46454545363437423530454532393833': {
+        |     2114847: {'end': Timestamp('2019-09-09 00:00:00'),
+        |               'start': Timestamp('2019-08-11 00:00:00'),
+        |               'zones': (1001, 1002)}},...
 
         If we want youth users that have paid for 11 zones.
         >>> youth_users_paid_11 = user_dict.get_data(ptype='Ung', paid_zones=1)
         >>> youth_users_paid_11
-        {'33323231434144303845393136443539': {2120236: {'end': Timestamp('2019-10-02 00:00:00'),
-                                                'start': Timestamp('2019-09-03 00:00:00'),
-                                                'zones': (1001,
-                                                          1002,
-                                                          1003,
-                                                          1006,
-                                                          1007,
-                                                          1009,
-                                                          1030,
-                                                          1031,
-                                                          1034,
-                                                          1035,
-                                                          1041,
-                                                          1042,
-                                                          1045,
-                                                          1051,
-                                                          1053,
-                                                          1061,
-                                                          1063,
-                                                          1071,
-                                                          1074,
-                                                          1082,
-                                                          1085,
-                                                          1093,
-                                                          1094)}}}
+        | {'33323231434144303845393136443539': {
+        |      2120236: {'end': Timestamp('2019-10-02 00:00:00'),
+        |                'start': Timestamp('2019-09-03 00:00:00'),
+        |                'zones': (1001,
+        |                          1002,
+        |                          1003,
+        |                          1006,
+        |                          1007,
+        |                          1009,
+        |                          1030,
+        |                          1031,
+        |                          1034,
+        |                          1035,
+        |                          1041,
+        |                          1042,
+        |                          1045,
+        |                          1051,
+        |                          1053,
+        |                          1061,
+        |                          1063,
+        |                          1071,
+        |                          1074,
+        |                          1082,
+        |                          1085,
+        |                          1093,
+        |                          1094)}}}
         You'll notice that there are more than eleven valid zones for this user.
         This is a result of the fare system for pendler tickets in which users that
         pay for 9 or more zones tend to get access to more physical zones than paid for
