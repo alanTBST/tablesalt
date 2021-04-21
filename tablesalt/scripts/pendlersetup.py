@@ -1,70 +1,67 @@
 """
 TBST - Trafik, Bygge, og Bolig -styrelsen
 
-
 Created on Sat Mar 14 18:07:24 2020
 
 @author: Alan Jones
 @email: alkj@tbst.dk; alanksjones@gmail.com
 
-# =============================================================================
- HELLO AGAIN!
- -------------
- This script sets up the
+**HELLO AGAIN!**
 
- WHAT DOES IT DO?
- -----------------
+This script is the second step in revenue analysis at TBST
 
+**WHAT DOES IT DO?**
 
- Directory tree structure:
+    Given a paths to pendler product data this script creates three more lmdb
+    key-value stores pertienent to pendler users. The delrejsersetup script, run before
+    this, created the trip_card_db
 
- rejsekortstores/
-    |
-    |------dbs/
-    |       |-----kombi_dates_db
-    |       |-----kombi_valid_trips
-    |       |-----trip_card_db
-    |       |-----user_trips_db
-    |
-    |------hdfstores/
-    |       |-----rkfile(0).h5.....rkfile(n).h5
-    |
-    |------packs/
-            |-----rkfile(0)cont.msgpack...rkfile(n)cont.msgpack
+PeriodeProdukt.csv
 
- First
- ------
+.. tabularcolumns:: |p{3cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|
++----------------------------------+----------------+-----------+----------------+---------------------------------+-------------------+-------------------+-----------------+-------------+--------------+------------+----------------+
+|          EncryptedCardEngravedID |   SeasonPassID | Fareset   | PsedoFareset   | SeasonPassName                  |   SeasonPassZones | ValidityStartDT   | ValidityEndDT   |   ValidDays |   FromZoneNr |   ToZoneNr | PassagerType   |
++==================================+================+===========+================+=================================+===================+===================+=================+=============+==============+============+================+
+| 42454135373736374541303030343937 |        2120462 | Sjælland  | Hovedstaden    | DOT Pendler Kombi m. Metro      |                 5 | 03/09/2019        | 16/09/2019      |          14 |         1002 |       1052 | Voksen         |
++----------------------------------+----------------+-----------+----------------+---------------------------------+-------------------+-------------------+-----------------+-------------+--------------+------------+----------------+
+| 32433241303531383137334546443541 |        2097861 | Sjælland  | Hovedstaden    | Udgået - Pendler Kombi Sjælland |                 8 | 05/06/2019        | 04/07/2019      |          30 |         1001 |       1085 | Voksen         |
++----------------------------------+----------------+-----------+----------------+---------------------------------+-------------------+-------------------+-----------------+-------------+--------------+------------+----------------+
+| 32433241303531383137334546443541 |        2105617 | Sjælland  | Hovedstaden    | Udgået - Pendler Kombi Sjælland |                 8 | 05/07/2019        | 03/08/2019      |          30 |         1001 |       1085 | Voksen         |
++----------------------------------+----------------+-----------+----------------+---------------------------------+-------------------+-------------------+-----------------+-------------+--------------+------------+----------------+
+| 32433241303531383137334546443541 |        2113630 | Sjælland  | Hovedstaden    | Udgået - Pendler Kombi Sjælland |                 8 | 05/08/2019        | 03/09/2019      |          30 |         1001 |       1085 | Voksen         |
++----------------------------------+----------------+-----------+----------------+---------------------------------+-------------------+-------------------+-----------------+-------------+--------------+------------+----------------+
+| 32433241303531383137334546443541 |        2125274 | Sjælland  | Hovedstaden    | DOT Pendler Kombi m. Metro      |                 8 | 12/09/2019        | 11/10/2019      |          30 |         1001 |       1085 | Voksen         |
++----------------------------------+----------------+-----------+----------------+---------------------------------+-------------------+-------------------+-----------------+-------------+--------------+------------+----------------+
 
- Second
- -------
+Resultant directory tree structure:
 
+| rejsekortstores/
+|
+|    |------dbs/
+|           |-----trip_card_db
+|           |-----kombi_dates_db
+|           |-----kombi_valid_tripshat
+|           |-----user_trips_db
+|
+|    |------hdfstores/
+|           |-----rkfile(0).h5.....rkfile(n).h5
+|
+|    |------packs/
+|           |-----rkfile(0)cont.msgpack...rkfile(n)cont.msgpack
 
-  Third
-  ------
+**First**
 
+user_trips_db
 
-  BE AWARE!
-  ---------
-
-
-  DEPENDENCIES
-  ------
-  tablesalt -
-  If using conda and the install step doesn't quite work, after the build
-  try pip install .  in the repo directory
-
-# =============================================================================
 """
-# standard imports
 import ast
 from datetime import datetime
 from functools import partial
-# from multiprocessing.pool import ThreadPool
 from itertools import groupby
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
-from typing import DictList
+from typing import Dict, List, Set, Union, Tuple
 
 import lmdb
 import numpy as np
@@ -76,10 +73,26 @@ from tablesalt.preprocessing import db_paths, find_datastores
 from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.season import users
 
+# may refactor to accept just a sequence of cardnums
+def get_pendler_trips(
+    userdata: Dict[str, Dict[int, Dict[str, Union[Timestamp, Tuple[int, ...]]]]],
+    tripcarddb: str, userdb: str
+    ) -> List[str]:
+    """create the user_trips_db from the season pass data and the trip_card kv store
+        cardnum -> (tripkey1, tripkey2, tripkey3,....)
+        also returns a list of pendler tripkeys
 
-def get_pendler_trips(pendler_cards, tripcarddb, userdb):
+    :param userdata: the data returned from users._PendlerInput.get_user_data()
+    :type userdata: Dict[str, Dict[int, Dict[str, Union[Timestamp, Tuple[int, ...]]]]]
+    :param tripcarddb: the path to the tripcarddb
+    :type tripcarddb: str
+    :param userdb: the path the output user_trips_db
+    :type userdb: str
+    :return: a list of all pendler tripkeys
+    :rtype: List[int]
+    """
 
-    user_card_nums = {bytes(x, 'utf-8') for x in pendler_cards}
+    user_card_nums = {bytes(x, 'utf-8') for x in userdata}
 
     trip_card_dict = {}
     with lmdb.open(tripcarddb) as env:
@@ -89,7 +102,7 @@ def get_pendler_trips(pendler_cards, tripcarddb, userdb):
                 if v in user_card_nums:
                     trip_card_dict[int(k.decode('utf-8'))] = v
 
-    trip_card_dict = sorted(zip(
+    trip_card_list = sorted(zip(
         trip_card_dict.values(), trip_card_dict.keys()
         ), key=itemgetter(0))
 
@@ -97,19 +110,20 @@ def get_pendler_trips(pendler_cards, tripcarddb, userdb):
     card_to_trips = {
         key: bytes(str(tuple(x[1] for x in grp)), 'utf-8')
         for key, grp in groupby(
-            trip_card_dict, key=itemgetter(0)
+            trip_card_list, key=itemgetter(0)
                 )
         }
 
     make_store(card_to_trips, userdb, start_size=5)
 
-    return [x[1] for x in trip_card_dict]
+    return [trip for card, trip in trip_card_list]
 
 
 def load_store_dates(store: str, pendler_trip_keys: List[int]) -> Dict[bytes, bytes]:
-    """load the time/date data from the given store
+    """load the time/date data from the given store and get only pendler user
+    tripkeys
 
-    :param store: the path of and hdf5 file
+    :param store: the path of an hdf5 file
     :type store: str
     :param pendler_trip_keys: a list of tripkeys that are pendler trips
     :type pendler_trip_keys: List[int]
@@ -216,6 +230,8 @@ def validate_travel_dates(
 
 
 def main():
+    """main script function
+    """
 
     parser = TableArgParser('year', 'products', 'zones')
 
@@ -234,11 +250,14 @@ def main():
     userdata = pendler_cards.get_user_data()
 
     pendler_trip_keys = get_pendler_trips(
-        userdata, paths['trip_card_db'], paths['user_trips_db']
+        userdata, paths['trip_card_db'],
+        paths['user_trips_db']
         )
 
     thread_dates(
-        stores, pendler_trip_keys, paths['kombi_dates_db']
+        stores,
+        pendler_trip_keys,
+        paths['kombi_dates_db']
         )
 
     print("validating travel dates")
