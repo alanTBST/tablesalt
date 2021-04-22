@@ -18,7 +18,7 @@ This script is the second step in revenue analysis at TBST
 
 PeriodeProdukt.csv
 
-.. tabularcolumns:: |p{3cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|p{2cm}|
+.. tabularcolumns:: |p{4cm}|p{15mm}|p{15mm}|p{15mm}|p{15mm}|p{15mm}|p{15mm}|p{15mm}|p{15mm}|p{15mm}|p{15mm}|p{15mm}|
 +----------------------------------+----------------+-----------+----------------+---------------------------------+-------------------+-------------------+-----------------+-------------+--------------+------------+----------------+
 |          EncryptedCardEngravedID |   SeasonPassID | Fareset   | PsedoFareset   | SeasonPassName                  |   SeasonPassZones | ValidityStartDT   | ValidityEndDT   |   ValidDays |   FromZoneNr |   ToZoneNr | PassagerType   |
 +==================================+================+===========+================+=================================+===================+===================+=================+=============+==============+============+================+
