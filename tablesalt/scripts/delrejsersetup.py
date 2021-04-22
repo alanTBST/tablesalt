@@ -7,94 +7,81 @@ Created on Sat Mar 14 18:07:24 2020
 @author: Alan Jones
 @email: alkj@tbst.dk; alanksjones@gmail.com
 
-# =============================================================================
+**HELLO THERE!**
 
- HELLO THERE!
- -------------
+    This script is the first step in any analysis of delrejser data
+    at TBST using Python. It creates the datastores that are needed for both the
+    OD analysis and the Revenue distribution for DOT for Takstsjælland
 
- This script is the first step in any analysis of delrejser data
- at TBST using Python. It creates the datastores that are needed for both the
- OD analysis and the Revenue distribution for DOT for Takstsjælland
+**WHAT DOES IT DO?**
 
- WHAT DOES IT DO?
- -----------------
+    Given a path to a directory of compressed zip files of rejsekort delrejser
+    data and a path for an output directory where the resulting datastores
+    should be placed, it will read those zips without having to extract them
+    first and splits the large dataset into various forms and files.
 
- Given a path to a directory of compressed zip files of rejsekort delrejser
- data and a path for an output directory where the resulting datastores
- should be placed, it will read those zips without having to extract them
- first and splits the large dataset into various forms and files.
+    Most significantly it will split the giant data set into hundreds of smaller
+    files.
 
- Most significantly it will split the giant data set into hundreds of smaller
- files.
+    Resultant directory tree structure:
 
- Directory tree structure:
+| GIVEN_OUTPUT_DIRECTORY/
+|
+|
+|         |---rejsekortstores/
+|
+|                   |------dbs/
+|                           |-----trip_card_db (key-value_store)
+|
+|                   |------hdfstores/
+|                           |-----rkfile(0).h5
+|                           |----- ...
+|                           |-----rkfile(n).h5
+|                   |------packs/
+|                           |-----rkfile(0)cont.msgpack
+|                           |----- ...
+|                           |-----rkfile(n)cont.msgpack
 
- GIVEN_OUTPUT_DIRECTORY/
-          |
-          |
-          |---rejsekortstores/
-                    |
-                    |------dbs/
-                    |       |-----trip_card_db (key-value_store)
-                    |
-                    |------hdfstores/
-                    |         |-----rkfile(0).h5
-                    |         |----- ...
-                    |         |-----rkfile(n).h5
-                    |------packs/
-                    |        |-----rkfile(0)cont.msgpack
-                    |        |----- ...
-                    |        |-----rkfile(n)cont.msgpack
- First
- ------
- A key-value store with tripkeys as keys and card numbers as values in a
- memory mapped lmdb database for super fast lookups.
- This database contains all the tripkeys in the dataset.
- For 2019 delrejser data, this uses approximately 5gb. The size is flexible
- up until 30gb without any user input, although that upper limit can be
- changed.
+**First**
 
- Second
- -------
- The flat data set is split up into more coherent subsets:
-     - stop_information
-     - time_information
-     - price_information
-     - passenger_information
-     - contractor_information
+    A key-value store with tripkeys as keys and card numbers as values in a
+    memory mapped lmdb database for super fast lookups.
+    This database contains all the tripkeys in the dataset.
+    For 2019 delrejser data, this uses approximately 5gb. The size is flexible
+    up until 30gb without any user input, although that upper limit can be
+    changed.
 
-  The first four dataset are places in hdf5 files in the directory structure
-  shown above. Each of these have been normalised and contain only integers
-  hdf5 files store and load matrices efficiently
+**Second**
 
-  Third
-  ------
-  The contractor information currently is put in msgpack files. These
-  files are similar to json but are smaller and load quickly.
-  The contractor_information is semi-normalised but contains the from and
-  to stop variables as strings. (This may change in the future to a
-  document database in the future)
+    The flat data set is split up into more coherent subsets:
+        - stop_information
+        - time_information
+        - price_information
+        - passenger_information
+        - contractor_information
 
-  Using this structure, analysis/computation can be easily parallelised
-  and reduces the reliance on RDBMS (SQL Server) database connections -
-  which can be slow
+The first four dataset are places in hdf5 files in the directory structure
+shown above. Each of these have been normalised and contain only integers
+hdf5 files store and load matrices efficiently
 
-  BE AWARE!
-  ---------
-  This script spawns four process, so ensure that you have four cores
-  available. If using a laptop, for instance, you won't be able to get
-  much else done. It shouldn't last much more than 7 hrs though :)
-  Multi-core server architecture advised.
+**Third**
 
-  DEPENDENCIES
-  ------
-  tablesalt - tbst python analysis package
+    The contractor information currently is put in msgpack files. These
+    files are similar to json but are smaller and load quickly.
+    The contractor_information is semi-normalised but contains the from and
+    to stop variables as strings. (This may change in the future to a
+    document database in the future)
 
-  numpy, pandas, python-lmdb, h5py, msgpack
-  Each of these can be installed with pip or conda
+    Using this structure, analysis/computation can be easily parallelised
+    and reduces the reliance on RDBMS (SQL Server) database connections -
+    which can be slow
 
+**BE AWARE!**
+    This script spawns four process, so ensure that you have four cores
+    available. If using a laptop, for instance, you won't be able to get
+    much else done. It shouldn't last much more than 7 hrs though :)
+    Multi-core server architecture advised.
 
-# =============================================================================
 """
 
 import json
@@ -260,7 +247,7 @@ def _resolve_column_orders(
 
 def format_time(x: str) -> Tuple[int, int, int, int, int, int, int]:
     """convert a time string to a tuple of integers of
-    year, month, day, hour, minute, second, weekday
+    (year, month, day, hour, minute, second, weekday)
     """
     try:
         time = datetime.fromisoformat(x)
