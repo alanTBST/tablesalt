@@ -10,11 +10,32 @@ Created on Sat Mar 14 18:07:24 2020
 
 This script is the second step in revenue analysis at TBST
 
-**WHAT DOES IT DO?**
+WHAT DOES IT DO?
+================
 
     Given a paths to pendler product data this script creates three more lmdb
-    key-value stores pertienent to pendler users. The delrejsersetup script, run before
+    key-value stores pertinent to pendler users. It creates creates the
+    user_trips_db
+    The delrejsersetup script, run before
     this, created the trip_card_db
+
+
+Resultant directory tree structure
+==================================
+
+| rejsekortstores/
+|
+|    |------dbs/
+|           |-----trip_card_db
+|           |-----kombi_dates_db
+|           |-----kombi_valid_trips
+|           |-----user_trips_db
+|
+|    |------hdfstores/
+|           |-----rkfile(0).h5.....rkfile(n).h5
+|
+|    |------packs/
+|           |-----rkfile(0)cont.msgpack...rkfile(n)cont.msgpack
 
 
 Input Data
@@ -23,7 +44,7 @@ Input Data
 PeriodeProdukt
 --------------
 
-.. tabularcolumns:: |p{5.5cm}||L||L|L|
+.. tabularcolumns:: |p{5.4cm}||L||L|L|
 +----------------------------------+--------------+----------------------+---------------------------------+
 |          EncryptedCardEngravedID | SeasonPassID | SeasonPassTemplateID | SeasonPassName                  |
 +==================================+==============+======================+=================================+
@@ -155,24 +176,6 @@ Zoner
 +----------------------------------+----------------+----------+
 | 32433241303531383137334546443541 |        2097861 |     1085 |
 +----------------------------------+----------------+----------+
-
-Resultant directory tree structure
-==================================
-
-| rejsekortstores/
-|
-|    |------dbs/
-|           |-----trip_card_db
-|           |-----kombi_dates_db
-|           |-----kombi_valid_tripshat
-|           |-----user_trips_db
-|
-|    |------hdfstores/
-|           |-----rkfile(0).h5.....rkfile(n).h5
-|
-|    |------packs/
-|           |-----rkfile(0)cont.msgpack...rkfile(n)cont.msgpack
-
 
 
 """

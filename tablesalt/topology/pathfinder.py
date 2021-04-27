@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Oct 15 10:31:40 2019
-
-@author: alkj
+Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
 
 
 functions and Classes used to find

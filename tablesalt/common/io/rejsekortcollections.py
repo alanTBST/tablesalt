@@ -1,8 +1,6 @@
 ﻿
 """
-Created on Wed Jun 27 11:21:12 2018
-
-@author: alkj
+Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
 """
 
 import json
