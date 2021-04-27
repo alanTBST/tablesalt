@@ -357,7 +357,7 @@ class StationOperators():
         >>> cph_operator_ids = op_getter.get_ops(8600626, format='operator_id')
         >>> cph_operator_ids
         >>> (4, 8, 5, 6)
-        >>> cph_operators = op_getter.get_ops(86000626, format='operator')
+        >>> cph_operators = op_getter.get_ops(8600626, format='operator')
         >>> cph_operators
         >>> ('first', 's-tog', 'dsb', 'metro')
 
@@ -406,8 +406,8 @@ class StationOperators():
         """return the possible operator strings that can service the
         a start and end point
 
-        :return: [description]
-        :rtype: [type]
+        :return: a tuple of operators that serve the station pair
+        :rtype: Tuple[str, ...]
         """
 
         intersect = set(start_ops).intersection(set(end_ops))
@@ -431,13 +431,13 @@ class StationOperators():
         """return the possibe operator ids that can service
         a start and end point
 
-        :param start_uic: [description]
+        :param start_uic: station id of start
         :type start_uic: int
-        :param start_ops: [description]
+        :param start_ops: station operators of start
         :type start_ops: Tuple[int, ...]
-        :param end_ops: [description]
+        :param end_ops: station operators of end
         :type end_ops: Tuple[int, ...]
-        :return: [description]
+        :return: a tuple of the possible operator ids
         :rtype: Tuple[int, ...]
         """
 

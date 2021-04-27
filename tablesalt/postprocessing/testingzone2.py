@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Nov 17 11:40:35 2020
-
-@author: alkj
+Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
 """
 
 import ast
