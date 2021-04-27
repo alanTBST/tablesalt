@@ -29,10 +29,6 @@ def _load_connection_config():
         asdict = json.load(fp)
     return asdict
 
-
-
-
-
 def make_connection():
     """
     Make a connection to the datawarehouse.

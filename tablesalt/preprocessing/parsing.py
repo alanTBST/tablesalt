@@ -1,6 +1,5 @@
-"""Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
-
-Parsing contains class to parse command line arguments for
+"""
+Parsing contains a class to parse command line arguments for
 tablesalt scripts. It defines allowable arguments and default
 values
 """

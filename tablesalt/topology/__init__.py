@@ -4,7 +4,6 @@
 The topology subpackage contains classes and functions used to interact
 with data from the transport network.py
 
-
 It has:
     * methods to download network and routing information from Rejseplan
     * ways to retrieve operators servicing stations
