@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
-
-
-functions and Classes used to find
+Functions and Classes used to find
 all the zones travelled through on
 a trip. Calculated from the given zones
 in which a user taps in or out

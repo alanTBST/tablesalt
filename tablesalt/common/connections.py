@@ -1,6 +1,7 @@
 """
-Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
-
+The connections module provides functions to interact with
+helrejser data in TBSTs datawarehouse and to create lmdb key-value
+stores from dictionaries.
 """
 import os
 import pkg_resources

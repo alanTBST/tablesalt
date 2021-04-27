@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Nov 24 13:38:57 2019
-
-@author: alkj
-
+Classes to interact with passenger stations and the operators that serve them
 """
 #standard imports
 import json
@@ -295,7 +292,7 @@ class StationOperators():
 
         :param uic_number: the stop uic number
         :type uic_number: int
-        :raises KeyError: if the station/stop is not found
+        :raises KeyError: the stop uic number
         :return: a tuple of line names that the stop is on
         :rtype: Tuple[str, ...]
         """
@@ -313,10 +310,10 @@ class StationOperators():
     def _get_operator_id(self, uic_number: int) -> Tuple[int, ...]:
         """[summary]
 
-        :param uic_number: [description]
+        :param uic_number: the stop uic number
         :type uic_number: int
-        :raises KeyError: [description]
-        :return: [description]
+        :raises KeyError: the stop uic number
+        :return:  a tuple of operator ids that the stop is on
         :rtype: Tuple[int, ...]
         """
         try:
@@ -349,7 +346,7 @@ class StationOperators():
         :rtype: Tuple[Union[int, str], ...]
 
         :Example:
-        ----------
+
         to return the operators at Copenhagen central station:
             the uic number is 8600626
 
@@ -514,7 +511,7 @@ class StationOperators():
         :rtype: Tuple[int, ...]
 
         :Example:
-        ----------
+
         to return the possbible operators servicing a leg from copenhagen central
         station to helsingør station
 
