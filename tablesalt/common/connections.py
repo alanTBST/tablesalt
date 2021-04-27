@@ -1,11 +1,8 @@
 """
-TBST Trafik, Bygge, og Bolig -styrelsen
-
-
 Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
 
 """
-import os 
+import os
 import pkg_resources
 import json
 
