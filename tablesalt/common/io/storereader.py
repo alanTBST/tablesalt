@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """
+Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
 
 Module containg StoreReader class to read
 datasets from the Rejsekort datasets that

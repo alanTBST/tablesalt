@@ -1,8 +1,4 @@
 """
-TBST Trafik, Bygge, og Bolig -styrelsen
-Package for rejsekort data analysis at TBST
-
-
 Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
 
 """
@@ -45,8 +41,8 @@ def find_zero_pay_trips(stores):
         for res in tqdm(results, 'finding trips inside zones', total=len(stores)):
             out.update(set(res))
     return out
-    
-    
+
+
 class DataSetError(ValueError):
     """
     ValueError that raises when file in the filepath
@@ -113,7 +109,7 @@ class RejsekortStore():
     DEFAULT_DATASTORE_DIR = os.path.join('...', 'datastores')
 
     def __init__(self, datastore_path=None, **kwargs):
-    
+
         if datastore_path is not None:
             self._datastore_path = datastore_path
         else:

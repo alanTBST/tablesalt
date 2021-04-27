@@ -34,8 +34,6 @@ from tablesalt.topology.tools import TakstZones
 
 # from turbodbc import connect, make_options
 
-
-
 THIS_DIR = Path(__file__).parent
 CPU_USAGE = 0.5
 

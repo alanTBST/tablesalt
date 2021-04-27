@@ -6,7 +6,7 @@ TABLESALT
 TBST Trafik, Bygge, og Bolig -styrelsen
 
 Tablesalt is a package for analysing Rejsekort Delrejser data.
-Delrejser, or partial trips, data is a dataset created at Rejsekort that
+Delrejser, or partial trips, is a dataset created at Rejsekort that
 contains a record for each check-in or checkout at a blue dot terminal.
 
 This delrejser dataset is not the raw data recorded at a terminal in a station
@@ -18,9 +18,10 @@ the Danish public transport fare system. It is not designed with trip analysis
 in mind.
 
 For Example
-===========
+-----------
+
 If you purhase a 2 zone cash ticket from a machine or a kiosk in Sjælland,
-that ticket is valid for 75 minutes. It is not only valid for for a single
+that ticket is valid for 75 minutes. It is not only valid for a single
 journey, but for any number of trips you can make in those 75 minutes,
 provided you do not go further than two zones away from the zone you start
 in. The rejsekort system mimics these conditions with the caveat that you are
