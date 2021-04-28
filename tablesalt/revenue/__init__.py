@@ -1,8 +1,7 @@
 """
-TBST Trafik, Bygge, og Bolig -styrelsen
-
-Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
-
+The revenue subpackage contains all of the functions and classes
+necessary to perform selection and aggregation of the zone work model
+for distributing sales data between operators
 """
 
 
