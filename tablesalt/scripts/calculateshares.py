@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Dec  5 09:51:04 2019
+This script uses the zone work model to calculate the zone work
+for each operator for each trip in sjælland and writes them to and lmdb key-value store
 
-@author: alkj
+delrejsersetup.py must be run before this script
+
+To run this script for the year 2019:
+
+    ./path/to/tablesalt/tablesalt/scripts/calculateshares.py -y 2019
+
 """
 
 import os
@@ -12,6 +18,7 @@ from itertools import chain, groupby
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
+from typing import Dict, List, Tuple, TypedDict, Iterator
 
 import numpy as np
 from tqdm import tqdm
@@ -26,14 +33,14 @@ from tablesalt.topology import ZoneGraph, ZoneSharer
 from tablesalt.topology.tools import TakstZones
 
 
-THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
+THIS_DIR = Path(__file__).parent
 
 CPU_USAGE = 0.5# %
 DB_START_SIZE = 8 # gb
 
 
-# NOTE: SAVE BORDER TRIP STARTZONES
-def proc_contractors(contrpack):
+# this should be in common.io as contractor_to_array
+def proc_contractors(contrpack) -> np.ndarray:
     """return the contractors dict as an array"""
     arr_length = len(tuple(chain(*contrpack.values())))
     arr = np.zeros(shape=(arr_length, 4), dtype=np.int64)
@@ -47,20 +54,21 @@ def proc_contractors(contrpack):
             i += 1
     return arr
 
-def _load_contractor_pack(store, region, region_contractors):
-    """
-    load and process the operator information from
-    msgpack file
+def _load_contractor_pack(
+    store: str,
+    region: str,
+    region_contractors: Dict[str, List[str]]
+    ) -> Dict[int, Tuple[int, ...]]:
+    """load and process the contractor/operator information
 
-    parameters
-    ----------
-    rkpack:
-        the msgpack file path corresponding to the rkstore
-
-    filter_type:
-        the region filter for the operators
-        currenlty only 'hovedstaden' is supported and
-        is the default value
+    :param store: the path to and h5 file
+    :type store: str
+    :param region: the region to include ['hovedstaden', 'sjælland']
+    :type region: str
+    :param region_contractors: a dictionary of region -> lst_operators
+    :type region_contractors: Dict[str, List[str]]
+    :return: an operator dictionary tripkey -> tuple of operator ids
+    :rtype: Dict[int, Tuple[int, ...]]
     """
     reader = StoreReader(store)
     contractors = reader.get_data('contractors')
@@ -81,30 +89,42 @@ def _load_contractor_pack(store, region, region_contractors):
         np.lexsort((contractors[:, 1], contractors[:, 0]))
         ]
 
-    op_dict = {key:tuple(x[2] for x in grp) for key, grp in
+    op_dict = {key: tuple(x[2] for x in grp) for key, grp in
                groupby(contractors, key=itemgetter(0))}
 
     return op_dict
 
-def _load_store_data(store, region, zonemap, region_contractors):
+class TripDict(TypedDict):
+    tripkey: int
+    trip_values: Tuple[int, ...]
+
+def _load_store_data(
+    store: str,
+    region: str,
+    zonemap: Dict[int, int],
+    region_contractors: Dict[str, List[str]]
+    ) -> Tuple[TripDict, TripDict, TripDict, TripDict]:
     """
     load the stop data from the h5 file and create
-    the stop, zone and usage dicts
+    the stop, zone and usage and operator dicts
 
-    parameters
-    ----------
-    store:
-        the path to the h5 file
-    region:
-
+    :param store: the path to an h5 file
+    :type store: str
+    :param region: the region to use
+    :type region: str
+    :param zonemap: a dictionary mapping stopid -> zone number
+    :type zonemap: Dict[int, int]
+    :param region_contractors: the region contractor dictionary
+    :type region_contractors: Dict[str, List[str]]
+    :return: a tuple of the stop, zone, usage and operator dictionaries
+    :rtype: Tuple[TripDict, TripDict, TripDict, TripDict]
     """
+
 
     reader = StoreReader(store)
     stops = reader.get_data('stops')
-
     stops = stops[np.lexsort((stops[:, 1], stops[:, 0]))]
-    # stops = stops[np.isin(stops[:, 0], list(ticket_tripkeys))]
-    # print(len(set(stops[:, 0])))
+
     usage_dict = {
         key: tuple(x[3] for x in grp) for key, grp in
         groupby(stops, key=itemgetter(0))
@@ -127,8 +147,8 @@ def _load_store_data(store, region, zonemap, region_contractors):
         }
 
     op_dict = _load_contractor_pack(store, region, region_contractors)
-    op_dict = {k:v for k, v in op_dict.items() if k in zone_dict}
 
+    op_dict = {k:v for k, v in op_dict.items() if k in zone_dict}
     stop_dict = {k:v for k, v in stop_dict.items() if k in op_dict}
     zone_dict = {k:v for k, v in zone_dict.items() if k in op_dict}
     usage_dict = {k:v for k, v in usage_dict.items() if k in op_dict}
@@ -136,27 +156,67 @@ def _load_store_data(store, region, zonemap, region_contractors):
     return stop_dict, zone_dict, usage_dict, op_dict
 
 
-def _get_store_num(store):
+def _get_store_num(store: str) -> str:
+    """just get the number of the store file name
 
-    st = store.split('.')[0]
+    :param store: the path to the h5 file
+    :type store: str
+    :return: the number in the file name
+    :rtype: str
+    """
+    st = store.split('.')[0]ct
     st = st.split('rkfile')[1]
 
     return st
 
+def _get_input(
+    stop_dict: TripDict,
+    zone_dict: TripDict,
+    usage_dict: TripDict,
+    op_dict: TripDict
+    ) -> Iterator[Tuple[int, Tuple[int, ...], Tuple[int, ...], Tuple[int, ...], Tuple[int, ...]]]:
+    """generate trips and associated sequences to input into a ZoneSharer
 
-def _convert_regional_to_sjælland():
-
-    return
-
-
-def _get_input(stop_dict, zone_dict, usage_dict, op_dict):
-
+    :param stop_dict: a dictionary of tripkey -> stop_sequence
+    :type stop_dict: TripDict
+    :param zone_dict: a dictionary of tripkey -> stop_sequence
+    :type zone_dict: TripDict
+    :param usage_dict: a dictionary of tripkey -> stop_sequence
+    :type usage_dict: TripDict
+    :param op_dict: a dictionary of tripkey -> stop_sequence
+    :type op_dict: TripDict
+    :yield: a tuple of tripkey, zone_sequence, stop_sequence, operator_sequence, usage_sequence
+    :rtype: Iterator[Tuple[int, Tuple[int, ...], Tuple[int, ...], Tuple[int, ...], Tuple[int, ...]]]
+    """
     for k, zone_sequence in zone_dict.items():
         yield k, zone_sequence, stop_dict[k], op_dict[k], usage_dict[k]
 
 
-def chunk_shares(store, year, graph, region, zonemap, region_contractors):
+def chunk_shares(
+    store: str,
+    year: int,
+    graph: ZoneGraph,
+    region: str,
+    zonemap: Dict[int, int],
+    region_contractors: Dict[str, List[str]]
+    ) -> Tuple[Dict[int, Tuple[Tuple[float, str], ...]], Dict[int, Tuple[Tuple[float, str], ...]]]:
+    """for all trips in an h5 file, calculate the zone work shares
 
+    :param store: the path to the h5 file
+    :type store: str
+    :param year: the year of analysis
+    :type year: int
+    :param graph: a ZoneGraph instance of tariff zones and route edges
+    :type graph: ZoneGraph
+    :param region: the region to perform the analysis on
+    :type region: str
+    :param zonemap: a mapping of stopid -> zone number
+    :type zonemap: Dict[int, int]
+    :param region_contractors: a dictionary of region -> list of contractors
+    :type region_contractors: Dict[str, List[str]]
+    :return: dict of model one results, dict of model two (solo zoner price) results
+    :rtype: Tuple[Dict[int, Tuple[Tuple[float, str], ...]], Dict[int, Tuple[Tuple[float, str], ...]]]
+    """
 
     stopsd, zonesd, usaged, operatorsd = _load_store_data(
         store, region, zonemap, region_contractors
@@ -167,7 +227,6 @@ def chunk_shares(store, year, graph, region, zonemap, region_contractors):
     border_changes = {}
     model_one_shares = {}
     model_two_shares = {} # solo_zone_price
-
 
     # k, zones, stops, operators, usage = next(gen)
     for k, zones, stops, operators, usage in gen:
@@ -187,14 +246,9 @@ def chunk_shares(store, year, graph, region, zonemap, region_contractors):
             model_two_shares[k] = sharer.solo_zone_price()
 
     num = _get_store_num(store)
-    #TODO ensure fp dir is created
-    fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__',
-        f'{year}',
-        'borderzones',
-        f'bzones{num}.pickle'
-        )
+
+    fp = (THIS_DIR / '__result_cache__',
+         / f'{year}' / 'borderzones' / f'bzones{num}.pickle')
     parent_dir = Path(fp).parent
     if not os.path.exists(parent_dir):
         os.makedirs(parent_dir)
@@ -206,7 +260,8 @@ def chunk_shares(store, year, graph, region, zonemap, region_contractors):
 def main():
     """
     main function to create the operator
-    shares for the data in the datastores
+    shares for the data in the datastores in parallel
+    using CPU_USAGE processing power
     """
 
     parser = TableArgParser('year')
