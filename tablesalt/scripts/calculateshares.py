@@ -247,7 +247,7 @@ def chunk_shares(
 
     num = _get_store_num(store)
 
-    fp = (THIS_DIR / '__result_cache__',
+    fp = (THIS_DIR / '__result_cache__'
          / f'{year}' / 'borderzones' / f'bzones{num}.pickle')
     parent_dir = Path(fp).parent
     if not os.path.exists(parent_dir):
