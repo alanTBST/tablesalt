@@ -1,6 +1,4 @@
 """
-Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
-
 The common subpackage groups classes and functions that are used throughout
 the tablesalt package
 """
