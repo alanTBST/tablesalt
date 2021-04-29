@@ -1,13 +1,45 @@
 # -*- coding: utf-8 -*-
 """
 This script uses the zone work model to calculate the zone work
-for each operator for each trip in sjælland and writes them to and lmdb key-value store
+for each operator for each trip in sjælland and writes them to and lmdb key-value store.
 
 delrejsersetup.py must be run before this script
 
+
+**USAGE***
+
 To run this script for the year 2019:
 
-    ./path/to/tablesalt/tablesalt/scripts/calculateshares.py -y 2019
+    *./path/to/tablesalt/tablesalt/scripts/calculateshares.py -y 2019*
+
+
+Resultant directory tree structure
+==================================
+
+| GIVEN_OUTPUT_DIRECTORY/
+|
+|         |---rejsekortstores/
+|
+|                   |------dbs/
+|                          *|-----calculated_shares*
+|                           |-----trip_card_db (key-value_store)
+|
+|                   |------hdfstores/
+|                           |-----rkfile(0).h5
+|                           |----- ...
+|                           |-----rkfile(n).h5
+|                   |------packs/
+|                           |-----rkfile(0)cont.msgpack
+|                           |----- ...
+|                           |-----rkfile(n)cont.msgpack
+
+calculated_shares
+-----------------
+
+This is the main output from the calculateshares.py script.
+It is an lmdb key-value store. The keys are bytestrings of tripkeys
+and the values are bytestrings of tuples of the form
+b'((float, operator), (float, operatr), ...)'
 
 """
 
@@ -35,7 +67,7 @@ from tablesalt.topology.tools import TakstZones
 
 THIS_DIR = Path(__file__).parent
 
-CPU_USAGE = 0.5# %
+CPU_USAGE = 0.5 # %
 DB_START_SIZE = 8 # gb
 
 
@@ -54,6 +86,7 @@ def proc_contractors(contrpack) -> np.ndarray:
             i += 1
     return arr
 
+# should be place in common.io
 def _load_contractor_pack(
     store: str,
     region: str,
@@ -95,9 +128,13 @@ def _load_contractor_pack(
     return op_dict
 
 class TripDict(TypedDict):
+    """typed dictionary for static type checking
+    for a stop/usage/operator/zone dictionary
+    """
     tripkey: int
     trip_values: Tuple[int, ...]
 
+# should be able to return these dictionaries from StoreReader
 def _load_store_data(
     store: str,
     region: str,
