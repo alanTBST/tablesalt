@@ -1,19 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-TBST Trafik, Bygge, og Bolig -styrelsen
-
-Created on Sat Mar 14 18:07:24 2020
-
-@author: Alan Jones
-@email: alkj@tbst.dk; alanksjones@gmail.com
-
 **HELLO THERE!**
 
     This script is the first step in any analysis of delrejser data
     at TBST using Python. It creates the datastores that are needed for both the
     OD analysis and the Revenue distribution for DOT for Takstsjælland
 
-**WHAT DOES IT DO?**
+WHAT DOES IT DO?
+================
 
     Given a path to a directory of compressed zip files of rejsekort delrejser
     data and a path for an output directory where the resulting datastores
@@ -23,10 +17,10 @@ Created on Sat Mar 14 18:07:24 2020
     Most significantly it will split the giant data set into hundreds of smaller
     files.
 
-    Resultant directory tree structure:
+Resultant directory tree structure
+==================================
 
 | GIVEN_OUTPUT_DIRECTORY/
-|
 |
 |         |---rejsekortstores/
 |
@@ -42,7 +36,8 @@ Created on Sat Mar 14 18:07:24 2020
 |                           |----- ...
 |                           |-----rkfile(n)cont.msgpack
 
-**First**
+trip_card_db
+------------
 
     A key-value store with tripkeys as keys and card numbers as values in a
     memory mapped lmdb database for super fast lookups.
@@ -51,7 +46,8 @@ Created on Sat Mar 14 18:07:24 2020
     up until 30gb without any user input, although that upper limit can be
     changed.
 
-**Second**
+hdf5 files
+----------
 
     The flat data set is split up into more coherent subsets:
         - stop_information
@@ -64,7 +60,8 @@ The first four dataset are places in hdf5 files in the directory structure
 shown above. Each of these have been normalised and contain only integers
 hdf5 files store and load matrices efficiently
 
-**Third**
+messagepack files
+-----------------
 
     The contractor information currently is put in msgpack files. These
     files are similar to json but are smaller and load quickly.
@@ -732,7 +729,6 @@ def main() -> None:
 if __name__ == "__main__":
 
     dt = datetime.now()
-
     if os.name == 'nt':
         INHIBITOR = WindowsInhibitor()
         INHIBITOR.inhibit()
@@ -740,5 +736,4 @@ if __name__ == "__main__":
         INHIBITOR.uninhibit()
     else:
         main()
-
     print(datetime.now() - dt)
