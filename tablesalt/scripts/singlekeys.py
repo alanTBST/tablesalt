@@ -1,9 +1,48 @@
 # -*- coding: utf-8 -*-
 """
-TBST Trafik, Bygge, og Bolig -styrelsen
+This script selects and aggregates trips for each single/cash ticket type.
+
+For short tickets - those up to 8 zones - rejsekort trips are selected based on
+the start zone and the farthest travelled zone. This is due to the nature of the
+ringzone fare system for tickets up to 8 zones. Note that the minimum ticket is
+a two zone ticket so that trips that only travel in one zone are used in 2 zone
+ticket agregations
+
+For example, if we are to find
+trips that represent a 4 zone ticket purchased in 1041, we would find rejsekort
+trips that start in zone 1041 and at some point in the trip travel to one (or more)
+of 1001, 1003, 1033, 1044, 1055, 1066, 1067, 1070, 1071, 1072, 1073, 1074, 1075, 1076.
+
+Each of these zones is exactly four zones away from the start zone, 1041.
 
 
-Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
+For long tickets - those 9 zones or more - rejsekort trips are selected based
+on the startzone and endzone of the trip. Single tickets for 9 or more zones are only
+valid between the origin zone and the destination zone. However, these tickets
+are for each natural path. For example, a ticket from Copenhagen (zone 1001) and
+Helsingør (zone 1005) is valid on kystbanen (incl. zones 1001, 1002, 1030, 1040,
+1050, 1060, 1070, 1080,  1013, 1015,  1005) and using the stog to Hillerød
+(1001, 1002, 1030, 1041, 1051, 1061, 1071, 1082, 1009) and
+the local train from Hillerød to Helsingør (1009, 1091, 1090, 1013, 1015, 1005)
+
+Long trips using rejsekort are not nearly as frequent as short trips, so for some
+long tickets we may not have any samples for the specific origin and destination
+zones, for this reason, we also use the ringzone principle for long tickets so
+that we have a fallback method to match to sales of long tickets should we not have
+any rejsekort sample trips to aggregate.
+
+The rabattrins of the trips used for this analysis are 0, 1 and 2.
+For each rabattrin, aggregates for each ticket type are produced.
+
+=====
+USAGE
+=====
+
+    ./path/to/tablesalt/tablesalt/scripts/singlekeys.py -year -model
+
+where year is the analysis year and model is 1 or 2. 1 for the normal zone work
+shares and 2 for the solozoner price adjusted zone work shares
+
 
 """
 import ast
@@ -15,7 +54,7 @@ from itertools import chain, groupby
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
-from typing import Set
+from typing import Set, Tuple, Dict
 
 import lmdb
 import numpy as np
@@ -31,17 +70,15 @@ from tablesalt.running import WindowsInhibitor
 from tablesalt.topology import ZoneGraph
 from tablesalt.topology.tools import TakstZones
 
-
-# from turbodbc import connect, make_options
-
 THIS_DIR = Path(__file__).parent
 CPU_USAGE = 0.5
 
-def _load_border_trips(year: int):
-    "load and merge the dumped border trips"
+def _load_border_trips(year: int) -> Dict[int, Tuple[int, ...]]:
+    """Load and merge the dumped border trips.
+    These are created by the delrejsersetup script in
+    the chunk_shares function"""
 
-
-    filedir = THIS_DIR / '__result_cache__' / f'{year}'/ 'borderzones'
+    filedir = THIS_DIR / '__result_cache__' / f'{year}' / 'borderzones'
 
     files = filedir.glob('*.pickle')
     borders = {}
@@ -51,19 +88,20 @@ def _load_border_trips(year: int):
             borders = {**borders, **border}
     return borders
 
-# TODO into io
-def helrejser_rabattrin(rabattrin, year):
-    """
-    return a set of the tripkeys from the helrejser data in
-    the datawarehouse
+# put in common.io
+def helrejser_rabattrin(rabattrin: int, year: int) -> Set[int]:
+    """return a set of tripkeys for the given year and rabattrin
+    that: a) are full trips; b) are rejsekort classic cards
 
-    parameter
-    ----------
-    rabattrin:
-        the value of the rabattrin
-        int or list of ints
-        default is None, returns all
+    THIS ONLY WORKS AT Trafikstyrelsen
 
+    :param rabattrin: the rabattrgin to load  0 --> 7
+    :type rabattrin: int
+    :param year: the year to return trips from
+    :type year: int
+    :raises KeyError: if 'turngl'
+    :return: a set of tripkeys that match the conditions
+    :rtype: Set[int]
     """
 
     query = (
@@ -72,10 +110,7 @@ def helrejser_rabattrin(rabattrin, year):
         f"where [År] = {year} and [Manglende-check-ud] = 'Nej' and "
         f"Produktfamilie = '5' and [Rabattrin] = {rabattrin}"
         )
-    # ops = make_options(
-    #     prefer_unicode=True,
-    #     use_async_io=True
-    #     ) # , use_async_io=True
+
     with make_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(query)
@@ -95,12 +130,12 @@ def helrejser_rabattrin(rabattrin, year):
 
     return {int(x) for x in out}
 
+# put this in the revenue subpackage
 def _aggregate_zones(shares):
     """
     aggregate the individual operator
     assignment values
 
-    TODO put this in revenue module
     """
     n_trips = len(shares)
     multi = tuple(x for x in shares if isinstance(x[0], tuple))
@@ -118,7 +153,19 @@ def _aggregate_zones(shares):
     return t
 
 
-def _map_zones(stop_arr, zonemap):
+def _map_zones(
+    stop_arr: np.ndarray,
+    zonemap: Dict[int, int]
+    ) -> Dict[int, Tuple[int, ...]]:
+    """Map the stops data stopids to their zones
+
+    :param stop_arr: stop_information data from h5 file
+    :type stop_arr: np.ndarray
+    :param zonemap: a dictionary mapping stopid -> zone number
+    :type zonemap: Dict[int, int]
+    :return: a dictionary of tripkey -> tuple(zone, zone, ...)
+    :rtype: Dict[int, Tuple[int, ...]]
+    """
     # stop_arr must be sorted
 
     mapped_zones = {}
@@ -126,12 +173,13 @@ def _map_zones(stop_arr, zonemap):
     for key, grp in groupby(stop_arr, key=itemgetter(0)):
         zones = tuple(x[2] for x in grp)
         zones = tuple(zonemap.get(x, 0) for x in zones)
+        # if we don't know what zone the stop is in
         if all(x > 0 for x in zones):
             mapped_zones[key] = zones
 
     return mapped_zones
 
-def _max_zones(operator_zones, ringdict):
+def _max_zones(operator_zones, ringdict: Dict[Tuple[int, int], int]) -> Dict:
 
     out = {}
     for k, v in operator_zones.items():
@@ -154,7 +202,6 @@ def _separate_keys(short, long, _max, ringzones):
     long_ring = {}
 
     for k, v in short.items():
-
         start_zone = v[0]
         end_zone = v[-1]
         distance = _max[k]
@@ -178,7 +225,8 @@ def _separate_keys(short, long, _max, ringzones):
             long_ring[(start_zone, distance)] = set()
         long_ring[(start_zone, distance)].add(k)
 
-    # add 1 travelled zone to 2 travllled zones for short ring
+    # add 1 travelled zone to 2 travellled zones for short ring
+    # minimum ticket is two zones
     startzones = {k[0] for k in ring}
     for zone in startzones:
         one = ring.get((zone, 1), set())
@@ -188,13 +236,17 @@ def _separate_keys(short, long, _max, ringzones):
     analysis_tripkeys = {
         'short_ring': ring,
         'long': long_,
-        'long_ring': long_ring
+        'long_ring': long_ringray
         }
-
 
     return analysis_tripkeys
 
-def _determine_keys(stop_arr, stopzone_map, ringzones, bordertrips):
+def _determine_keys(
+    stop_arr: np.ndarray,
+    stopzone_map,
+    ringzones,
+    bordertrips
+    ):
 
     zones = _map_zones(stop_arr, stopzone_map)
 
@@ -258,15 +310,13 @@ def _filter_operators(ticket_keys, operator_tripkeys: Set[int]):
 
     out = {}
     for k, v in ticket_keys.items():
-        d = {
-            k1: v1.intersection(operator_tripkeys)
-            for k1, v1 in v.items()
-            }
+        d = {k1: v1.intersection(operator_tripkeys)
+             for k1, v1 in v.items()}
         out[k] = d
 
     return out
 
-def _get_exception_stations(stops, *uic):
+def _get_exception_stations(stops: np.ndarray, *uic):
 
     tripkeys = stops[
         (np.isin(stops[:, 2], list(uic))) &
@@ -276,7 +326,13 @@ def _get_exception_stations(stops, *uic):
     return tripkeys
 
 
-def _store_tripkeys(store, stopzone_map, ringzones, rabatkeys, bordertrips):
+def _store_tripkeys(
+    store: str,
+    stopzone_map,
+    ringzones,
+    rabatkeys,
+    bordertrips
+    ):
 
     reader = StoreReader(store)
     all_stops = reader.get_data('stops')
@@ -287,7 +343,6 @@ def _store_tripkeys(store, stopzone_map, ringzones, rabatkeys, bordertrips):
 
     dr_byen = _get_exception_stations(all_stops, 8603311)
     dr_byen = all_stops[np.isin(all_stops[:, 0], dr_byen)]
-
 
     tick_keys, region_keys = _determine_keys(
         all_stops, stopzone_map, ringzones, bordertrips
@@ -302,7 +357,7 @@ def _store_tripkeys(store, stopzone_map, ringzones, rabatkeys, bordertrips):
 
     return tick_keys, dr_keys
 
-def _store_operator_tripkeys(store, ticket_keys, operators):
+def _store_operator_tripkeys(store: str, ticket_keys, operators):
 
     reader = StoreReader(store)
 
@@ -318,7 +373,7 @@ def _store_operator_tripkeys(store, ticket_keys, operators):
     return out
 
 
-def _get_trips(db, tripkeys):
+def _get_trips(db: str, tripkeys: Set[int]) -> Dict:
 
     tripkeys_ = {bytes(str(x), 'utf-8') for x in tripkeys}
 
@@ -332,9 +387,7 @@ def _get_trips(db, tripkeys):
                         shares = shares.decode('utf-8')
                         out[int(k.decode('utf-8'))] = ast.literal_eval(shares)
                     except ValueError:
-
                         continue
-
     return out
 
 
@@ -346,7 +399,15 @@ def _get_store_num(store):
     return st
 
 
-def _get_store_keys(store, stopzone_map, ringzones, operators, rabatkeys, year, bordertrips):
+def _get_store_keys(
+    store: str,
+    stopzone_map,
+    ringzones,
+    operators,
+    rabatkeys,
+    year: int,
+    bordertrips
+    ) -> None:
 
     tripkeys, dr_keys = _store_tripkeys(
         store, stopzone_map, ringzones, rabatkeys, bordertrips
@@ -358,7 +419,6 @@ def _get_store_keys(store, stopzone_map, ringzones, operators, rabatkeys, year, 
     op_tripkeys['all'] = tripkeys
     op_tripkeys['dr_byen'] = dr_keys
 
-
     num = _get_store_num(store)
     fp = os.path.join(
         '__result_cache__',
@@ -369,7 +429,7 @@ def _get_store_keys(store, stopzone_map, ringzones, operators, rabatkeys, year, 
         pickle.dump(op_tripkeys, f)
 
 
-def _get_all_store_keys(stores, stopzone_map, ringzones, operators, rabatkeys, year):
+def _get_all_store_keys(stores, stopzone_map, ringzones, operators, rabatkeys, year: int) -> None:
 
 
     borders = _load_border_trips(year)
@@ -386,7 +446,7 @@ def _get_all_store_keys(stores, stopzone_map, ringzones, operators, rabatkeys, y
         pool.map(pfunc, stores)
 
 
-def _load_store_keys(filepath):
+def _load_store_keys(filepath: str):
 
     with open(filepath, 'rb') as f:
         pack = pickle.load(f)
@@ -404,7 +464,7 @@ def _merge_dicts(old, new, old_op, new_op, operators):
 
     return out_all, out_operators
 
-def _gather_store_keys(lst_of_files, operators, nparts):
+def _gather_store_keys(lst_of_files, operators, nparts: int):
 
     initial = _load_store_keys(lst_of_files[0])
     out_all = initial['all']
@@ -422,17 +482,11 @@ def _gather_store_keys(lst_of_files, operators, nparts):
 
     return out_all, out_operators
 
-def _gather_all_store_keys(operators, nparts, year):
+def _gather_all_store_keys(operators, nparts: int, year: int):
 
+    lst_of_temp = THIS_DIR / '__result_cache__' / f'{year}'
+    lst_of_temp = list(lst_of_temp.glob('*.pickle'))
 
-    lst_of_temp = glob.glob(
-        os.path.join(
-            THIS_DIR,
-            '__result_cache__',
-            f'{year}',
-            '*.pickle'
-            )
-        )
     lst_of_temp = [x for x in lst_of_temp if 'skeys' in x]
     lst_of_lsts = split_list(lst_of_temp, wanted_parts=nparts)
 
@@ -459,16 +513,10 @@ def _gather_all_store_keys(operators, nparts, year):
 
     return out_all, out_operators
 
+def _get_rabatkeys(rabattrin: int, year: int) -> Set[int]:
 
-def _get_rabatkeys(rabattrin, year):
-
-    fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__',
-        f'{year}',
-        'preprocessed',
-        f'rabat{rabattrin}trips.pickle'
-        )
+    fp = (THIS_DIR / '__result_cache__' / f'{year}',
+         'preprocessed' / f'rabat{rabattrin}trips.pickle')
     try:
         with open(fp, 'rb') as f:
             rabatkeys = pickle.load(f)
@@ -535,7 +583,15 @@ def _output_df(results, tick) -> pd.core.frame.DataFrame:
 
     return frame
 
-def _write_results(rabattrin, year) -> None:
+def _write_results(rabattrin: int, year: int) -> None:
+    """write the results for the given year and rabattrin
+    to a csv file
+
+    :param rabattrin: the rabattrin of the trips selected
+    :type rabattrin: int
+    :param year: the year of the trips selected
+    :type year: int
+    """
 
     dir_path = os.path.join(
         '__result_cache__',
@@ -576,8 +632,14 @@ def _nzone_merge(resultdict):
     return agg_nested_dict(nzone)
 
 
-def _all_rabat_keys(year):
+def _all_rabat_keys(year: int) -> Tuple[int, ...]:
+    """return all of the single/classic trips for each rabattrin
 
+    :param year: the year of the trips
+    :type year: int
+    :return: a tuple of tripkeys
+    :rtype: Tuple[int, ...]
+    """
     all_rabat_levels = ()
     for i in range(0, 8):
         rabatkeys = tuple(_get_rabatkeys(i, year))
@@ -586,20 +648,19 @@ def _all_rabat_keys(year):
     return all_rabat_levels
 
 def _rabat_results(
-        year,
-        model,
-        rabat_level,
-        db_path,
+        year: int,
+        model: int,
+        rabat_level: int,
+        db_path: str,
         stores,
         stopzone_map,
         ringzones,
-        wanted_operators
-        ):
+        wanted_operators: List[str]
+        ) -> None:
 
     single_fp = (THIS_DIR / '__result_cache__' /
                  f'{year}' / 'preprocessed' /
                  f'single_tripkeys_{year}_r{rabat_level}.pickle')
-
 
     if not single_fp.is_file():
 
@@ -657,19 +718,15 @@ def _rabat_results(
 
     operator_results_['all'] = all_results_
 
-    fp = Path(
-        THIS_DIR,
-        '__result_cache__',
-        f'{year}',
-        'preprocessed',
-        f'single_results_{year}_r{rabat_level}_model_{model}.pickle'
-        )
+    fp = (THIS_DIR / '__result_cache__' / f'{year}' / 'preprocessed' /
+          f'single_results_{year}_r{rabat_level}_model_{model}.pickle'
+          )
 
     with open(fp, 'wb') as f:
         pickle.dump(operator_results_, f)
 
 
-def main():
+def main() -> None:
 
     parser = TableArgParser('year', 'model')
     args = parser.parse()
