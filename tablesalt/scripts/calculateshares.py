@@ -5,33 +5,25 @@ for each operator for each trip in sjælland and writes them to and lmdb key-val
 
 delrejsersetup.py must be run before this script
 
-
-**USAGE***
+=====
+USAGE
+=====
 
 To run this script for the year 2019:
 
-    *./path/to/tablesalt/tablesalt/scripts/calculateshares.py -y 2019*
+    **./path/to/tablesalt/tablesalt/scripts/calculateshares.py -y 2019**
 
 
 Resultant directory tree structure
 ==================================
 
-| GIVEN_OUTPUT_DIRECTORY/
-|
+| given_output_directory/
 |         |---rejsekortstores/
-|
 |                   |------dbs/
-|                          *|-----calculated_shares*
-|                           |-----trip_card_db (key-value_store)
-|
+|                           |-----**calculated_shares**
 |                   |------hdfstores/
-|                           |-----rkfile(0).h5
-|                           |----- ...
-|                           |-----rkfile(n).h5
 |                   |------packs/
-|                           |-----rkfile(0)cont.msgpack
-|                           |----- ...
-|                           |-----rkfile(n)cont.msgpack
+
 
 calculated_shares
 -----------------
@@ -73,7 +65,7 @@ DB_START_SIZE = 8 # gb
 
 # this should be in common.io as contractor_to_array
 def proc_contractors(contrpack) -> np.ndarray:
-    """return the contractors dict as an array"""
+    """Return the contractors dict as an array"""
     arr_length = len(tuple(chain(*contrpack.values())))
     arr = np.zeros(shape=(arr_length, 4), dtype=np.int64)
     i = 0
@@ -92,7 +84,7 @@ def _load_contractor_pack(
     region: str,
     region_contractors: Dict[str, List[str]]
     ) -> Dict[int, Tuple[int, ...]]:
-    """load and process the contractor/operator information
+    """Load and process the contractor/operator information
 
     :param store: the path to and h5 file
     :type store: str
@@ -128,7 +120,7 @@ def _load_contractor_pack(
     return op_dict
 
 class TripDict(TypedDict):
-    """typed dictionary for static type checking
+    """Typed dictionary for static type checking
     for a stop/usage/operator/zone dictionary
     """
     tripkey: int
@@ -142,7 +134,7 @@ def _load_store_data(
     region_contractors: Dict[str, List[str]]
     ) -> Tuple[TripDict, TripDict, TripDict, TripDict]:
     """
-    load the stop data from the h5 file and create
+    Load the stop data from the h5 file and create
     the stop, zone and usage and operator dicts
 
     :param store: the path to an h5 file
@@ -194,7 +186,7 @@ def _load_store_data(
 
 
 def _get_store_num(store: str) -> str:
-    """just get the number of the store file name
+    """Just get the number of the store file name
 
     :param store: the path to the h5 file
     :type store: str
@@ -212,7 +204,7 @@ def _get_input(
     usage_dict: TripDict,
     op_dict: TripDict
     ) -> Iterator[Tuple[int, Tuple[int, ...], Tuple[int, ...], Tuple[int, ...], Tuple[int, ...]]]:
-    """generate trips and associated sequences to input into a ZoneSharer
+    """Generate trips and associated sequences to input into a ZoneSharer
 
     :param stop_dict: a dictionary of tripkey -> stop_sequence
     :type stop_dict: TripDict
@@ -237,7 +229,7 @@ def chunk_shares(
     zonemap: Dict[int, int],
     region_contractors: Dict[str, List[str]]
     ) -> Tuple[Dict[int, Tuple[Tuple[float, str], ...]], Dict[int, Tuple[Tuple[float, str], ...]]]:
-    """for all trips in an h5 file, calculate the zone work shares
+    """For all trips in an h5 file, calculate the zone work shares
 
     :param store: the path to the h5 file
     :type store: str
@@ -265,7 +257,6 @@ def chunk_shares(
     model_one_shares = {}
     model_two_shares = {} # solo_zone_price
 
-    # k, zones, stops, operators, usage = next(gen)
     for k, zones, stops, operators, usage in gen:
 
         sharer = ZoneSharer(graph, zones, stops, operators, usage)
@@ -296,7 +287,7 @@ def chunk_shares(
 
 def main():
     """
-    main function to create the operator
+    Main function to create the operator
     shares for the data in the datastores in parallel
     using CPU_USAGE processing power
     """
@@ -344,4 +335,3 @@ if __name__ == "__main__":
         INHIBITOR.uninhibit()
     else:
         main()
-
