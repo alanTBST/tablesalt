@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Feb  6 09:31:46 2020
 
-@author: alkj
 """
 import ast
 import os
