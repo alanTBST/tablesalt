@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 """
+
+What does it do?
+================
+
 This script selects and aggregates trips for each single/cash ticket type.
 
 For short tickets - those up to 8 zones - rejsekort trips are selected based on
@@ -18,8 +22,10 @@ Each of these zones is exactly four zones away from the start zone, 1041.
 
 For long tickets - those 9 zones or more - rejsekort trips are selected based
 on the startzone and endzone of the trip. Single tickets for 9 or more zones are only
-valid between the origin zone and the destination zone. However, these tickets
-are for each natural path. For example, a ticket from Copenhagen (zone 1001) and
+valid between the origin zone and the destination zone.
+
+However, these tickets are for each natural path.
+For example, a ticket from Copenhagen (zone 1001) and
 Helsingør (zone 1005) is valid on kystbanen (incl. zones 1001, 1002, 1030, 1040,
 1050, 1060, 1070, 1080,  1013, 1015,  1005) and using the stog to Hillerød
 (1001, 1002, 1030, 1041, 1051, 1061, 1071, 1082, 1009) and
@@ -38,9 +44,13 @@ For each rabattrin, aggregates for each ticket type are produced.
 USAGE
 =====
 
-    ./path/to/tablesalt/tablesalt/scripts/singlekeys.py -year -model
+calculateshares.py must be run prior to this script
 
-where year is the analysis year and model is 1 or 2. 1 for the normal zone work
+To run this script for the year 2019 using model 1
+
+    **./path/to/tablesalt/tablesalt/scripts/singlekeys.py -y 2019 -m 1**
+
+where -y is the analysis year and -m is model 1 or 2. 1 for the normal zone work
 shares and 2 for the solozoner price adjusted zone work shares
 
 
