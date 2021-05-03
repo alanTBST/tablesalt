@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-**HELLO THERE!**
-
     This script is the first step in any analysis of delrejser data
     at TBST using Python. It creates the datastores that are needed for both the
     OD analysis and the Revenue distribution for DOT for Takstsjælland
@@ -71,14 +69,45 @@ messagepack files
 
     Using this structure, analysis/computation can be easily parallelised
     and reduces the reliance on RDBMS (SQL Server) database connections -
-    which can be slow
+    which can be slow or not available
 
 **BE AWARE!**
     This script spawns four process, so ensure that you have four cores
     available. If using a laptop, for instance, you won't be able to get
     much else done. It shouldn't last much more than 7 hrs though :)
-    Multi-core server architecture advised.
+    Multi-core workstation/server advised.
 
+USAGE
+=====
+
+With rejsekort delrejser zipfiles located in eg C:/users/alkj/rejsekortdata
+and the desired output location at C:/users/alkj/datastores
+
+To setup data for 2019, processing 500 000 rows at a time
+
+    ./path/to/tablesalt/tablesalt/scripts/delrejsersetup.py -y 2019 -c 500000 -i C:/users/alkj/rejsekortdata -o C:/users/alkj/datastores
+
+This will result in the following directory tree:
+
+| C:/users/alkj/datastores/
+|         |---rejsekortstores/
+|                   |---2019DataStores/
+|                           |------dbs/
+|                                   |-----trip_card_db (key-value_store)
+|                           |------hdfstores/
+|                                   |-----rkfile(0).h5
+|                                   |----- ...
+|                                   |-----rkfile(n).h5
+|                           |------packs/
+|                                   |-----rkfile(0)cont.msgpack
+|                                   |----- ...
+|                                   |-----rkfile(n)cont.msgpack
+
+The number of files (n) is dependent on the chunksize.
+
+Should you run into memory errors, reduce the chunksize (-c) argument.
+On a 128gb machine, 2 to 4 million shouldn't pose any issue.
+On an 8gb machine you may need as low as 50 000
 """
 
 import json
