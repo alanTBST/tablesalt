@@ -1,5 +1,19 @@
 # -*- coding: utf-8 -*-
 """
+What does it do?
+================
+Creates the results for the pendler tickets
+
+
+USAGE
+=====
+To run the script for the year 2019 using model 1 (standard zonework model)
+
+    python ./path/to/tablesalt/tablesalt/scripts/pendlerkeys.py -y 2019 -p /path/to/PeriodeProdukt.csv -z /path/to/Zoner.csv -m 1
+
+where -p is the path to the period product data provided by rejsekort,
+-z is the path to the product zones data provided by rejsekort
+and -m is the model to run (1-> stard zonework model, 2-> solo zoner price model, 3-> equal operator model)
 
 """
 import ast

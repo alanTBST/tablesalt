@@ -11,7 +11,7 @@ USAGE
 
 To run this script for the year 2019:
 
-    **./path/to/tablesalt/tablesalt/scripts/calculateshares.py -y 2019**
+    python **./path/to/tablesalt/tablesalt/scripts/calculateshares.py -y 2019**
 
 
 Resultant directory tree structure

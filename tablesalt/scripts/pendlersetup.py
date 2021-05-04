@@ -28,6 +28,13 @@ Resultant directory tree structure
 |    |------packs/
 |           |-----rkfile(0)cont.msgpack...rkfile(n)cont.msgpack
 
+USAGE
+=====
+
+To setup the datastores for the year 2019
+
+    python ./path/to/tablesalt/tablesalt/scripts/pendlersetup.py -y 2019 -p /path/to/PeriodeProdukt.csv -z /path/to/Zoner.csv
+
 
 Input Data
 ==========

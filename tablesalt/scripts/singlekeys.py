@@ -40,7 +40,7 @@ any rejsekort sample trips to aggregate.
 The rabattrins of the trips used for this analysis are 0, 1 and 2.
 For each rabattrin, aggregates for each ticket type are produced.
 
-=====
+
 USAGE
 =====
 
@@ -48,7 +48,7 @@ calculateshares.py must be run prior to this script
 
 To run this script for the year 2019 using model 1
 
-    **./path/to/tablesalt/tablesalt/scripts/singlekeys.py -y 2019 -m 1**
+     python **./path/to/tablesalt/tablesalt/scripts/singlekeys.py -y 2019 -m 1**
 
 where -y is the analysis year and -m is model 1 or 2. 1 for the normal zone work
 shares and 2 for the solozoner price adjusted zone work shares

@@ -72,6 +72,7 @@ messagepack files
     which can be slow or not available
 
 **BE AWARE!**
+
     This script spawns four process, so ensure that you have four cores
     available. If using a laptop, for instance, you won't be able to get
     much else done. It shouldn't last much more than 7 hrs though :)
@@ -85,7 +86,7 @@ and the desired output location at C:/users/alkj/datastores
 
 To setup data for 2019, processing 500 000 rows at a time
 
-    ./path/to/tablesalt/tablesalt/scripts/delrejsersetup.py -y 2019 -c 500000 -i C:/users/alkj/rejsekortdata -o C:/users/alkj/datastores
+    python ./path/to/tablesalt/tablesalt/scripts/delrejsersetup.py -y 2019 -c 500000 -i C:/users/alkj/rejsekortdata -o C:/users/alkj/datastores
 
 This will result in the following directory tree:
 
