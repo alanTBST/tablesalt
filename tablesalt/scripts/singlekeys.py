@@ -53,8 +53,8 @@ To run this script for the year 2019 using model 1
 where -y is the analysis year and -m is model 1 or 2. 1 for the normal zone work
 shares and 2 for the solozoner price adjusted zone work shares
 
-
 """
+
 import ast
 import glob
 import os
@@ -80,8 +80,10 @@ from tablesalt.running import WindowsInhibitor
 from tablesalt.topology import ZoneGraph
 from tablesalt.topology.tools import TakstZones
 
-THIS_DIR = Path(__file__).parent
-CPU_USAGE = 0.5
+THIS_DIR: Path = Path(__file__).parent
+CPU_USAGE: float = 0.5
+
+RING_ZONES = Dict[Tuple[int, int], int]
 
 def _load_border_trips(year: int) -> Dict[int, Tuple[int, ...]]:
     """Load and merge the dumped border trips.
@@ -141,7 +143,7 @@ def helrejser_rabattrin(rabattrin: int, year: int) -> Set[int]:
     return {int(x) for x in out}
 
 # put this in the revenue subpackage
-def _aggregate_zones(shares):
+def _aggregate_zones(shares) -> Dict[str, Union[int, float]]:
     """
     aggregate the individual operator
     assignment values
@@ -162,7 +164,7 @@ def _aggregate_zones(shares):
 
     return t
 
-
+# put this in common.io
 def _map_zones(
     stop_arr: np.ndarray,
     zonemap: Dict[int, int]
@@ -189,8 +191,19 @@ def _map_zones(
 
     return mapped_zones
 
-def _max_zones(operator_zones, ringdict: Dict[Tuple[int, int], int]) -> Dict:
+def _max_zones(
+    operator_zones: Dict[int, Tuple[int, ...]],
+    ringdict: RING_ZONES
+    ) -> Dict[int, int]:
+    """Find the maximum zone distance travelled on a trip
 
+    :param operator_zones: a dictionary of tripkeys -> (zonenum, ...)
+    :type operator_zones: Dict[int, Tuple[int, ...]]
+    :param ringdict: a ringzone distance dictionary
+    :type ringdict: RING_ZONES
+    :return: a dictionary of tripkey -> furthest travelled zone
+    :rtype: Dict[int, int]
+    """
     out = {}
     for k, v in operator_zones.items():
         current_max = 1
@@ -205,7 +218,26 @@ def _max_zones(operator_zones, ringdict: Dict[Tuple[int, int], int]) -> Dict:
         out[k] = current_max
     return out
 
-def _separate_keys(short, long, _max, ringzones):
+# put this in revenue subpackage
+def _separate_keys(
+    short: Dict[int, Tuple[int, ...]],
+    long:  Dict[int, Tuple[int, ...]],
+    _max: Dict[int, int],
+    ringzones: RING_ZONES
+    ) -> Dict[str, Dict[Tuple[int, int], Set[int]]]:
+    """assign trips to the different ticket types
+
+    :param short: [description]
+    :type short: Dict[int, Tuple[int, ...]]
+    :param long: [description]
+    :type long: Dict[int, Tuple[int, ...]]
+    :param _max: [description]
+    :type _max: Dict[int, int]
+    :param ringzones: [description]
+    :type ringzones: RING_ZONES
+    :return: [description]
+    :rtype: Dict[str, Dict[Tuple[int, int], Set[int]]]
+    """
 
     ring = {}
     long_ = {}
@@ -246,15 +278,16 @@ def _separate_keys(short, long, _max, ringzones):
     analysis_tripkeys = {
         'short_ring': ring,
         'long': long_,
-        'long_ring': long_ringray
+        'long_ring': long_ring
         }
 
     return analysis_tripkeys
 
+# put into revenue
 def _determine_keys(
     stop_arr: np.ndarray,
     stopzone_map,
-    ringzones,
+    ringzones: RING_ZONES,
     bordertrips
     ):
 
@@ -325,8 +358,8 @@ def _filter_operators(ticket_keys, operator_tripkeys: Set[int]):
         out[k] = d
 
     return out
-
-def _get_exception_stations(stops: np.ndarray, *uic):
+# put into revenue
+def _get_exception_stations(stops: np.ndarray, *uic: int) -> np.ndarray:
 
     tripkeys = stops[
         (np.isin(stops[:, 2], list(uic))) &
@@ -335,11 +368,11 @@ def _get_exception_stations(stops: np.ndarray, *uic):
 
     return tripkeys
 
-
+# put into revenue
 def _store_tripkeys(
     store: str,
-    stopzone_map,
-    ringzones,
+    stopzone_map: Dict[int, int],
+    ringzones: RING_ZONES,
     rabatkeys,
     bordertrips
     ):
@@ -366,7 +399,7 @@ def _store_tripkeys(
     tick_keys['regions'] = region_keys
 
     return tick_keys, dr_keys
-
+# put into revenue
 def _store_operator_tripkeys(store: str, ticket_keys, operators):
 
     reader = StoreReader(store)
@@ -382,7 +415,7 @@ def _store_operator_tripkeys(store: str, ticket_keys, operators):
 
     return out
 
-
+# put into revenue
 def _get_trips(db: str, tripkeys: Set[int]) -> Dict:
 
     tripkeys_ = {bytes(str(x), 'utf-8') for x in tripkeys}
@@ -401,18 +434,18 @@ def _get_trips(db: str, tripkeys: Set[int]) -> Dict:
     return out
 
 
-def _get_store_num(store):
+def _get_store_num(store: str) -> str:
 
     st = store.split('.')[0]
     st = st.split('rkfile')[1]
 
     return st
 
-
+# put into revenue
 def _get_store_keys(
     store: str,
-    stopzone_map,
-    ringzones,
+    stopzone_map: Dict[int, int],
+    ringzones: RING_ZONES,
     operators,
     rabatkeys,
     year: int,
@@ -439,8 +472,14 @@ def _get_store_keys(
         pickle.dump(op_tripkeys, f)
 
 
-def _get_all_store_keys(stores, stopzone_map, ringzones, operators, rabatkeys, year: int) -> None:
-
+def _get_all_store_keys(
+    stores: List[str],
+    stopzone_map: Dict[int, int],
+    ringzones: RING_ZONES,
+    operators,
+    rabatkeys,
+    year: int
+    ) -> None:
 
     borders = _load_border_trips(year)
 
@@ -662,8 +701,8 @@ def _rabat_results(
         model: int,
         rabat_level: int,
         db_path: str,
-        stores,
-        stopzone_map,
+        stores: List[str],
+        stopzone_map: Dict[int, int],
         ringzones,
         wanted_operators: List[str]
         ) -> None:
