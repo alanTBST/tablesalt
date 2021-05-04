@@ -5,7 +5,7 @@ for each operator for each trip in sjælland and writes them to and lmdb key-val
 
 delrejsersetup.py must be run before this script
 
-=====
+
 USAGE
 =====
 
