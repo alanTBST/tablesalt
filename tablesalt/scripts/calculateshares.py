@@ -3,11 +3,13 @@
 This script uses the zone work model to calculate the zone work
 for each operator for each trip in sjælland and writes them to and lmdb key-value store.
 
-delrejsersetup.py must be run before this script
+
 
 
 USAGE
 =====
+
+**delrejsersetup.py must be run before this script**
 
 To run this script for the year 2019:
 
