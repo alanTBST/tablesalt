@@ -1,8 +1,128 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat May 23 00:18:51 2020
+This is the last script to run to create output for the "kildefordeling"
+or revenue sharing between operators
 
-@author: alkj
+
+What does it do?
+================
+
+
+USAGE
+=====
+To merge all sales with all results for 2019 using model 1
+    python ./path/to/scripts/salesoutput.py -y 2019 -m 1
+
+Configuration File
+==================
+
+The file salesoutconfig.json contains the settings for how you wish to
+match a product sales record with the aggregate data.
+
+Below are the default settings for the merging rules
+
+start_locations
+---------------
+Here you place the "salgsmedie" that indicates which operator sells the ticket
+and thus, theoretically, which operator services the first leg of the trip
+
+single_tickets
+--------------
+A list of the product names to be merged using single ticket aggregations
+
+pendler_tickets
+---------------
+A list of product names to be merged using pendler ticket aggregations
+
+city_small
+----------
+A list of product names to merge using the small city pass (zones 1001, 1002, 1003, 1004)
+results from the subtakst script
+
+city_large
+----------
+A list of product names to merge using the large city pass (zones 1001-1099)
+results from the subtakst script
+
+use_locations
+-------------
+a boolean value (true/false). Whether to enforce the start_locations.
+That is, if a sales record as a starting zone 1001 and salgsmedie "automat"
+whether to aggregate only trips that start on the metro or not.
+The default is false
+
+minimum_trips
+-------------
+The minimum number of trips required to merge a certain aggregation before
+using a fallback method
+The default is 1
+
+{
+    "start_locations": {
+        "automat": "metro",
+        "nautila": "dsb",
+        "lokaltog-automater i 25 nordsj\u00e6llandske togs\u00e6t": "movia",
+        "enkeltbilletter bus": "movia"
+    },
+    "single_tickets": [
+        "enkeltbillet",
+        "lang enkeltbillet",
+        "forsorgsbilletter"
+    ],
+    "pendler_tickets": [
+        "pendlerkort",
+        "erhvervskort",
+        "virksomhedskort",
+        "pensionistkort",
+        "ungdomskort xu",
+        "flexcard 7 dage",
+        "flexcard",
+        "ungdomskort vu",
+        "ungdomskort uu",
+        "skolekort"
+    ],
+    "city_small": [
+        "city pass small",
+        "citypass small 24 timer",
+        "citypass small 120 timer",
+        "citypass small 48 timer",
+        "citypass small 72 timer",
+        "citypass small 96 timer",
+        "mobilklippekort",
+        "park and ride"
+    ],
+    "city_large": [
+        "institutionskort, 20 b\u00f8rn",
+        "travel pass",
+        "kulturnatten",
+        "citypass large 120 timer",
+        "citypass large 24 timer",
+        "b\u00f8rnealderskompensation",
+        "city pass large",
+        "citypass large 96 timer",
+        "citypass large 72 timer",
+        "copenhagen card",
+        "citypass large 48 timer",
+        "skoleklassekort",
+        "institutionskort, 15 b\u00f8rn",
+        "blindekort",
+        "off peak-kompensation",
+        "mobilklippekort",
+        "turistbillet",
+        "print-selv-billet",
+        "enkeltbillet refusion",
+        "ungdomskort uu - fritid",
+        "ungdomskort uu - kompensation",
+        "ungdomskort vu - fritid",
+        "ungdomskort vu - kompensation",
+        "ungdomskort xu - fritid",
+        "dsb-salg uspecificeret",
+        "bornholmtrafikken"
+    ],
+    "use_locations": false,
+    "minimum_trips": 1
+}
+
 """
 import ast
 import glob
