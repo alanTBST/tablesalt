@@ -77,7 +77,7 @@ def main():
     API. creates the zone_relations msgpack file
     for use in the pendler revenue distribution
     program
-    # TODO!!!! Make this for takst sjælland
+
     """
 
     hovedstad = list(range(1001, 1300))
