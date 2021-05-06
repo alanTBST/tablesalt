@@ -4,7 +4,7 @@
     at TBST using Python. It creates the datastores that are needed for both the
     OD analysis and the Revenue distribution for DOT for Takstsjælland
 
-WHAT DOES IT DO?
+WHAT does it do?
 ================
 
     Given a path to a directory of compressed zip files of rejsekort delrejser
@@ -86,7 +86,8 @@ and the desired output location at C:/users/alkj/datastores
 
 To setup data for 2019, processing 500 000 rows at a time
 
-    python ./path/to/tablesalt/tablesalt/scripts/delrejsersetup.py -y 2019 -c 500000 -i C:/users/alkj/rejsekortdata -o C:/users/alkj/datastores
+    python ./path/to/tablesalt/tablesalt/scripts/delrejsersetup.py -y 2019
+    -c 500000 -i C:/users/alkj/rejsekortdata -o C:/users/alkj/datastores
 
 This will result in the following directory tree:
 
