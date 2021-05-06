@@ -3,7 +3,15 @@
 What does it do?
 ================
 
-Creates the share aggregations for the larger regions/taksæts
+Creates the share aggregations for the larger regions/taksæts.
+
+These are:
+
+    - all zones in hovedstaden, th
+    - all zones in sydsjælland, ts
+    - all zones in vestsjælland, tv,
+    - all zones between takstsæts, dsb
+    - the inner city (01-04)
 
 
 USAGE
