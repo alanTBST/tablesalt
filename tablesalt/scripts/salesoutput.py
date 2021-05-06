@@ -7,6 +7,11 @@ or revenue sharing between operators
 What does it do?
 ================
 
+This script joins the merged sales input data with the aggregated results
+sets produced by singlekeys.py, pendlerkeys.py and subtakst.py
+
+Each record in the sales data gets assigned an operator share based on
+the settings in the configuration file.
 
 USAGE
 =====
@@ -61,7 +66,7 @@ The default is 1
     "start_locations": {
         "automat": "metro",
         "nautila": "dsb",
-        "lokaltog-automater i 25 nordsj\u00e6llandske togs\u00e6t": "movia",
+        "lokaltog-automater i 25 nordsjællandske togsæt": "movia",
         "enkeltbilletter bus": "movia"
     },
     "single_tickets": [
@@ -92,19 +97,19 @@ The default is 1
         "park and ride"
     ],
     "city_large": [
-        "institutionskort, 20 b\u00f8rn",
+        "institutionskort, 20 børn",
         "travel pass",
         "kulturnatten",
         "citypass large 120 timer",
         "citypass large 24 timer",
-        "b\u00f8rnealderskompensation",
+        "børnealderskompensation",
         "city pass large",
         "citypass large 96 timer",
         "citypass large 72 timer",
         "copenhagen card",
         "citypass large 48 timer",
         "skoleklassekort",
-        "institutionskort, 15 b\u00f8rn",
+        "institutionskort, 15 børn",
         "blindekort",
         "off peak-kompensation",
         "mobilklippekort",
