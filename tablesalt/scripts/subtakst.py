@@ -1,8 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Sep 27 23:17:45 2020
+What does it do?
+================
 
-@author: alkj
+Creates the share aggregations for the larger regions/taksæts
+
+
+USAGE
+=====
+To run this script for 2019 rabattrin 0 and model 1:
+    python ./path/to/tablesalt/tablesalt/scripts/subtakst.py -y 2019 -r 0 -m 1
+
+
 """
 import ast
 import os
