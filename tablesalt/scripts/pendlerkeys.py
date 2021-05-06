@@ -2,18 +2,29 @@
 """
 What does it do?
 ================
-Creates the results for the pendler tickets
+
+Aggregates pendler tickets:
+
+    - by chosen pendlerkombi zones
+    - by the number of paid to
+    - by zones matching the DOT zone relations
+
+These are then dumped in a __result_cache__ folder for later processing
+by the salesoutput.py script
 
 
 USAGE
 =====
+
 To run the script for the year 2019 using model 1 (standard zonework model)
 
-    python ./path/to/tablesalt/tablesalt/scripts/pendlerkeys.py -y 2019 -p /path/to/PeriodeProdukt.csv -z /path/to/Zoner.csv -m 1
+    python ./path/to/tablesalt/tablesalt/scripts/pendlerkeys.py -y 2019
+    -p /path/to/PeriodeProdukt.csv -z /path/to/Zoner.csv -m 1
 
 where -p is the path to the period product data provided by rejsekort,
 -z is the path to the product zones data provided by rejsekort
-and -m is the model to run (1-> stard zonework model, 2-> solo zoner price model, 3-> equal operator model)
+and -m is the model to run (1 --> standard zonework model,
+2 --> solo zoner price model, 3 --> equal operator model)
 
 """
 import ast
@@ -25,7 +36,7 @@ from itertools import groupby, chain
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
-from typing import AnyStr
+from typing import AnyStr, Set, Tuple
 
 import lmdb
 import msgpack
@@ -40,20 +51,13 @@ from tablesalt.preprocessing.parsing import TableArgParser
 
 THIS_DIR = Path(__file__).parent
 
-def get_zone_combinations(udata):
-    """
-    Get all the chosen zone combinations of pendler kombi users
+def get_zone_combinations(udata) -> Set[Tuple[int], ...]:
+    """Get all the chosen zone combinations of pendler kombi users
 
-    Parameters
-    ----------
-    udata : dict
-        userdata loaded from users.PendlerInput class.
-
-    Returns
-    -------
-    zone_set : set
-        distinct valid zone combinations of all users.
-
+    :param udata: userdata loaded from users.PendlerInput class
+    :type udata: Dict
+    :return: distinct valid zone combinations of all users.
+    :rtype: Set[Tuple[int], ...]
     """
 
     zone_set = set()
@@ -61,29 +65,22 @@ def get_zone_combinations(udata):
         for _id, card_info in seasons.items():
             if card_info['zones'] not in zone_set:
                 zone_set.add(card_info['zones'])
-    # THIS IS ONLY FOR SJÆLLAND
+    # THIS IS ONLY FOR SJÆLLAND < 1300
     return {x for x in zone_set if all(y < 1300 for y in x)}
 
-def get_users_for_zones(udict, zone_set):
+def get_users_for_zones(
+    udict: PendlerKombiUsers,
+    zone_set: Set[Tuple[int], ...]
+    ) -> Tuple[Dict, Dict]:
+    """For each distinct zone combination, find their users and season passes
+
+    :param udict: the user dictionary for pendler kombi users.
+    :type udict: PendlerKombiUsers
+    :param zone_set: distinct valid zone combinations of all users
+    :type zone_set: Set[Tuple[int], ...]
+    :return: the users/seasonpasses for each set of valid zones, summary statistics
+    :rtype: Tuple[Dict, Dict]
     """
-    For each distinct zone combination, find their users and season passes
-
-    Parameters
-    ----------
-    udict : users.PendlerKombiUsers
-        the user dictionary for pendler kombi users.
-    zone_set : set
-        distinct valid zone combinations of all users .
-
-    Returns
-    -------
-    zone_set_users : dict
-        DESCRIPTION.
-    statistics : dict
-        DESCRIPTION.
-
-    """
-
 
     zone_set_users = {}
     statistics = {}
@@ -133,7 +130,7 @@ def proc_user_data(udata, combo_users):
 
 
 
-def load_valid(valid_kombi_store):
+def load_valid(valid_kombi_store: str) -> Dict:
     """
     Load the valid kombi user trips
 
@@ -157,7 +154,7 @@ def _date_in_window(test_period, test_date):
     """test that a date is in a validity period"""
     return min(test_period) <= test_date <= max(test_period)
 
-def wrap_price(store):
+def _wrap_price(store):
     """
 
     :param store: DESCRIPTION
@@ -212,7 +209,7 @@ def assert_internal_zones(zero_travel_price, zone_combo_trips):
 
     return {k: v.intersection(zero_travel_price) for k, v in zone_combo_trips.items()}
 
-def match_trip_to_season(kombi_trips, season_dates, kombi_dates):
+def match_trip_to_season(kombi_trips, season_dates, kombi_dates_path: str):
     """
     For each user seasonpassID match the valid kombi trips to
     that seasonpassID time window
@@ -231,7 +228,7 @@ def match_trip_to_season(kombi_trips, season_dates, kombi_dates):
 
     """
     out = {k: [] for k, v in season_dates.items()}
-    with lmdb.open(kombi_dates, readahead=False) as env:
+    with lmdb.open(kombi_dates_path, readahead=False) as env:
         with env.begin() as txn:
             for k, v in tqdm(kombi_trips.items(), 'matching trips to season passes'):
                 v = (bytes(str(x), 'utf-8') for x in v)
@@ -483,13 +480,6 @@ def _chosen_zones(
 # match the zone_relations
 # =============================================================================
 def _load_zone_relations():
-    """
-    Returns
-    -------
-    zonerelations : TYPE
-        DESCRIPTION.
-
-    """
 
     fp = pkg_resources.resource_filename(
         'tablesalt',
@@ -498,15 +488,13 @@ def _load_zone_relations():
 
     with open(fp, 'rb') as f:
         zone_relations = msgpack.load(f, strict_map_key=False)
-
-
     return zone_relations
 
 def _unpack_valid_zones(zonelist):
 
     return tuple(x['ZoneID'] for x in zonelist)
 
-def _proc_zone_relations(zone_rels: dict):
+def _proc_zone_relations(zone_rels: Dict):
 
     wanted_keys = ('StartZone',
                    'DestinationZone',
@@ -523,15 +511,11 @@ def _proc_zone_relations(zone_rels: dict):
 
     return zone_rels
 
-def _load_kombi_results(year, model):
+def _load_kombi_results(year: str, model: int):
 
+    fp = (THIS_DIR / '__result_cache__' /  f'{year}' /
+          'pendler' / f'pendlerchosenzones{year}_model_{model}.csv')
 
-    fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__', f'{year}',
-        'pendler',
-        f'pendlerchosenzones{year}_model_{model}.csv'
-        )
 
     results = pd.read_csv(fp, index_col=0)
     results = results.to_dict(orient='index')
@@ -539,7 +523,7 @@ def _load_kombi_results(year, model):
     return {ast.literal_eval(k): v for k, v in results.items()}
 
 
-def _zonerelations(year, model):
+def _zonerelations(year: int, model: int):
 
     zone_rels = _load_zone_relations()
     zone_rels = _proc_zone_relations(zone_rels)
@@ -566,21 +550,18 @@ def _zonerelations(year, model):
         ]
     df = pd.concat([frame, cp])
     df = df.fillna(0)
-
     # add new frame d=o and o=d
-    fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__', f'{year}',
-        'pendler',
-        f'zonerelations{year}_model_{model}.csv'
-        )
+    fp = (THIS_DIR / '__result_cache__' / f'{year}' / 'pendler' /
+          f'zonerelations{year}_model_{model}.csv')
 
     df.to_csv(fp, index=False)
 
 
 def main():
 
-    parser = TableArgParser('year', 'products', 'zones', 'model')
+    parser = TableArgParser(
+        'year', 'products', 'zones', 'model'
+        )
 
     args = parser.parse()
 
