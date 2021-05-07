@@ -1,10 +1,8 @@
 """
-
-Author: Alan Jones alkj@tbst.dk
+Various functions to manipulate trips
 
 """
 from collections import defaultdict
-
 import numpy as np
 
 

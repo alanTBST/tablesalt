@@ -1,4 +1,8 @@
-
+"""
+Parsing contains a class to parse command line arguments for
+tablesalt scripts. It defines allowable arguments and default
+values
+"""
 from argparse import (
     ArgumentParser,
     RawTextHelpFormatter

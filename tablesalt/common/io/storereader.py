@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-
 Module containg StoreReader class to read
 datasets from the Rejsekort datasets that
 are created from the csv zipfile delivered
 by rejsedata
-
 """
 
 import os
@@ -193,7 +191,6 @@ class StoreReader():
                 pas_type: defaults to 'main' (all humans and only humans)
                 pas_total: int - total number of passengers on the trip
         :type **kwargs: TYPE
-        :return: ''
         :rtype: None
 
         """

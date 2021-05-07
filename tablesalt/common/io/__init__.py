@@ -1,10 +1,6 @@
 """
-TBST Trafik, Bygge, og Bolig -styrelsen
-Package for data analysis at TBST
-Includes Rejsekort and GTFS analysis
-
-Author: Alan Jones alkj@tbst.dk
-
+io contains the functions and classes used to load package data and
+rejsekort delrejser data
 """
 
 from .rejsekortcollections import _load_collection, proc_collection

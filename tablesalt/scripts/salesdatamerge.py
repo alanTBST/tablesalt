@@ -1,8 +1,27 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat May 16 18:58:46 2020
 
-@author: alkj
+What does it do?
+================
+
+This script merges and processes sales data received from the operators.
+
+
+USAGE
+=====
+
+Place all of the delivered sales data files in one folder/directory.
+
+Eg ./path/to/salesdata
+
+The name of the operator should be in the filename. EG 'moviasales2020.csv', 'dsbomsætning.xlsx'
+
+To run the script
+
+    python ./path/to/tablesalt/tablesalt/scripts/salesdatamerge.py -y 2019 -d ./path/to/salesdata
+
+This will place the file in a result cache directory in tablesalt to be used
+in the salesoutput script later.
 """
 
 import ast
@@ -16,15 +35,15 @@ from typing import Any, AnyStr, Dict, List, Set, Tuple
 import numpy as np
 import pandas as pd
 
-THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
+THIS_DIR: Path = Path(__file__).parent
 
-SUPPORTED_FILES = {
+SUPPORTED_FILES: Set[str] = {
     'csv',
     'xlsx',
     'xls'
     }
 
-MERGE_COLUMNS = [
+MERGE_COLUMNS: List[str] = [
     'salgsvirksomhed',
     'indtægtsgruppe',
     'salgsår',
@@ -42,7 +61,7 @@ MERGE_COLUMNS = [
     'antal'
     ]
 
-STRAIGHT_MAP = {
+STRAIGHT_MAP: Dict[str, str] = {
     'aar': 'salgsår',
     'afsætning': 'antal',
     'summen af antal': 'antal',
@@ -53,8 +72,31 @@ STRAIGHT_MAP = {
     'kildesystem': 'salgsmedie'
     }
 
-KNOWN_NOT_NEEDED = {'smedie', 'antalzoner'}
+KNOWN_NOT_NEEDED: Set[str] = {
+    'smedie',
+    'antalzoner'
+    }
 
+INTEGER_COLUMNS: Set[str] = {
+    'salgsår',
+    'salgsmåned',
+    'betaltezoner',
+    }
+
+STRING_COLUMNS: Set[str] = {
+    'salgsvirksomhed',
+    'takstsæt',
+    'produktgruppe',
+    'produktnavn',
+    'kundetype' ,
+    'salgsmedie',
+    'valgtezoner'
+    }
+
+FLOAT_COLUMNS: Set[str] = {
+    'omsætning',
+    'antal'
+    }
 
 def parseargs() -> Dict:
     """
@@ -82,31 +124,21 @@ def parseargs() -> Dict:
     parser.add_argument(
         '-o', '--outfilename', help=ohelp, default='mergedsales.csv'
         )
-
+    parser.add_argument(
+        '-y', '--year', type=int
+        )
     return vars(parser.parse_args())
 
 
 def directory_contents(directory: AnyStr) -> List[AnyStr]:
+    """Get the contents of the directory
+
+    :param directory: the path to the directory containing the sales data.
+    :type directory: AnyStr
+    :raises TypeError: if any of the files in the directory are not csv or excel files.
+    :return: a list of the files in the given directory.
+    :rtype: List[AnyStr]
     """
-    Get the contents of the directory
-
-    Parameters
-    ----------
-    directory : AnyStr
-        the path to the directory containing the sales data.
-
-    Raises
-    ------
-    TypeError
-        if any of the files in the directory are not csv or excel files.
-
-    Returns
-    -------
-    List[AnyStr]
-        a list of the files in the given directory.
-
-    """
-
     contents = glob.glob(os.path.join(directory, '*'))
     extensions = {x.split('.')[-1] for x in contents}
     if not all(x in SUPPORTED_FILES for x in extensions):
@@ -133,24 +165,13 @@ def _op_id(filename: AnyStr) -> Tuple[str, str]:
 
 
 def identify_operator(dir_contents: List[AnyStr]) -> Dict[str, str]:
-    """
-    Identify the operator for each filename
+    """Identify the operator for each filename
 
-    Parameters
-    ----------
-    dir_contents : List[AnyStr]
-        list of filenames.
-
-    Raises
-    ------
-    ValueError:
-        if any of the operators are not in the filenames.
-
-    Returns
-    -------
-    Dict[str, str]
-        {operator: filename}.
-
+    :param dir_contents: list of filenames
+    :type dir_contents: List[AnyStr]
+    :raises ValueError: if any of the operators are not in the filenames.
+    :return: a dictionary of operator -> filename
+    :rtype: Dict[str, str]
     """
 
     vals = {}
@@ -159,12 +180,18 @@ def identify_operator(dir_contents: List[AnyStr]) -> Dict[str, str]:
             k, v = _op_id(file)
             vals[k] = v
         except Exception as e:
-            raise e
+            raise ValueError from e
 
     return vals
 
 def _get_separator(file: AnyStr) -> str:
+    """find the separator of the file
 
+    :param file: the filepath
+    :type file: AnyStr
+    :return: a comma or a semicolon
+    :rtype: str
+    """
     with open(file, 'r') as f:
         firstline = f.readline()
         commas = firstline.count(',')
@@ -181,7 +208,7 @@ def _get_separator(file: AnyStr) -> str:
     return NotImplemented
 
 
-def _read_utf8(file: AnyStr) -> Tuple:
+def _read_utf8(file: AnyStr) -> Tuple[str, ...]:
 
     return tuple(pd.read_csv(
         file, nrows=0,
@@ -189,7 +216,7 @@ def _read_utf8(file: AnyStr) -> Tuple:
         ).columns)
 
 
-def _read_iso(file: AnyStr) -> Tuple:
+def _read_iso(file: AnyStr) -> Tuple[str, ...]:
 
     return tuple(pd.read_csv(
         file, nrows=0, encoding='iso-8859-1',
@@ -208,7 +235,7 @@ def _check_chars(columns: Tuple) -> bool:
     return True
 
 
-def _read_header(file: AnyStr) -> Tuple:
+def _read_header(file: AnyStr) -> Tuple[str, ...]:
 
     ext = file.split('.')[-1]
     if ext == 'csv':
@@ -235,7 +262,7 @@ def find_columns(identified_operators: Dict) -> Dict:
 
     return cols
 
-# TODO this could be in preprocessing
+
 def match_columns(columndict: Dict[str, Tuple[str, ...]]) -> Dict[str, Dict[str, str]]:
     """
     Match the input columns/field names given to the wanted
@@ -277,19 +304,7 @@ def read_and_merge(
         files: Dict, matched_columns: Dict
         ) -> pd.core.frame.DataFrame:
     """
-
-
-    Parameters
-    ----------
-    files : Dict
-        DESCRIPTION.
-    matched_columns : Dict
-        DESCRIPTION.
-
-    Returns
-    -------
-    df : pd.core.frame.DataFrame
-        DESCRIPTION.
+    Read each of the files and merge them into a single dataframe
 
     """
 
@@ -339,17 +354,8 @@ def _check_types(column: pd.core.series.Series) -> Set:
 
 def _all_string(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
     """process columns that should contain only strings"""
-    string_columns = (
-        'salgsvirksomhed',
-        'takstsæt',
-        'produktgruppe',
-        'produktnavn',
-        'kundetype' ,
-        'salgsmedie',
-        'valgtezoner'
-        )
 
-    for col in string_columns:
+    for col in STRING_COLUMNS:
         distinct_types = _check_types(frame[col])
         if distinct_types == {str}:
             frame.loc[:, col] = frame.loc[:, col].str.lower()
@@ -362,8 +368,6 @@ def _all_string(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
     frame.loc[:, 'takstsæt'] = frame.loc[:, 'takstsæt'].str.replace('ht', 'th')
 
     return frame
-
-
 
 def _paidzones(val: Any) -> int:
 
@@ -425,7 +429,6 @@ def _assign_region_nr(
     return frame
 
 
-
 def _zone_string(string: str, prefix: str) -> str:
 
     if r'/' in string:
@@ -433,7 +436,7 @@ def _zone_string(string: str, prefix: str) -> str:
     return prefix + string.zfill(4)[2:]
 
 
-def _assign_shortzone(frame: pd.core.frame.DataFrame, col: str):
+def _assign_shortzone(frame: pd.core.frame.DataFrame, col: str) -> pd.core.frame.DataFrame:
 
     frame.loc[(frame.loc[:, 'takstsæt'] == 'th'), col] = \
         frame.loc[(frame.loc[:, 'takstsæt'] == 'th'), col].apply(
@@ -467,13 +470,7 @@ def _startend_zone(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
 def _all_int(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
     """process columns that should contain only integers"""
 
-    integer_columns = (
-        'salgsår',
-        'salgsmåned',
-        'betaltezoner',
-         )
-
-    for col in integer_columns:
+    for col in INTEGER_COLUMNS:
         distinct_types = _check_types(frame[col])
         if distinct_types == {int}:
             continue
@@ -489,12 +486,7 @@ def _all_int(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
 def _all_float(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
     """process columns that should contain only floats"""
 
-    float_columns = (
-        'omsætning',
-        'antal'
-        )
-
-    for col in float_columns:
+    for col in FLOAT_COLUMNS:
         distinct_types = _check_types(frame[col])
         if str not in distinct_types:
             continue
@@ -504,7 +496,7 @@ def _all_float(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
                 lambda x: isinstance(x, str)
                 ), col].str.replace(',', '.')
 
-    for col in float_columns:
+    for col in FLOAT_COLUMNS:
         frame.loc[:, col] = frame.loc[:, col].astype(float)
 
     return frame
@@ -530,7 +522,7 @@ def _eval_literal(val: Any) -> Tuple:
     except Exception as e:
         return ()
 
-def _format_tuple(val: Tuple) -> Tuple:
+def _format_tuple(val: Tuple) -> Tuple[int, ...]:
 
     return tuple(int('1' + str(x).zfill(4)[1:]) for x in val)
 
@@ -548,7 +540,13 @@ def _valgtezoner(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
 
 
 def clean_frame(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
+    """perform all the cleaning on the given frame
 
+    :param frame: a frame to clean
+    :type frame: pd.core.frame.DataFrame
+    :return: a cleaned dataframe of sales data
+    :rtype: pd.core.frame.DataFrame
+    """
     frame = _all_string(frame)
     frame = _all_int(frame)
     frame = _startend_zone(frame)
@@ -558,12 +556,11 @@ def clean_frame(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
     return frame
 
 
-def main():
+def main(dirpath, year, outfile):
     """main function"""
 
-    d = r'H:\revenue\inputdata\2020\sales'
-    year = 2020
-    contents = directory_contents(d)
+
+    contents = directory_contents(dirpath)
     operators = identify_operator(contents)
     given_columns = find_columns(operators)
     columns_matched = match_columns(given_columns)
@@ -574,13 +571,17 @@ def main():
         '__result_cache__',
         f'{year}',
         'preprocessed',
-        'mergedsales.csv'
+        f'{outfile}.csv'
         )
     df.to_csv(fp, index=False)
 
 
 if __name__ == "__main__":
     from datetime import datetime
+    args = parseargs()
+    dir_path = args['directory']
+    year = args['year']
+    outfile = args['outfile']
     st = datetime.now()
-    main()
+    main(dir_path, year, outfile)
     print(datetime.now() - st)

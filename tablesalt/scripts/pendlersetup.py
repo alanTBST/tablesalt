@@ -1,100 +1,222 @@
 """
-TBST - Trafik, Bygge, og Bolig -styrelsen
+This script is the second step in revenue analysis at TBST
+
+What does it do?
+================
+
+    Given a paths to pendler product data this script creates three more lmdb
+    key-value stores pertinent to pendler users. It creates creates the
+    user_trips_db
+    The delrejsersetup script, run before
+    this, created the trip_card_db
 
 
-Created on Sat Mar 14 18:07:24 2020
+Resultant directory tree structure
+==================================
 
-@author: Alan Jones
-@email: alkj@tbst.dk; alanksjones@gmail.com
+| rejsekortstores/
+|
+|    |------dbs/
+|           |-----trip_card_db
+|           |-----kombi_dates_db
+|           |-----kombi_valid_trips
+|           |-----user_trips_db
+|
+|    |------hdfstores/
+|           |-----rkfile(0).h5.....rkfile(n).h5
+|
+|    |------packs/
+|           |-----rkfile(0)cont.msgpack...rkfile(n)cont.msgpack
 
-# =============================================================================
- HELLO AGAIN!
- -------------
- This script sets up the
+USAGE
+=====
 
- WHAT DOES IT DO?
- -----------------
+To setup the datastores for the year 2019
 
-
- Directory tree structure:
-
- rejsekortstores/
-    |
-    |------dbs/
-    |       |-----kombi_dates_db
-    |       |-----kombi_valid_trips
-    |       |-----trip_card_db
-    |       |-----user_trips_db
-    |
-    |------hdfstores/
-    |       |-----rkfile(0).h5.....rkfile(n).h5
-    |
-    |------packs/
-            |-----rkfile(0)cont.msgpack...rkfile(n)cont.msgpack
-
- First
- ------
-
- Second
- -------
+    python ./path/to/tablesalt/tablesalt/scripts/pendlersetup.py -y 2019 -p /path/to/PeriodeProdukt.csv -z /path/to/Zoner.csv
 
 
-  Third
-  ------
+Input Data
+==========
+
+PeriodeProdukt
+--------------
+
+.. tabularcolumns:: |p{5.3cm}||L||L|L|
++----------------------------------+--------------+----------------------+---------------------------------+
+|          EncryptedCardEngravedID | SeasonPassID | SeasonPassTemplateID | SeasonPassName                  |
++==================================+==============+======================+=================================+
+| 42454135373736374541303030343937 |      2120462 |              8192163 | DOT Pendler Kombi m. Metro      |
++----------------------------------+--------------+----------------------+---------------------------------+
+| 32433241303531383137334546443541 |      2097861 |              8192130 | Udgået - Pendler Kombi Sjælland |
++----------------------------------+--------------+----------------------+---------------------------------+
+| 32433241303531383137334546443541 |      2105617 |              8192130 | Udgået - Pendler Kombi Sjælland |
++----------------------------------+--------------+----------------------+---------------------------------+
+| 32433241303531383137334546443541 |      2113630 |              8192130 | Udgået - Pendler Kombi Sjælland |
++----------------------------------+--------------+----------------------+---------------------------------+
+| 32433241303531383137334546443541 |      2125274 |              8192163 | DOT Pendler Kombi m. Metro      |
++----------------------------------+--------------+----------------------+---------------------------------+
+| 32433241303531383137334546443541 |      2133790 |              8192163 | DOT Pendler Kombi m. Metro      |
++----------------------------------+--------------+----------------------+---------------------------------+
+| 32433241303531383137334546443541 |      2141567 |              8192163 | DOT Pendler Kombi m. Metro      |
++----------------------------------+--------------+----------------------+---------------------------------+
+
+...
+
++----------+----------------+------------------+---------------------+
+| Fareset  | PsedoFareset   | SeasonPassType   | PassengerGroupType1 |
++==========+================+==================+=====================+
+| Sjælland | Hovedstaden    | NumberOfZones    |                   1 |
++----------+----------------+------------------+---------------------+
+| Sjælland | Hovedstaden    | NumberOfZones    |                   1 |
++----------+----------------+------------------+---------------------+
+| Sjælland | Hovedstaden    | NumberOfZones    |                   1 |
++----------+----------------+------------------+---------------------+
+| Sjælland | Hovedstaden    | NumberOfZones    |                   1 |
++----------+----------------+------------------+---------------------+
+| Sjælland | Hovedstaden    | NumberOfZones    |                   1 |
++----------+----------------+------------------+---------------------+
+| Sjælland | Hovedstaden    | NumberOfZones    |                   1 |
++----------+----------------+------------------+---------------------+
+| Sjælland | Hovedstaden    | NumberOfZones    |                   1 |
++----------+----------------+------------------+---------------------+
+
+...
+
++------------------------------------------------------+------------------+----------------+
+| SeasonPassStatus                                     | ValidityStartDT  | ValidityEndDT  |
++======================================================+==================+================+
+| Slettet, periodekort er allerede fjernet fra kortet. | 03/09/2019       | 16/09/2019     |
++------------------------------------------------------+------------------+----------------+
+| Slettet, periodekort er allerede fjernet fra kortet. | 05/06/2019       | 04/07/2019     |
++------------------------------------------------------+------------------+----------------+
+| Slettet, periodekort er allerede fjernet fra kortet. | 05/07/2019       | 03/08/2019     |
++------------------------------------------------------+------------------+----------------+
+| Slettet, periodekort er allerede fjernet fra kortet. | 05/08/2019       | 03/09/2019     |
++------------------------------------------------------+------------------+----------------+
+| Stoppet, periodekort kan fjernes fra kortet          | 12/09/2019       | 11/10/2019     |
++------------------------------------------------------+------------------+----------------+
+| Slettet, periodekort er allerede fjernet fra kortet. | 22/10/2019       | 20/11/2019     |
++------------------------------------------------------+------------------+----------------+
+| Stoppet, periodekort kan fjernes fra kortet          | 21/11/2019       | 20/12/2019     |
++------------------------------------------------------+------------------+----------------+
+
+...
+
++-------------+--------------+------------+-----------------+--------------+----------------+
+|   ValidDays |   FromZoneNr |   ToZoneNr | SeasonPassZones | PassagerType | TpurseRequired |
++=============+==============+============+=================+==============+================+
+|          14 |         1002 |       1052 |               5 | Voksen       | Yes            |
++-------------+--------------+------------+-----------------+--------------+----------------+
+|          30 |         1001 |       1085 |               8 | Voksen       | Yes            |
++-------------+--------------+------------+-----------------+--------------+----------------+
+|          30 |         1001 |       1085 |               8 | Voksen       | Yes            |
++-------------+--------------+------------+-----------------+--------------+----------------+
+|          30 |         1001 |       1085 |               8 | Voksen       | Yes            |
++-------------+--------------+------------+-----------------+--------------+----------------+
+|          30 |         1001 |       1085 |               8 | Voksen       | Yes            |
++-------------+--------------+------------+-----------------+--------------+----------------+
+|          30 |         1001 |       1085 |               8 | Voksen       | Yes            |
++-------------+--------------+------------+-----------------+--------------+----------------+
+|          30 |         1001 |       1085 |               8 | Voksen       | Yes            |
++-------------+--------------+------------+-----------------+--------------+----------------+
+
+...
+
++---------------------+----------+---------------------------+--------------+
+| SeasonPassCategory  | Pris     | RefundType                | productdate  |
++=====================+==========+===========================+==============+
+| Standard            | 623,26   | TILBAGEBETALING REJSEKORT | 03/09/2019   |
++---------------------+----------+---------------------------+--------------+
+| Standard            | 1.329,90 | nan                       | 05/06/2019   |
++---------------------+----------+---------------------------+--------------+
+| Standard            | 1.329,90 | nan                       | 05/07/2019   |
++---------------------+----------+---------------------------+--------------+
+| Standard            | 1.329,90 | nan                       | 05/08/2019   |
++---------------------+----------+---------------------------+--------------+
+| Standard            | 1.329,90 | nan                       | 12/09/2019   |
++---------------------+----------+---------------------------+--------------+
+| Standard            | 1.329,90 | nan                       | 22/10/2019   |
++---------------------+----------+---------------------------+--------------+
+| Standard            | 1.329,90 | nan                       | 21/11/2019   |
++---------------------+----------+---------------------------+--------------+
 
 
-  BE AWARE!
-  ---------
+Zoner
+-----
+
++----------------------------------+----------------+----------+
+|          EncryptedCardEngravedID |   SeasonPassID |   ZoneNr |
++==================================+================+==========+
+| 42454135373736374541303030343937 |        2120462 |     1001 |
++----------------------------------+----------------+----------+
+| 42454135373736374541303030343937 |        2120462 |     1002 |
++----------------------------------+----------------+----------+
+| 42454135373736374541303030343937 |        2120462 |     1031 |
++----------------------------------+----------------+----------+
+| 42454135373736374541303030343937 |        2120462 |     1041 |
++----------------------------------+----------------+----------+
+| 42454135373736374541303030343937 |        2120462 |     1052 |
++----------------------------------+----------------+----------+
+| 32433241303531383137334546443541 |        2097861 |     1001 |
++----------------------------------+----------------+----------+
+| 32433241303531383137334546443541 |        2097861 |     1002 |
++----------------------------------+----------------+----------+
+| 32433241303531383137334546443541 |        2097861 |     1031 |
++----------------------------------+----------------+----------+
+| 32433241303531383137334546443541 |        2097861 |     1042 |
++----------------------------------+----------------+----------+
+| 32433241303531383137334546443541 |        2097861 |     1053 |
++----------------------------------+----------------+----------+
+| 32433241303531383137334546443541 |        2097861 |     1063 |
++----------------------------------+----------------+----------+
+| 32433241303531383137334546443541 |        2097861 |     1074 |
++----------------------------------+----------------+----------+
+| 32433241303531383137334546443541 |        2097861 |     1085 |
++----------------------------------+----------------+----------+
 
 
-  DEPENDENCIES
-  ------
-  tablesalt -
-  If using conda and the install step doesn't quite work, after the build
-  try pip install .  in the repo directory
-
-# =============================================================================
 """
-# standard imports
 import ast
+import os
 from datetime import datetime
 from functools import partial
-# from multiprocessing.pool import ThreadPool
 from itertools import groupby
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
+from typing import Dict, List, Set, Union, Tuple
 
 import lmdb
 import numpy as np
+from pandas import Timestamp
 
 from tablesalt import StoreReader
 from tablesalt.common import make_store
 from tablesalt.preprocessing import db_paths, find_datastores
 from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.season import users
+from tablesalt.running import WindowsInhibitor
+# may refactor to accept just a sequence of cardnums
+def get_pendler_trips(
+    userdata: Dict[str, Dict[int, Dict[str, Union[Timestamp, Tuple[int, ...]]]]],
+    tripcarddb: str, userdb: str
+    ) -> List[str]:
+    """create the user_trips_db from the season pass data and the trip_card kv store
+        cardnum -> (tripkey1, tripkey2, tripkey3,....)
+        also returns a list of pendler tripkeys
 
-
-def get_pendler_trips(pendler_cards, tripcarddb, userdb):
+    :param userdata: the data returned from users._PendlerInput.get_user_data()
+    :type userdata: Dict[str, Dict[int, Dict[str, Union[Timestamp, Tuple[int, ...]]]]]
+    :param tripcarddb: the path to the tripcarddb
+    :type tripcarddb: str
+    :param userdb: the path the output user_trips_db
+    :type userdb: str
+    :return: a list of all pendler tripkeys
+    :rtype: List[int]
     """
-    Filter out non-pendler kombi trips
 
-    Parameters
-    ----------
-    card_trip_fp : str/path
-        path to the CARD_.
-    pendler_cards : dict
-        the pendler user data returned from
-        users._PendlerInput().get_user_data()
-
-    Returns
-    -------
-    list
-        list of tuples.
-
-    """
-
-    user_card_nums = {bytes(x, 'utf-8') for x in pendler_cards}
+    user_card_nums = {bytes(x, 'utf-8') for x in userdata}
 
     trip_card_dict = {}
     with lmdb.open(tripcarddb) as env:
@@ -104,7 +226,7 @@ def get_pendler_trips(pendler_cards, tripcarddb, userdb):
                 if v in user_card_nums:
                     trip_card_dict[int(k.decode('utf-8'))] = v
 
-    trip_card_dict = sorted(zip(
+    trip_card_list = sorted(zip(
         trip_card_dict.values(), trip_card_dict.keys()
         ), key=itemgetter(0))
 
@@ -112,31 +234,25 @@ def get_pendler_trips(pendler_cards, tripcarddb, userdb):
     card_to_trips = {
         key: bytes(str(tuple(x[1] for x in grp)), 'utf-8')
         for key, grp in groupby(
-            trip_card_dict, key=itemgetter(0)
+            trip_card_list, key=itemgetter(0)
                 )
         }
 
     make_store(card_to_trips, userdb, start_size=5)
 
-    return [x[1] for x in trip_card_dict]
+    return [trip for card, trip in trip_card_list]
 
 
-def load_store_dates(store, pendler_trip_keys):
-    """
-    load the time information from the hdfstores
+def load_store_dates(store: str, pendler_trip_keys: List[int]) -> Dict[bytes, bytes]:
+    """load the time/date data from the given store and get only pendler user
+    tripkeys
 
-    Parameters
-    ----------
-    store : str/path
-        path to an hdfstore.
-    pendler_trip_keys : list
-        a list of tripkey integers.
-
-    Returns
-    -------
-    tuple
-        tuple of two-tuples of (tripkey, date string).
-
+    :param store: the path of an hdf5 file
+    :type store: str
+    :param pendler_trip_keys: a list of tripkeys that are pendler trips
+    :type pendler_trip_keys: List[int]
+    :return: a dictionary of tripkey -> datestring
+    :rtype: Dict[bytes, bytes]
     """
 
     time_info = StoreReader(store).get_data('time')
@@ -151,28 +267,22 @@ def load_store_dates(store, pendler_trip_keys):
         for x in date_info
         }
 
-def thread_dates(lst_of_stores, pendler_keys, dbpath):
+def thread_dates(
+    lst_of_stores: List[str],
+    pendler_trip_keys: List[int],
+    dbpath: str
+    ) -> None:
+    """Load all of the stores in parallel, filter pendler trips and write
+    to key-value store
+
+    :param lst_of_stores: list of paths to hdf5 files
+    :type lst_of_stores: List[str]
+    :param pendler_trip_keys: a list of tripkeys that are pendler trips
+    :type pendler_trip_keys: List[int]
+    :param dbpath: the path of the lmdb key-value store to create
+    :type dbpath: str
     """
-    Load the pendler
-
-    Parameters
-    ----------
-    card_trip_fp : str
-        DESCRIPTION.
-    pendler_cards : dict
-        DESCRIPTION.
-    stores : TYPE
-        DESCRIPTION.
-    n_threads : TYPE, optional
-        DESCRIPTION. The default is 4.
-
-    Returns
-    -------
-    list
-        list of two-tules (tripkey, datetime.date).
-
-    """
-    func = partial(load_store_dates, pendler_trip_keys=pendler_keys)
+    func = partial(load_store_dates, pendler_trip_keys=pendler_trip_keys)
     print("Loading travel dates...")
     with Pool(7) as pool:
         results = pool.imap(func, lst_of_stores)
@@ -180,33 +290,33 @@ def thread_dates(lst_of_stores, pendler_keys, dbpath):
             make_store(res, dbpath, start_size=5)
 
 def _card_periods(dict_dicts):
-    """get val periods from dict of dicts"""
+    """Get val periods from dict of dicts"""
     return set((v['start'].date(), v['end'].date())
                 for _, v  in dict_dicts.items())
 
 def _date_in_window(test_period, test_date):
-    """test that a date is in a validity period"""
+    """Test that a date is in a validity period"""
     return min(test_period) <= test_date <= max(test_period)
 
 
 def validate_travel_dates(
-        userdata, userdbpath,
-        kombidatespath, kombivalidpath
-        ):
-    """
-    Validate that a trip occurs in a valid kombi time period
+        userdata: Dict[str, Dict[int, Dict[str, Union[Timestamp, Tuple[int, ...]]]]],
+        userdbpath: str,
+        kombidatespath: str,
+        kombivalidpath: str
+        ) -> None:
+    """Validate that trips occur in the valid date range for each pendler seasonpass
+    write only those that do into a key-vaue store
 
-    Parameters
-    ----------
-    travel_dates : TYPE
-        DESCRIPTION.
-    userdata : TYPE
-        DESCRIPTION.
 
-    Returns
-    -------
-    None.
-
+    :param userdata: the dictionary of users and seasonpasses
+    :type userdata: Dict[str, Dict[int, Dict[str, Union[Timestamp, Tuple[int, ...]]]]]
+    :param userdbpath: the path to the user database key-value store
+    :type userdbpath: str
+    :param kombidatespath: the path to the key-value store of kombi dates
+    :type kombidatespath: str
+    :param kombivalidpath: the path to the key value store of valid kombi trips
+    :type kombivalidpath: str
     """
     # =========================================================================
     # load the user trips from lmdb
@@ -244,6 +354,8 @@ def validate_travel_dates(
 
 
 def main():
+    """main script function
+    """
 
     parser = TableArgParser('year', 'products', 'zones')
 
@@ -262,11 +374,14 @@ def main():
     userdata = pendler_cards.get_user_data()
 
     pendler_trip_keys = get_pendler_trips(
-        userdata, paths['trip_card_db'], paths['user_trips_db']
+        userdata, paths['trip_card_db'],
+        paths['user_trips_db']
         )
 
     thread_dates(
-        stores, pendler_trip_keys, paths['kombi_dates_db']
+        stores,
+        pendler_trip_keys,
+        paths['kombi_dates_db']
         )
 
     print("validating travel dates")
@@ -280,5 +395,11 @@ def main():
 
 if __name__ == "__main__":
     st = datetime.now()
-    main()
+    if os.name == 'nt':
+        INHIBITOR = WindowsInhibitor()
+        INHIBITOR.inhibit()
+        main()
+        INHIBITOR.uninhibit()
+    else:
+        main()
     print(datetime.now() - st)

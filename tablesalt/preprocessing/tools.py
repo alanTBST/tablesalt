@@ -1,3 +1,7 @@
+"""
+Module conatining functions to find location of datastores, setup needed
+directories and inspect zipfiles of dejrejser data.
+"""
 import glob
 import os
 import sys

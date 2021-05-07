@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Nov 17 11:40:35 2020
-
-@author: alkj
+This module is a test for the corrections of zone 1002 proposed by Movia
 """
 
 import ast
@@ -252,7 +250,7 @@ if __name__ == "__main__":
     a, b, c = main(2019)
     out = {}
     out['contains_zone1'] = a
-    out['contains_zone2'] = b
+    out['contains_zone2'] = bThis
     out['in_01_or_0103_or_0104'] = c
     import pandas as pd
 

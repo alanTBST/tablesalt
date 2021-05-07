@@ -1,17 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Mar  6 11:44:06 2020
-
-@author: alkj
-
 Class to create an undirected graph
 of the tariffzones in Denmark
 """
 
 from typing import Dict, Generator, Optional, Tuple
 
-import networkx as nx
-import pandas as pd
+import networkx as nx #type: ignore
+import pandas as pd #type: ignore
 import pkg_resources
 
 from tablesalt.topology.tools import EdgeMaker
@@ -39,7 +35,15 @@ REGION_ZONES = {
     }
 
 def _ringzone_dict(region: str) -> Dict[Tuple[int, int], int]:
+    """load the ringzone csv file from the package and convert it
+    to a dictionary
 
+    :param region: the region or subregion to include
+    :type region: str
+    :return: a dictionary with a two tuple of zones
+        and the distance in zones as values
+    :rtype: Dict[Tuple[int, int], int]
+    """
     fp = pkg_resources.resource_filename(
         'tablesalt', 'resources/networktopodk/national_ringzone.csv'
         )
@@ -83,15 +87,25 @@ class ZoneGraph():
         """
 
         self.region = region
-        self.data = EdgeMaker().make_edges(mode)
+        self.mode = mode
+        self.data = EdgeMaker().make_edges(self.mode)
         self.columns = self.rows = self.data['idx']
         self.rev_columns = self.rev_rows = self.data['rev_idx']
         self.graph = nx.from_numpy_matrix(self.data['adj_array'])
         self._ringzone_dict = _ringzone_dict(self.region)
         self.SHORTEST_PATHS_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
 
+    # OPTION put this in the TakstZones class in tools
     @classmethod
-    def ring_dict(cls, region):
+    def ring_dict(cls, region: str):
+        """return the ringzone dictionary for the given region
+
+        :param region: the region wanted:
+             ['sjælland', 'hovedstaden', 'sydsjælland', 'vestsjælland']
+        :type region: str
+        :return: the ringzone dictionary
+        :rtype: Dict[Tuple[int, int], int]
+        """
 
         return _ringzone_dict(region)
 
@@ -102,14 +116,14 @@ class ZoneGraph():
     def find_paths(
             self,
             start: int,
-            end,
+            end: int,
             ) -> Generator[Tuple[int, ...], None, None]:
         """
         Return all simple paths between the given start and end zones
 
-        :param start: the start zone (nation zone format)
+        :param start: the start zone (national zone format)
         :type start: int
-        :param end: the end zone (nation zone format)
+        :param end: the end zone (national zone format)
         :type end: int
         :yield: a tuple of the zone path
         :rtype: Generator[Tuple[int, ...], None, None]
@@ -163,4 +177,3 @@ class ZoneGraph():
         self.SHORTEST_PATHS_CACHE[(start, end)] = mapped
 
         return mapped
-

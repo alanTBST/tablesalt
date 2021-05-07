@@ -1,29 +1,35 @@
 """
-TBST Trafik, Bygge, og Bolig -styrelsen
-Package for rejsekort data analysis at TBST
-
-
-Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
-
+Contains the RejsekortStore class to interact with all hdf5 datastores
 """
 
 # standard imports
 import os
 import glob
 from datetime import datetime
-# third party imports
+from multiprocessing import Pool
+from typing import Tuple, Set, Dict, Optional, List
+
+from tqdm import tqdm
 import h5py
 import numpy as np
 import pandas as pd
 import msgpack
 
-#package imports
 from .storereader import StoreReader
 
 
-def get_zero_price(p):
+def get_zero_price(price_array: np.ndarray) -> Tuple[int,...]:
+    """given an array of price_information, find the trips
+    that have a no charge for the trip
+
+    :param price_array: the price array return from an h5 file
+    :type price_array: np.ndarray
+    :return: a tuple of unique tripkeys of zero price trips
+    :rtype: Tuple[int,...]
+    """
+
     df = pd.DataFrame(
-        p[:, (0, -1)],
+        price_array[:, (0, -1)],
         columns=['tripkey', 'price']
         ).set_index('tripkey')
 
@@ -31,22 +37,36 @@ def get_zero_price(p):
     df = df[df == 0]
     return tuple(set(df.index.values))
 
-def proc(store):
+def load_zero_price(store: str) -> Tuple[int,...]:
+    """load and return tripkeys of trips that have zero price
+
+    :param store: the path to an h5 file
+    :type store: str
+    :return:  a tuple of unique tripkeys of zero price trips
+    :rtype: Tuple[int,...]
+    """
 
     price = StoreReader(store).get_data('price')
 
     return get_zero_price(price)
 
-def find_zero_pay_trips(stores):
+def find_zero_pay_trips(stores: List[str]) -> Set[int]:
+    """load all of the tripkey from the datastores that
+
+    :param stores: a list of paths to h5 files
+    :type stores: List[str]
+    :return: a set of tripkeys of trips with zero price
+    :rtype: Set[int]
+    """
 
     out = set()
     with Pool(os.cpu_count() - 1) as pool:
-        results = pool.imap(proc, stores)
+        results = pool.imap(load_zero_price, stores)
         for res in tqdm(results, 'finding trips inside zones', total=len(stores)):
             out.update(set(res))
     return out
-    
-    
+
+
 class DataSetError(ValueError):
     """
     ValueError that raises when file in the filepath
@@ -77,7 +97,7 @@ DEFAULT_FILTERS = {
     }
 
 
-def _find_available_stores(store_dir):
+def _find_available_stores(store_dir: str) -> Dict[str, List[str]]:
     """
     Find the available datastores in the directory.
 
@@ -112,8 +132,14 @@ class RejsekortStore():
 
     DEFAULT_DATASTORE_DIR = os.path.join('...', 'datastores')
 
-    def __init__(self, datastore_path=None, **kwargs):
-    
+    def __init__(self, datastore_path: Optional[str] = None, **kwargs) -> None:
+        """Class to interact with h5 files of Rejsekort data
+
+        :param datastore_path:the path to the datastore directory, defaults to None
+        :type datastore_path: Optional[str], optional
+        :raises OSError: if the rejsekort datastores cannot be located
+        """
+
         if datastore_path is not None:
             self._datastore_path = datastore_path
         else:
@@ -132,21 +158,11 @@ class RejsekortStore():
 
 
     def __repr__(self):
-        """
-        repr magic.
-
-        Returns:
-            str:
-
-        """
         return f'RejsekortStore at "{self._datastore_path}"'
 
-    def _available_stores(self):
+    def _available_stores(self) ->Dict[str, List[str]]:
         """
-        get the list of substores in the RejsekortStore
-
-        Returns:
-            list: a list of available stores.
+        get the lists of substores in the RejsekortStore
 
         """
         return _find_available_stores(self._datastore_path)
@@ -179,7 +195,7 @@ class RejsekortStore():
 
         return pas1, pas2, pas3
 
-    def passenger_dict(self):
+    def passenger_dict(self) -> Dict[int, int]:
         """
         return total passenger counts as
         a dictionary for the store
@@ -188,25 +204,14 @@ class RejsekortStore():
             dict: DESCRIPTION.
 
         """
-        """
 
-        """
         with h5py.File(self.path) as store:
             pas = store['passenger_information']
             totals = {x[0]: sum(x[2:5]) for x in pas}
         return totals
 
     def array_to_classify(self):
-        """
 
-        Raises:
-            DataSetError: DESCRIPTION.
-
-        Returns:
-            arr (np.ndarray): DESCRIPTION.
-            pas (np.ndarray): DESCRIPTION.
-
-        """
         #check keys
         with h5py.File(self.path) as store:
             dsets = store.keys()
