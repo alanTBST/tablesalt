@@ -81,6 +81,7 @@ from . import common
 from . import topology
 from . import revenue
 from . import season
+from . import preprocessing
 
 from .common.io import StoreReader
 from . import running

@@ -25,11 +25,8 @@ import zipfile
 import pandas as pd  # type: ignore
 from pandas._libs.parsers import TextReader #type: ignore
 # from pandas.io.parsers import TextFileReader
-
-
 from tablesalt.common.io import mappers #type: ignore
-from tablesalt.preprocessing.parsing import TableArgParser #type: ignore
-
+from tablesalt.preprocessing import TableArgParser #type: ignore
 from datastores import make_store
 
 
@@ -635,7 +632,7 @@ def _data_producer(data_generator: DataGenerator, queue) -> None:
     """
 
 
-    generator = data_generator.generate(1_000_000)
+    generator = data_generator.generate(50_000)
     for x in generator:
         queue.put(x)
         time.sleep(0.01)
