@@ -46,6 +46,7 @@ setup(name='tablesalt',
                         'requests', 'h5py', 'geopandas',
                         'pyproj', 'setuptools-git', 'networkx',
                         'xlrd',],
+      scripts=['scripts/ingest.py']
       include_package_data=True,
       zip_safe=True)
 
