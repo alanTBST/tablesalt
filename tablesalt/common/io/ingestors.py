@@ -26,7 +26,6 @@ import pandas as pd  # type: ignore
 from pandas._libs.parsers import TextReader #type: ignore
 # from pandas.io.parsers import TextFileReader
 from tablesalt.common.io import mappers #type: ignore
-from tablesalt.preprocessing.parsing import TableArgParser #type: ignore
 from datastores import make_store
 
 
@@ -709,11 +708,3 @@ def delrejser_setup(input_path: str, output_path: str) -> None:
     t1.join()
     et = time.time()
     print((et-st) / 60)
-
-
-if __name__ == "__main__":
-    parser = TableArgParser('input_dir', 'output_dir')
-    args = parser.parse()
-    input_dir = args['input_dir']
-    output_dir = args['output_dir']
-    delrejser_setup(input_dir, output_dir)
