@@ -1,8 +1,4 @@
 """
-Created on Fri Feb 26 13:14:53 2021
-
-@author: alkj
-
 Functions and methods to interact with
 the Delrejser Rejsekort Data.
 
@@ -453,7 +449,7 @@ class TripDurationError(Exception):
     """Error for invalid trip duration"""
 
 class TimeStore(_BaseStore):
-    """TimeStore\n"""
+    """TimeStore"""
 
     def __init__(self, path: Path) -> None:
         """
