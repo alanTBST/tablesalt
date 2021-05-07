@@ -1,17 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
 
 The topology subpackage contains classes and functions used to interact
 with data from the transport network.py
-
 
 It has:
     * methods to download network and routing information from Rejseplan
     * ways to retrieve operators servicing stations
     * a method to validate whether a given operator can service a trip leg
     * a ZoneProperties class that provides various information regarding
-        zones traveled through
+    zones traveled through
     * a class to share zone work between operators on a trip
 
 as well as other topological tools

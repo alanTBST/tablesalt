@@ -1,19 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-TBST Trafik, Bygge, og Bolig -styrelsen
-
-Created on Sat Mar 14 18:07:24 2020
-
-@author: Alan Jones
-@email: alkj@tbst.dk; alanksjones@gmail.com
-
-**HELLO THERE!**
-
     This script is the first step in any analysis of delrejser data
     at TBST using Python. It creates the datastores that are needed for both the
     OD analysis and the Revenue distribution for DOT for Takstsjælland
 
-**WHAT DOES IT DO?**
+WHAT does it do?
+================
 
     Given a path to a directory of compressed zip files of rejsekort delrejser
     data and a path for an output directory where the resulting datastores
@@ -23,10 +15,10 @@ Created on Sat Mar 14 18:07:24 2020
     Most significantly it will split the giant data set into hundreds of smaller
     files.
 
-    Resultant directory tree structure:
+Resultant directory tree structure
+==================================
 
 | GIVEN_OUTPUT_DIRECTORY/
-|
 |
 |         |---rejsekortstores/
 |
@@ -42,7 +34,8 @@ Created on Sat Mar 14 18:07:24 2020
 |                           |----- ...
 |                           |-----rkfile(n)cont.msgpack
 
-**First**
+trip_card_db
+------------
 
     A key-value store with tripkeys as keys and card numbers as values in a
     memory mapped lmdb database for super fast lookups.
@@ -51,7 +44,8 @@ Created on Sat Mar 14 18:07:24 2020
     up until 30gb without any user input, although that upper limit can be
     changed.
 
-**Second**
+hdf5 files
+----------
 
     The flat data set is split up into more coherent subsets:
         - stop_information
@@ -64,7 +58,8 @@ The first four dataset are places in hdf5 files in the directory structure
 shown above. Each of these have been normalised and contain only integers
 hdf5 files store and load matrices efficiently
 
-**Third**
+messagepack files
+-----------------
 
     The contractor information currently is put in msgpack files. These
     files are similar to json but are smaller and load quickly.
@@ -74,14 +69,47 @@ hdf5 files store and load matrices efficiently
 
     Using this structure, analysis/computation can be easily parallelised
     and reduces the reliance on RDBMS (SQL Server) database connections -
-    which can be slow
+    which can be slow or not available
 
 **BE AWARE!**
+
     This script spawns four process, so ensure that you have four cores
     available. If using a laptop, for instance, you won't be able to get
     much else done. It shouldn't last much more than 7 hrs though :)
-    Multi-core server architecture advised.
+    Multi-core workstation/server advised.
 
+USAGE
+=====
+
+With rejsekort delrejser zipfiles located in eg C:/users/alkj/rejsekortdata
+and the desired output location at C:/users/alkj/datastores
+
+To setup data for 2019, processing 500 000 rows at a time
+
+    python ./path/to/tablesalt/tablesalt/scripts/delrejsersetup.py -y 2019
+    -c 500000 -i C:/users/alkj/rejsekortdata -o C:/users/alkj/datastores
+
+This will result in the following directory tree:
+
+| C:/users/alkj/datastores/
+|         |---rejsekortstores/
+|                   |---2019DataStores/
+|                           |------dbs/
+|                                   |-----trip_card_db (key-value_store)
+|                           |------hdfstores/
+|                                   |-----rkfile(0).h5
+|                                   |----- ...
+|                                   |-----rkfile(n).h5
+|                           |------packs/
+|                                   |-----rkfile(0)cont.msgpack
+|                                   |----- ...
+|                                   |-----rkfile(n)cont.msgpack
+
+The number of files (n) is dependent on the chunksize.
+
+Should you run into memory errors, reduce the chunksize (-c) argument.
+On a 128gb machine, 2 to 4 million shouldn't pose any issue.
+On an 8gb machine you may need as low as 50 000
 """
 
 import json
@@ -732,7 +760,6 @@ def main() -> None:
 if __name__ == "__main__":
 
     dt = datetime.now()
-
     if os.name == 'nt':
         INHIBITOR = WindowsInhibitor()
         INHIBITOR.inhibit()
@@ -740,5 +767,4 @@ if __name__ == "__main__":
         INHIBITOR.uninhibit()
     else:
         main()
-
     print(datetime.now() - dt)

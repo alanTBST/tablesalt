@@ -1,14 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Aug 11 21:10:21 2020
-
-@author: alkj
-"""
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Sep  9 15:51:11 2019
-
-@author: alkj, email: alkj@tbst.dk, alanksjones@gmail.com
 
 This script calls the api that creates the
 zonemaps on the DOT site for pendler data
@@ -86,7 +77,7 @@ def main():
     API. creates the zone_relations msgpack file
     for use in the pendler revenue distribution
     program
-    # TODO!!!! Make this for takst sjælland
+
     """
 
     hovedstad = list(range(1001, 1300))

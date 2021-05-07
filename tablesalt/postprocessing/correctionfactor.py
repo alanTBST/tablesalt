@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Nov 24 12:44:17 2020
-
-@author: alkj
+This script uses the correction factor proposed by Movia for
+the problem of pendler kombi users requiring zone 1001 when
+purchasing zone 1002
 """
 
 import os

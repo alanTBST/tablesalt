@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Mar  6 11:44:06 2020
-
-@author: alkj
-
 Class to create an undirected graph
 of the tariffzones in Denmark
 """

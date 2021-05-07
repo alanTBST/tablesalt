@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jan 30 09:42:36 2020
-
-@author: alkj
-
 Classes for manipulating Pendler Product data sets
 """
 

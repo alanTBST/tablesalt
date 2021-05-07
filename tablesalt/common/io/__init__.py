@@ -1,7 +1,4 @@
 """
-TBST Trafik, Bygge, og Bolig -styrelsen
-Author: Alan Jones alkj@tbst.dk
-
 io contains the functions and classes used to load package data and
 rejsekort delrejser data
 """

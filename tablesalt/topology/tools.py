@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Mar  2 12:08:07 2020
-
-@author: alkj
+Classes to download and manipulate routing and spatial data
 """
 
 

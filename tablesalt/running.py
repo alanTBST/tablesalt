@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jan 15 16:29:25 2019
+Contains an inhibitor specific to the Windows OS to ensure
+that the operating systme does not sleep with it is running.py
 
-@author: alkj
+A few functions and classes for cmd line output
 """
 import os
 import sys

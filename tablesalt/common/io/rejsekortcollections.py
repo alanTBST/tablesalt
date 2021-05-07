@@ -1,6 +1,6 @@
 ﻿
 """
-Author: Alan Jones alkj@tbst.dk, alanksjones@gmail.com
+Loaders for specific values for rejsekort data
 """
 
 import json

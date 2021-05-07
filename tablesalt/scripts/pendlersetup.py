@@ -1,16 +1,7 @@
 """
-TBST - Trafik, Bygge, og Bolig -styrelsen
-
-Created on Sat Mar 14 18:07:24 2020
-
-@author: Alan Jones
-@email: alkj@tbst.dk; alanksjones@gmail.com
-
-**HELLO AGAIN!**
-
 This script is the second step in revenue analysis at TBST
 
-WHAT DOES IT DO?
+What does it do?
 ================
 
     Given a paths to pendler product data this script creates three more lmdb
@@ -37,6 +28,13 @@ Resultant directory tree structure
 |    |------packs/
 |           |-----rkfile(0)cont.msgpack...rkfile(n)cont.msgpack
 
+USAGE
+=====
+
+To setup the datastores for the year 2019
+
+    python ./path/to/tablesalt/tablesalt/scripts/pendlersetup.py -y 2019 -p /path/to/PeriodeProdukt.csv -z /path/to/Zoner.csv
+
 
 Input Data
 ==========
@@ -44,7 +42,7 @@ Input Data
 PeriodeProdukt
 --------------
 
-.. tabularcolumns:: |p{5.4cm}||L||L|L|
+.. tabularcolumns:: |p{5.3cm}||L||L|L|
 +----------------------------------+--------------+----------------------+---------------------------------+
 |          EncryptedCardEngravedID | SeasonPassID | SeasonPassTemplateID | SeasonPassName                  |
 +==================================+==============+======================+=================================+
@@ -180,6 +178,7 @@ Zoner
 
 """
 import ast
+import os
 from datetime import datetime
 from functools import partial
 from itertools import groupby
@@ -197,7 +196,7 @@ from tablesalt.common import make_store
 from tablesalt.preprocessing import db_paths, find_datastores
 from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.season import users
-
+from tablesalt.running import WindowsInhibitor
 # may refactor to accept just a sequence of cardnums
 def get_pendler_trips(
     userdata: Dict[str, Dict[int, Dict[str, Union[Timestamp, Tuple[int, ...]]]]],
@@ -273,7 +272,7 @@ def thread_dates(
     pendler_trip_keys: List[int],
     dbpath: str
     ) -> None:
-    """load all of the stores in parallel, filter pendler trips and write
+    """Load all of the stores in parallel, filter pendler trips and write
     to key-value store
 
     :param lst_of_stores: list of paths to hdf5 files
@@ -291,12 +290,12 @@ def thread_dates(
             make_store(res, dbpath, start_size=5)
 
 def _card_periods(dict_dicts):
-    """get val periods from dict of dicts"""
+    """Get val periods from dict of dicts"""
     return set((v['start'].date(), v['end'].date())
                 for _, v  in dict_dicts.items())
 
 def _date_in_window(test_period, test_date):
-    """test that a date is in a validity period"""
+    """Test that a date is in a validity period"""
     return min(test_period) <= test_date <= max(test_period)
 
 
@@ -306,8 +305,8 @@ def validate_travel_dates(
         kombidatespath: str,
         kombivalidpath: str
         ) -> None:
-    """Validate that trips occur in the valid date range for each seasonpass
-    write only to ones that do into a key-vaue store
+    """Validate that trips occur in the valid date range for each pendler seasonpass
+    write only those that do into a key-vaue store
 
 
     :param userdata: the dictionary of users and seasonpasses
@@ -396,5 +395,11 @@ def main():
 
 if __name__ == "__main__":
     st = datetime.now()
-    main()
+    if os.name == 'nt':
+        INHIBITOR = WindowsInhibitor()
+        INHIBITOR.inhibit()
+        main()
+        INHIBITOR.uninhibit()
+    else:
+        main()
     print(datetime.now() - st)

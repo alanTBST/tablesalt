@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-TBST - Trafik, Bygge, og Bolig -styrelsen
-
-@author: Alan Jones
-@email: alkj@tbst.dk; alanksjones@gmail.com
 
 """
 
