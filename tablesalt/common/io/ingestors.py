@@ -26,7 +26,7 @@ import pandas as pd  # type: ignore
 from pandas._libs.parsers import TextReader #type: ignore
 # from pandas.io.parsers import TextFileReader
 from tablesalt.common.io import mappers #type: ignore
-from tablesalt.preprocessing import TableArgParser #type: ignore
+from tablesalt.preprocessing.parsing import TableArgParser #type: ignore
 from datastores import make_store
 
 

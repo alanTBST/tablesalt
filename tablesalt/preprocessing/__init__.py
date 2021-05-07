@@ -5,4 +5,4 @@ script.
 """
 
 from .tools import find_datastores, db_paths
-from .parsing import TableArgParser
+from . import parsing
