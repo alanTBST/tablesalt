@@ -19,6 +19,6 @@ tablesalt/topology/route_shapes.geojson
 environment.yml
 tablesalt/resources/gtfs/
 tablesalt/scripts/__result_cache__/
-
+docs/
 #monkeytype
 mtype*
