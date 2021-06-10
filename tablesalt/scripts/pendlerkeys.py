@@ -36,7 +36,7 @@ from itertools import groupby, chain
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
-from typing import AnyStr, Set, Tuple
+from typing import AnyStr, Set, Tuple, Dict
 
 import lmdb
 import msgpack
@@ -51,7 +51,7 @@ from tablesalt.preprocessing.parsing import TableArgParser
 
 THIS_DIR = Path(__file__).parent
 
-def get_zone_combinations(udata) -> Set[Tuple[int], ...]:
+def get_zone_combinations(udata) -> Set[Tuple[int, ...]]:
     """Get all the chosen zone combinations of pendler kombi users
 
     :param udata: userdata loaded from users.PendlerInput class
@@ -70,7 +70,7 @@ def get_zone_combinations(udata) -> Set[Tuple[int], ...]:
 
 def get_users_for_zones(
     udict: PendlerKombiUsers,
-    zone_set: Set[Tuple[int], ...]
+    zone_set: Set[Tuple[int, ...]]
     ) -> Tuple[Dict, Dict]:
     """For each distinct zone combination, find their users and season passes
 
@@ -176,7 +176,7 @@ def get_zeros(p):
 
 def proc(store):
 
-    price = wrap_price(store)
+    price = _wrap_price(store)
 
     return get_zeros(price)
 
