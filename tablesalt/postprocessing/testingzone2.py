@@ -250,7 +250,7 @@ if __name__ == "__main__":
     a, b, c = main(2019)
     out = {}
     out['contains_zone1'] = a
-    out['contains_zone2'] = bThis
+    out['contains_zone2'] = b
     out['in_01_or_0103_or_0104'] = c
     import pandas as pd
 
