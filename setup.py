@@ -8,9 +8,16 @@ Created on Thu Mar  5 13:21:26 2020
 
 from setuptools import setup, find_packages
 
+
+with open('README.rst', 'r') as f:
+    long_description = fh.read()
+    
+    
 setup(name='tablesalt',
       version='0.1',
       description='Package for Rejsekort analysis at TBST',
+      long_description=long_description,
+      long_description_content_type="text/x-rst",
       author='Alan Jones Trafik, Bygge of Boligstyrelsen: Plan & Klima',
       author_email='alkj@tbst.dk, alanksjones@gmail.com',
       package_dir = {'tablesalt':'tablesalt'},
