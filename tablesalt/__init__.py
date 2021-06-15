@@ -85,4 +85,10 @@ from . import season
 from .common.io import StoreReader
 from . import running
 
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_get_versions
 
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions

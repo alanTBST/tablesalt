@@ -7,14 +7,15 @@ Created on Thu Mar  5 13:21:26 2020
 
 
 from setuptools import setup, find_packages
-
+import versioneer
 
 with open('README.rst', 'r') as f:
     long_description = fh.read()
     
     
 setup(name='tablesalt',
-      version='0.0.1',
+      version=versioneer.get_version(),
+      cmdclass=versioneer.get_cmdclass(),
       description='Package for Rejsekort analysis at TBST',
       long_description=long_description,
       long_description_content_type="text/x-rst",
