@@ -14,7 +14,7 @@ with open('README.rst', 'r') as f:
     
     
 setup(name='tablesalt',
-      version='0.1',
+      version='0.0.1',
       description='Package for Rejsekort analysis at TBST',
       long_description=long_description,
       long_description_content_type="text/x-rst",
@@ -49,10 +49,10 @@ setup(name='tablesalt',
               'networktopodk/gtfs/*.txt'
               ]
           },
-      install_requires=['pandas', 'shapely', 'lmdb', 'msgpack',
+      install_requires=['pandas', 'shapely', 'python-lmdb', 'msgpack-python',
                         'requests', 'h5py', 'geopandas',
                         'pyproj', 'setuptools-git', 'networkx',
-                        'xlrd',],
+                        'xlrd', 'openpyxl'],
       include_package_data=True,
       zip_safe=True)
 
