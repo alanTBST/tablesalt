@@ -3,19 +3,17 @@
 /__pycache__/
 /.vscode/
 /.pylint.d/
+/__result_cache__/
+/gtfs/
 /*.egg-info
 *.pyc
 __pycache__
 *.sqlite3
 *.pyi
-gtfs/
-tablesalt/resources/networktopodk/gtfs/
 docs/build/
-tablesalt/scripts/.pylint.d/
 tablesalt/topology/route_shapes.geojson
 environment.yml
-tablesalt/resources/gtfs/
-tablesalt/scripts/__result_cache__/
+
 
 #monkeytype
 mtype*
