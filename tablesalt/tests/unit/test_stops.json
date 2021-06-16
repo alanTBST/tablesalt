@@ -1,0 +1,68 @@
+{
+    "461011300": {
+        "stop_code": "",
+        "stop_name": "Dyrupg\u00e5rds Alle (Odense Kommune)",
+        "stop_desc": "",
+        "stop_lat": 55.354917787122,
+        "stop_lon": 10.34503493446,
+        "location_type": 0,
+        "parent_station": "",
+        "wheelchair_boarding": "",
+        "platform_code": ""
+    },
+    "8600718": {
+        "stop_code": "",
+        "stop_name": "Vipper\u00f8d St.",
+        "stop_desc": "",
+        "stop_lat": 55.666828000195,
+        "stop_lon": 11.738709682837,
+        "location_type": 0,
+        "parent_station": "",
+        "wheelchair_boarding": "",
+        "platform_code": ""
+    },
+    "8600719": {
+        "stop_code": "",
+        "stop_name": "Holb\u00e6k St.",
+        "stop_desc": "",
+        "stop_lat": 55.715749854582995,
+        "stop_lon": 11.708598367335,
+        "location_type": 0,
+        "parent_station": "",
+        "wheelchair_boarding": "",
+        "platform_code": ""
+    },
+    "8600716": {
+        "stop_code": "",
+        "stop_name": "Hvals\u00f8 St.",
+        "stop_desc": "",
+        "stop_lat": 55.595536698638,
+        "stop_lon": 11.859821066749001,
+        "location_type": 0,
+        "parent_station": "",
+        "wheelchair_boarding": "",
+        "platform_code": ""
+    },
+    "8600717": {
+        "stop_code": "",
+        "stop_name": "T\u00f8ll\u00f8se St.",
+        "stop_desc": "",
+        "stop_lat": 55.611892570756,
+        "stop_lon": 11.772802809728,
+        "location_type": 0,
+        "parent_station": "",
+        "wheelchair_boarding": "",
+        "platform_code": ""
+    },
+    "8600714": {
+        "stop_code": "",
+        "stop_name": "Frederikssund St.",
+        "stop_desc": "",
+        "stop_lat": 55.835808992453,
+        "stop_lon": 12.065635811616001,
+        "location_type": 0,
+        "parent_station": "",
+        "wheelchair_boarding": "",
+        "platform_code": ""
+    }
+}
