@@ -1,0 +1,289 @@
+{
+    "8600621": {
+        "name": "Albertslund St.",
+        "zones": [
+            1043,
+            1054
+        ]
+    },
+    "8600681": {
+        "name": "Aller\u00f8d St.",
+        "zones": [
+            1071,
+            1082
+        ]
+    },
+    "8600614": {
+        "name": "Borup St.",
+        "zones": [
+            1027,
+            1028
+        ]
+    },
+    "8600690": {
+        "name": "Buddinge St.",
+        "zones": [
+            1031,
+            1041
+        ]
+    },
+    "8600657": {
+        "name": "Charlottenlund St.",
+        "zones": [
+            1030,
+            1040
+        ]
+    },
+    "8603311": {
+        "name": "DR Byen St.",
+        "zones": [
+            1001,
+            1003
+        ]
+    },
+    "8601601": {
+        "name": "Dronningm\u00f8lle St.",
+        "zones": [
+            1011,
+            1016
+        ]
+    },
+    "8600780": {
+        "name": "Dysseg\u00e5rd St.",
+        "zones": [
+            1002,
+            1031
+        ]
+    },
+    "8601707": {
+        "name": "Dyssekilde St.",
+        "zones": [
+            1006,
+            1068
+        ]
+    },
+    "8601711": {
+        "name": "Grimstrup St.",
+        "zones": [
+            1034,
+            1035
+        ]
+    },
+    "8600903": {
+        "name": "Grubberholm St.",
+        "zones": [
+            1023,
+            1024
+        ]
+    },
+    "8600694": {
+        "name": "Hareskov St.",
+        "zones": [
+            1041,
+            1052
+        ]
+    },
+    "8600801": {
+        "name": "Havdrup St.",
+        "zones": [
+            1088,
+            1098
+        ]
+    },
+    "8600655": {
+        "name": "Hellerup St.",
+        "zones": [
+            1002,
+            1030
+        ]
+    },
+    "8600805": {
+        "name": "Herf\u00f8lge St.",
+        "zones": [
+            1020,
+            1022
+        ]
+    },
+    "8600677": {
+        "name": "Holte St.",
+        "zones": [
+            1051,
+            1061
+        ]
+    },
+    "8600769": {
+        "name": "Hundige St.",
+        "zones": [
+            1055,
+            1067
+        ]
+    },
+    "8600600": {
+        "name": "Hvidovre St.",
+        "zones": [
+            1002,
+            1032
+        ]
+    },
+    "8601617": {
+        "name": "H\u00f8jstrup St.",
+        "zones": [
+            1005,
+            1015
+        ]
+    },
+    "8600791": {
+        "name": "Jersie St.",
+        "zones": [
+            1089,
+            1099
+        ]
+    },
+    "8600723": {
+        "name": "Jyderup St.",
+        "zones": [
+            1170,
+            1174
+        ]
+    },
+    "8601421": {
+        "name": "Kagerup St. (Hiller\u00f8d)",
+        "zones": [
+            1019,
+            1018
+        ]
+    },
+    "8600771": {
+        "name": "Karlslunde St.",
+        "zones": [
+            1067,
+            1077
+        ]
+    },
+    "8600955": {
+        "name": "Kildedal St.",
+        "zones": [
+            1053,
+            1063
+        ]
+    },
+    "8600664": {
+        "name": "Kokkedal St.",
+        "zones": [
+            1070,
+            1080
+        ]
+    },
+    "8601723": {
+        "name": "Kregme",
+        "zones": [
+            1065,
+            1006
+        ]
+    },
+    "8603007": {
+        "name": "Lyngby Lokal St.",
+        "zones": [
+            1041,
+            1051
+        ]
+    },
+    "8600675": {
+        "name": "Lyngby St.",
+        "zones": [
+            1041,
+            1051
+        ]
+    },
+    "8601627": {
+        "name": "Skibstrup St.",
+        "zones": [
+            1014,
+            1015
+        ]
+    },
+    "8600661": {
+        "name": "Skodsborg St.",
+        "zones": [
+            1050,
+            1060
+        ]
+    },
+    "8600711": {
+        "name": "Stenl\u00f8se St.",
+        "zones": [
+            1074,
+            1085
+        ]
+    },
+    "8601631": {
+        "name": "S\u00f8borg St. (Gilleleje)",
+        "zones": [
+            1010,
+            1016
+        ]
+    },
+    "8600755": {
+        "name": "Trekroner St.",
+        "zones": [
+            1008,
+            1076
+        ]
+    },
+    "8600620": {
+        "name": "Taastrup St.",
+        "zones": [
+            1054,
+            1066
+        ]
+    },
+    "8603009": {
+        "name": "N\u00e6rum",
+        "zones": [
+            1051,
+            1060
+        ]
+    },
+    "8600767": {
+        "name": "Vallensb\u00e6k St.",
+        "zones": [
+            1044,
+            1055
+        ]
+    },
+    "8600662": {
+        "name": "Vedb\u00e6k St.",
+        "zones": [
+            1060,
+            1070
+        ]
+    },
+    "8600710": {
+        "name": "Veks\u00f8 St.",
+        "zones": [
+            1063,
+            1074
+        ]
+    },
+    "8600792": {
+        "name": "\u00d8lby St.",
+        "zones": [
+            1020,
+            1099
+        ]
+    },
+    "8601443": {
+        "name": "\u00d8rby St.",
+        "zones": [
+            1039,
+            1049
+        ]
+    },
+    "8600763": {
+        "name": "\u00c5marken St.",
+        "zones": [
+            1002,
+            1033
+        ]
+    }
+}
