@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from shapely.geometry import Point  # type: ignore
-from topo.stopnetwork import Stop, StopsList, _load_stopslist, _load_border_stations  # noqa
+from tablesalt.topology.stopnetwork import Stop, StopsList, _load_stopslist, _load_border_stations  # noqa
 
 HERE = Path(__file__).parent
 
