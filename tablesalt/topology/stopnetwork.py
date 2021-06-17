@@ -96,7 +96,7 @@ class Stop:
     parent_station: Optional[Union[str, int]] = None
     wheelchair_boarding: Optional[Union[str, int]] = None
     platform_code: Optional[Union[str, int]] = None
-    _alternate_stop_number: Optional[int] = None
+    _alternate_stop_numbers: List[int] = []
     
 
     @classmethod
@@ -112,12 +112,13 @@ class Stop:
 
         return cls(**obj)
     @property 
-    def alternate_stop_number(self):
-        return self._alternate_stop_number
+    def alternate_stop_numbers(self):
+        return self._alternate_stop_numbers
 
-    @alternate_stop_number.setter
+    @alternate_stop_numbers.setter
     def alternate_stop_number(self, value):
-        self._alternate_stop_number = value
+        self._alternate_stop_numbers.append(value)
+    
     @property
     def coordinates(self) -> Tuple[float, float]:
         """
@@ -131,7 +132,8 @@ class Stop:
         return self.stop_lat, self.stop_lon
     @property
     def is_border(self):
-        return self.stop_number in BORDER_STATIONS
+        return (self.stop_number in BORDER_STATIONS or 
+            self.alternate_stop_number in BORDER_STATIONS)
     def as_point(self) -> Point:
         """return the stop as a shapely point"""
 
@@ -144,6 +146,7 @@ class Stop:
 
 
 class StopsList(Iterator):
+
 
     def __init__(
             self,
