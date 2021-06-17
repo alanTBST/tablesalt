@@ -96,6 +96,7 @@ class Stop:
     parent_station: Optional[Union[str, int]] = None
     wheelchair_boarding: Optional[Union[str, int]] = None
     platform_code: Optional[Union[str, int]] = None
+    _alternate_stop_number: Optional[int] = None
     
 
     @classmethod
@@ -110,6 +111,13 @@ class Stop:
         """
 
         return cls(**obj)
+    @property 
+    def alternate_stop_number(self):
+        return self._alternate_stop_number
+
+    @alternate_stop_number.setter
+    def alternate_stop_number(self, value):
+        self._alternate_stop_number = value
     @property
     def coordinates(self) -> Tuple[float, float]:
         """
