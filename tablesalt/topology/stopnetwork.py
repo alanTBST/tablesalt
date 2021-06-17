@@ -75,7 +75,7 @@ BORDER_STATIONS = _load_border_stations()
 @dataclass
 class Stop:
     """
-    A stop dataclass that holds data from a stop point from gtfs
+    A stop dataclass that holds data from a stop point from gtfs data
 
     :param stop_number: the uic number or stop number of the stop
     :type stop_number: int
@@ -212,11 +212,3 @@ class StopsList(Iterator):
     def update_stops(self):
         # update the stops in the stops.json from rejseplan gtfs
         return
-
-
-
-
-#filepath = r'C:\Users\B087115\Desktop\sandpit\stops.json'
-#stop_list = StopsList(filepath)
-#rail = stop_list.rail_stops()
-#bus = stop_list.bus_stops()
