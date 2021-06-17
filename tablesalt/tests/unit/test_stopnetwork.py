@@ -15,7 +15,6 @@ class MockJson:
     @staticmethod
     def load():
         stop1 = {
-            'is_border': None,
             'location_type': 0,
             'parent_station': '',
             'platform_code': '',
@@ -29,7 +28,6 @@ class MockJson:
             }
 
         stop2 = {
-            'is_border': None,
             'location_type': 0,
             'parent_station': '',
             'platform_code': '',
