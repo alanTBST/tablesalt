@@ -72,6 +72,13 @@ def _load_border_stations():
 
 BORDER_STATIONS = _load_border_stations()
 
+def _load_alternate_stations():
+
+    fp = HERE / 'alternatenumbers.json'
+
+    with open(fp) as f:
+        alternate_numbers = json.load(f)
+    return {int(k): v for k, v in alternate_numbers.items()}
 @dataclass
 class Stop:
     """
