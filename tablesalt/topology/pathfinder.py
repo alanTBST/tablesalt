@@ -20,6 +20,7 @@ from networkx.classes.graph import Graph #type: ignore
 from tablesalt.common import triptools
 from tablesalt.common.io import mappers
 from tablesalt.topology import stationoperators
+from tablesalt.topology.stopnetwork import StopsList
 from tablesalt.topology.zonegraph import ZoneGraph
 
 # put these in lines in a config
