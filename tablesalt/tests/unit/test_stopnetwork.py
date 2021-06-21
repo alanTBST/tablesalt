@@ -116,12 +116,19 @@ def test_stoplist_iteration(a_stopslist):
             x = next(a_stopslist)
 
 
-def test_rail_stops():
+def test_rail_stops(a_stopslist):
 
-    return 
+    rail_list = a_stopslist.rail_stops()
+
+    assert isinstance(rail_list, StopsList)
+    assert len(rail_list) == 5
 
 
-def test_bus_stops():
+def test_bus_stops(a_stopslist):
 
-    return 
+    bus_list = a_stopslist.bus_stops() 
+    assert isinstance(bus_list, StopsList)
+    assert len(bus_list) == 1
+
+
 
