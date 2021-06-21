@@ -105,14 +105,15 @@ def test_stopslist_from_file():
     assert isinstance(slist, StopsList)
 
 
-def test_stoplist_getitem():
+def test_stoplist_getitem(a_stopslist):
 
-    return
+    assert isinstance(a_stopslist[0], Stop)
 
 
-def test_stoplist_iteration():
-
-    return 
+def test_stoplist_iteration(a_stopslist):
+    with pytest.raises(StopIteration):
+        while True:
+            x = next(a_stopslist)
 
 
 def test_rail_stops():
