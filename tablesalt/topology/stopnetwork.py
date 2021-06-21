@@ -174,7 +174,7 @@ class StopsList(Iterator):
     
     def __init__(
             self,
-            filepath: Optional[str] = None,
+            filepath: Optional[str] = None
             ) -> None:
         """Load a list of Stops from a json file
 
@@ -185,7 +185,6 @@ class StopsList(Iterator):
 
         self._filepath = filepath if filepath is not None else self.DEFAULT_PATH
         self._data = _load_stopslist(str(self._filepath))
-        self.border_stations = _load_border_stations()
         self.stops: List[Stop]
         self.stops = [Stop.from_dict(x) for x in self._data]
 
