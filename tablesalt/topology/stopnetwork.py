@@ -8,9 +8,11 @@ import json
 from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
+from itertools import chain
 from json import JSONDecodeError
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union, ClassVar
+from typing import (Any, ClassVar, Dict, List, Optional, Set, Tuple, TypedDict,
+                    Union)
 
 from shapely.geometry import Point  # type: ignore
 
@@ -234,6 +236,23 @@ class StopsList(Iterator):
         bus.stops = [x for x in bus if len(str(x.stop_number)) != 7]
 
         return bus
+
+    def border_stations_and_zones(self) -> Dict[int, Tuple[int, ...]]:
+        """return a dictionary of railways stations on tariff zone borders
+        with zone numbers
+
+        :return: dictionary of station uic numbers and correcsponding zones
+        :rtype: Dict[int, Tuple[int, ...]]
+        """
+       
+        border_stops = {x for x in self if x.is_border}
+        border_dict = {}
+        for stop in border_stops:
+            border_dict[stop.stop_number] = tuple(BORDER_STATIONS[stop.stop_number]['zones'])
+            for num in stop.alternate_stop_numbers:
+                border_dict[num] = tuple(BORDER_STATIONS[stop.stop_number]['zones'])
+
+        return border_dict
 
     @classmethod
     def update_stops(self):

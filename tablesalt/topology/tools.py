@@ -680,13 +680,13 @@ class RejseplanLoader(_GTFSloader):
             responses[k] = requests.get(v)
         return responses
 
-
     def _get_zip_content(self) -> Dict[str, Tuple[str, ...]]:
 
         for k, v in self._responses.items():
             self._content[k] = zipfile.ZipFile(
                 BytesIO(v.content)
                 ).namelist()
+                
     @property
     def contents(self):
         if not self._content:
