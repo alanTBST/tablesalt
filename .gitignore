@@ -19,3 +19,5 @@ mtype*
 
 #testing anything
 /testing*
+*.dot
+*.png
