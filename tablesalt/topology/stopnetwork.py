@@ -184,7 +184,7 @@ class StopsList(Iterator):
         :type filepath: Optional[str], optional
         """
 
-        self._filepath = filepath if filepath is not None else self.DEFAULT_PATH
+        self._filepath = Path(filepath) if filepath is not None else self.DEFAULT_PATH
         self._data = _load_stopslist(str(self._filepath))
         self.stops: List[Stop]
         self.stops = [Stop.from_dict(x) for x in self._data]
@@ -192,10 +192,11 @@ class StopsList(Iterator):
         self._index = 0
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}('{self._filepath}')"
+        return f"{self.__class__.__name__}('{str(self._filepath.absolute())}')"
 
     def __getitem__(self, index) -> Stop:
         # update to deal with slicing and returning a StopList
+        # right now slice returns normal list of Stop
         return self.stops.__getitem__(index)
 
     def __iter__(self) -> 'StopsList':
