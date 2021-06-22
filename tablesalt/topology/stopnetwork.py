@@ -180,6 +180,7 @@ class StopsList(Iterator):
 
         :param filepath: the path to a stops.json file, defaults to None. If 
             no file is given, the default stops are used
+        
         :type filepath: Optional[str], optional
         """
 
