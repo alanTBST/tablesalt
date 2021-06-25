@@ -179,6 +179,7 @@ Zoner
 """
 import ast
 import os
+from collections import defaultdict
 from datetime import datetime
 from functools import partial
 from itertools import groupby
@@ -291,8 +292,8 @@ def thread_dates(
 
 def _card_periods(dict_dicts):
     """Get val periods from dict of dicts"""
-    return set((v['start'].date(), v['end'].date())
-                for _, v  in dict_dicts.items())
+    return {k: (v['start'].date(), v['end'].date())
+                for k, v  in dict_dicts.items()}
 
 def _date_in_window(test_period, test_date):
     """Test that a date is in a validity period"""
@@ -331,26 +332,28 @@ def validate_travel_dates(
     # =========================================================================
     # validate the user trips using the kombi dates lmdb store
     # =========================================================================
-    with lmdb.open(kombidatespath) as env:
-        valid_user_dict = {}
-        for k, v in usertrips.items():
-            try:
-                userdates = _card_periods(userdata[k])
-            except KeyError:
-                continue
-            valid_user_trips = []
-            with env.begin() as txn:
+    valid_user_season_dict = defaultdict(list)
+    with lmdb.open(kombidatespath) as env:      
+        with env.begin() as txn:  
+            for k, v in usertrips.items():
+                try:
+                    userdates = _card_periods(userdata[k])
+                except KeyError:
+                    continue            
                 for trip in v:
                     trip_date = txn.get(str(trip).encode('utf-8'))
                     if not trip_date:
                         continue
                     trip_date = trip_date.decode('utf-8')
                     trip_date = datetime.strptime(trip_date, '%Y-%m-%d').date()
-                    if any(_date_in_window(x, trip_date) for x in userdates):
-                        valid_user_trips.append(trip)
-            valid_user_dict[k] = tuple(valid_user_trips)
+                    for season_id, valid_dates in userdates.items():
+                        if _date_in_window(valid_dates, trip_date):
+                            valid_user_season_dict[(k, season_id)].append(trip)
+                            break
 
-    make_store(valid_user_dict, kombivalidpath, start_size=5)
+    valid_user_season_dict = {k: tuple(v) for k, v in valid_user_season_dict.items()}
+
+    make_store(valid_user_season_dict, kombivalidpath, start_size=5)
 
 
 def main():
@@ -374,7 +377,8 @@ def main():
     userdata = pendler_cards.get_user_data()
 
     pendler_trip_keys = get_pendler_trips(
-        userdata, paths['trip_card_db'],
+        userdata, 
+        paths['trip_card_db'],
         paths['user_trips_db']
         )
 
