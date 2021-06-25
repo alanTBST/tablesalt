@@ -285,7 +285,7 @@ def thread_dates(
     """
     func = partial(load_store_dates, pendler_trip_keys=pendler_trip_keys)
     print("Loading travel dates...")
-    with Pool(7) as pool:
+    with Pool(os.cpu_count() - 2) as pool:
         results = pool.imap(func, lst_of_stores)
         for res in results:
             make_store(res, dbpath, start_size=5)
