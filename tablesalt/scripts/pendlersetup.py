@@ -361,7 +361,7 @@ def main():
 
     args = parser.parse()
 
-    paths = db_paths(find_datastores('H:/'), args['year'])
+    paths = db_paths(find_datastores(), args['year'])
     stores = paths['store_paths']
 
     pendler_cards = users._PendlerInput(
