@@ -26,3 +26,14 @@ tablesalt/scripts/__result_cache__/2019/pendler/kombi_paid_zones_region_dsb_mode
 tablesalt/scripts/__result_cache__/2019/pendler/kombi_paid_zones_region_hovedstad_model_1.csv
 tablesalt/scripts/__result_cache__/2019/pendler/kombi_paid_zones_region_sydsjælland_model_1.csv
 tablesalt/scripts/__result_cache__/2019/pendler/kombi_paid_zones_region_vestsjælland_model_1.csv
+tablesalt/resources/networktopodk/gtfs/trips.txt
+tablesalt/resources/networktopodk/gtfs/transfers.txt
+tablesalt/resources/networktopodk/gtfs/stops.txt
+tablesalt/resources/networktopodk/gtfs/stop_times.txt
+tablesalt/resources/networktopodk/gtfs/shapes.txt
+tablesalt/resources/networktopodk/gtfs/frequencies.txt
+tablesalt/resources/networktopodk/gtfs/routes.txt
+tablesalt/resources/networktopodk/gtfs/calendar_dates.txt
+tablesalt/resources/networktopodk/gtfs/calendar.txt
+tablesalt/resources/networktopodk/gtfs/attributions.txt
+tablesalt/resources/networktopodk/gtfs/agency.txt
