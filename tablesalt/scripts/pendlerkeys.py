@@ -331,13 +331,17 @@ def get_zone_combination_shares(tofetch, db_path: str, model: int):
 # =============================================================================
 # aggregation by paid zones
 # =============================================================================
-def _kombi_by_users(pendler_kombi, cardnums):
+def _kombi_by_seasonpass(pendler_kombi, userdict):
 
-    cardnums = {x.encode('utf-8') for x in cardnums}
+    user_seasons = set()
+    for cardnum, season in userdict.items():
+        tups = {str((cardnum, seasonid)).encode('utf-8') for seasonid in season}
+        user_seasons.update(tups)
+
     valid = set()
     with lmdb.open(pendler_kombi) as env:
         with env.begin() as txn:
-            for card in cardnums:
+            for card in user_seasons:
                 try:
                     v = txn.get(card)
                 except KeyError:
@@ -367,7 +371,6 @@ def _get_trips(db_path, tripkeys, model):
                     else:
                         out[int(k.decode('utf-8'))] = pendler_reshare(val)
 
-
     return out
 
 
@@ -388,7 +391,7 @@ def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, db_path, year, 
                 out[nzones] = out[97]
                 break
             all_users = userdict.get_data(paid_zones=paidzones, takst=takst)
-            usertrips = _kombi_by_users(valid_kombi_store, all_users)
+            usertrips = _kombi_by_seasonpass(valid_kombi_store, all_users)
             trips = usertrips.intersection(zero_travel_price)
             tripshares = _get_trips(db_path, trips, model)
             shared = get_user_shares(tripshares.values())
