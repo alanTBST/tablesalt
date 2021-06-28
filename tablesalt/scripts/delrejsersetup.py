@@ -252,10 +252,10 @@ def delrejser_generator(
             try:
                 df['tidsrabat'] = df['tidsrabat'].astype(str)
                 df['RejsePris'] = df['RejsePris'].astype(str)
-                df['tidsrabat'] = df['tidsrabat'].str.replace(',', '')
-                df['tidsrabat'] = df['tidsrabat'].str.replace('.', '')
-                df['RejsePris'] = df['RejsePris'].str.replace(',', '')
-                df['RejsePris'] = df['RejsePris'].str.replace('.', '')
+                df['tidsrabat'] = df['tidsrabat'].str.replace(',', '', regex=False)
+                df['tidsrabat'] = df['tidsrabat'].str.replace('.', '', regex=False)
+                df['RejsePris'] = df['RejsePris'].str.replace(',', '', regex=False)
+                df['RejsePris'] = df['RejsePris'].str.replace('.', '', regex=False)
             except KeyError:
                 pass
             df = df.fillna(0)
