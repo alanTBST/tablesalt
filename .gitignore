@@ -22,3 +22,7 @@ mtype*
 *.dot
 *.png
 tablesalt/scripts/__result_cache__/2019/preprocessed/zero_price.pickle
+tablesalt/scripts/__result_cache__/2019/pendler/kombi_paid_zones_region_dsb_model_1.csv
+tablesalt/scripts/__result_cache__/2019/pendler/kombi_paid_zones_region_hovedstad_model_1.csv
+tablesalt/scripts/__result_cache__/2019/pendler/kombi_paid_zones_region_sydsjælland_model_1.csv
+tablesalt/scripts/__result_cache__/2019/pendler/kombi_paid_zones_region_vestsjælland_model_1.csv
