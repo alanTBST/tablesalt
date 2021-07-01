@@ -600,7 +600,7 @@ class TakstZones:
         joined = gpd.sjoin(stops, zones)
         # NOTE: decide on whether border stations should be added here
         return dict(
-            zip(joined.index,  joined.loc[:, 'natzonenum'])
+            zip(joined.loc[:, 'stop_number'],  joined.loc[:, 'natzonenum'])
             )
     @staticmethod
     def neighbour_dict(region: str) -> Dict[int, Any]:
