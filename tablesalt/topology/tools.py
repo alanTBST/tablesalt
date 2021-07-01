@@ -487,7 +487,7 @@ class TakstZones:
             os.path.join(
                 'resources',
                 'networktopodk',
-                'RejseplanenStoppesteder.csv'
+                'stops.json'
                 )
             )
     def __init__(self) -> None:
@@ -529,7 +529,7 @@ class TakstZones:
 
         gdf.rename(columns={'businesske': 'natzonenum'}, inplace=True)
 
-        gdf = gdf.to_crs(epsg=4326)
+        gdf = gdf.to_crs(epsg=4326) # set projection to wgs84
 
         return gdf
 
@@ -543,35 +543,22 @@ class TakstZones:
         """
 
         fp = self.DEFAULT_STOPS_LOC
-        try:
-            with open(fp, 'r') as f:
-                date = f.readline()
-        except UnicodeDecodeError:
-            with open(fp, 'r', encoding='iso-8859-1') as f:
-                date = f.readline()
-        if 'period' in date.lower() or 'export' in date.lower():
-            skiprows = 1
-        else:
-            skiprows = 0
-        stops_df = pd.read_csv(
-            fp, header=None,
-            skiprows=skiprows,
-            encoding='iso-8859-1',
-            sep=';'
-            )
-        stops_df.columns = ['UIC', 'Name', 'long_utm32N', 'lat_utm32N']
+
+        with open(fp) as fh:
+            stops = json.load(fh)
+        stops = {int(k): v for k, v in stops.items()}
+
+        stops_df = pd.DataFrame(stops).T
+        stops_df.index.name = 'stop_number'
+        stops_df = stops_df.reset_index()
 
         stops_gdf = gpd.GeoDataFrame(
             stops_df,
             geometry=gpd.points_from_xy(
-                stops_df.iloc[:, 2], stops_df.iloc[:, 3]
+                stops_df.iloc[:, 5], stops_df.iloc[:, 4]
                 )
             )
-
-        stops_gdf.crs = "EPSG:32632" # this is the utm32N given by rejsedata
-        #if not projection:
-         #   projection = "EPSG:32632"
-        stops_gdf = stops_gdf.to_crs(epsg=4326)
+        stops_gdf.crs = 4326  #set projection WGS84 
 
         return stops_gdf
 
@@ -587,8 +574,8 @@ class TakstZones:
 
         s_stops = mappers['s_uic']
         corr_s_stops = [x - 90000 for x in s_stops]
-        corr_stops = stops_df.query("UIC in @corr_s_stops").copy(deep=True)
-        corr_stops.loc[:, 'UIC'] = corr_stops.loc[:, 'UIC'] + 90_000
+        corr_stops = stops_df.query("stop_number in @corr_s_stops").copy(deep=True)
+        corr_stops.loc[:, 'stop_number'] = corr_stops.loc[:, 'stop_number'] + 90_000
         out_frame = pd.concat([stops_df, corr_stops])
 
         return out_frame
@@ -613,7 +600,7 @@ class TakstZones:
         joined = gpd.sjoin(stops, zones)
         # NOTE: decide on whether border stations should be added here
         return dict(
-            zip(joined.loc[:, 'UIC'],  joined.loc[:, 'natzonenum'])
+            zip(joined.index,  joined.loc[:, 'natzonenum'])
             )
     @staticmethod
     def neighbour_dict(region: str) -> Dict[int, Any]:
