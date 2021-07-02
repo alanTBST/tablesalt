@@ -64,7 +64,7 @@ from itertools import chain, groupby
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
-from typing import Set, Tuple, Dict
+from typing import Set, Tuple, Dict, Union
 
 import lmdb
 import numpy as np
