@@ -64,7 +64,7 @@ from itertools import chain, groupby
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
-from typing import Set, Tuple, Dict, Union
+from typing import Set, Tuple, Dict, Union, List
 
 import lmdb
 import numpy as np
@@ -81,7 +81,7 @@ from tablesalt.topology import ZoneGraph
 from tablesalt.topology.tools import TakstZones
 
 THIS_DIR: Path = Path(__file__).parent
-CPU_USAGE: float = 0.5
+CPU_USAGE: float = 0.75
 
 RING_ZONES = Dict[Tuple[int, int], int]
 
