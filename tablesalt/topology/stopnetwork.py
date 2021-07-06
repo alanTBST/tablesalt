@@ -1,6 +1,25 @@
 # -*- coding: utf-8 -*-
 """
+Module holding the classes to deal with stop points in the Danish public transit network
 
+The main useful class is StopsList.
+An instance of a StopsList contains instances of the Stop class 
+
+An instance of a StopsList can be instantiated as:
+.. highlight:: python
+.. code-block:: python
+
+# create an instance with the default stop network
+stop_list = StopsList()
+
+# access the first stop in the list of stops
+stop1 = stop_list[0]
+
+# create a new instance of the StopsList class with only railway stations
+rail_stops = stop_list.rail_stops()
+
+# create a new instance of the StopsList class with only bus stops
+bus_stops = stop_list.bus_stops()
 """
 
 import copy
