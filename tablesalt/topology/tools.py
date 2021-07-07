@@ -6,6 +6,7 @@ Classes to download and manipulate routing and spatial data
 
 import json
 import os
+from tablesalt.topology.stopnetwork import StopsList
 import zipfile
 from io import BytesIO
 from itertools import chain, groupby
@@ -24,6 +25,7 @@ from shapely.geometry.linestring import LineString  # type: ignore
 from shapely.geometry.point import Point # type: ignore
 from shapely.geometry.polygon import Polygon  # type: ignore
 from tablesalt.common.io import mappers
+from tablesalt.topology.stopnetwork import StopsList
 
 
 FILE_PATH = Union[str, bytes, 'os.PathLike[Any]']
@@ -143,10 +145,6 @@ class _GTFSloader:
         if self._agency_ids is None:
             self.load_agency()
         return self._agency_ids
-
-    # @agency_ids.setter
-    # def agency_ids(self) -> None:
-    #     pass
 
     @property
     def id_agency(self) -> Dict[int, str]:
@@ -498,12 +496,33 @@ class TakstZones:
         :rtype: None
 
         """
-        pass
+        self._list_of_stops = StopsList(self.DEFAULT_STOPS_LOC)
 
+
+    def stop_zone_map(
+        self,
+        ) -> Dict[int, int]:
+        """
+        Return a mapping of stopids to zone ids
+
+        :param region: the region to get a map for, defaults to 'sjælland'
+        :type region: Optional[str], optional
+        :return: a dictionary with stopids as keys and zoneids as values
+        :rtype: Dict[int, int]
+
+        """
+
+        stops = self.stop_geodataframe()
+        stops = self._set_stog_location(stops)
+        zones = self.load_tariffzones()
+        joined = gpd.sjoin(stops, zones)
+        # NOTE: decide on whether border stations should be added here
+        return dict(
+            zip(joined.loc[:, 'stop_number'],  joined.loc[:, 'natzonenum'])
+            )
 
     def load_tariffzones(
         self,
-        takst: Optional[str] = 'sjælland'
         ) -> gpd.geodataframe.GeoDataFrame:
         """
         Load the tariffzones geospatial data.
@@ -515,11 +534,6 @@ class TakstZones:
         :rtype: geopandas.GeoDataFrame
 
         """
-
-        if not takst == 'sjælland':
-            raise NotImplementedError(
-                f"takst {takst} is not supported yet"
-                )
 
         gdf = gpd.read_file(self.DEFAULT_ZONE_LOC)
         gdf.columns = [x.lower() for x in gdf.columns]
@@ -533,7 +547,7 @@ class TakstZones:
 
         return gdf
 
-    def load_stops_data(self) -> gpd.geodataframe.GeoDataFrame:
+    def stop_geodataframe(self) -> gpd.geodataframe.GeoDataFrame:
         """
         Load and return a dataframe of stops in Denmark.
 
@@ -541,16 +555,7 @@ class TakstZones:
         :rtype: geopandas.GeoDataFrame
 
         """
-
-        fp = self.DEFAULT_STOPS_LOC
-
-        with open(fp) as fh:
-            stops = json.load(fh)
-        stops = {int(k): v for k, v in stops.items()}
-
-        stops_df = pd.DataFrame(stops).T
-        stops_df.index.name = 'stop_number'
-        stops_df = stops_df.reset_index()
+        stops_df = pd.DataFrame(self._list_of_stops)
 
         stops_gdf = gpd.GeoDataFrame(
             stops_df,
@@ -580,28 +585,6 @@ class TakstZones:
 
         return out_frame
 
-    def stop_zone_map(
-        self,
-        region: Optional[str] = 'sjælland'
-        ) -> Dict[int, int]:
-        """
-        Return a mapping of stopids to zone ids
-
-        :param region: the region to get a map for, defaults to 'sjælland'
-        :type region: Optional[str], optional
-        :return: a dictionary with stopids as keys and zoneids as values
-        :rtype: Dict[int, int]
-
-        """
-
-        stops = self.load_stops_data()
-        stops = self._set_stog_location(stops)
-        zones = self.load_tariffzones(takst=region)
-        joined = gpd.sjoin(stops, zones)
-        # NOTE: decide on whether border stations should be added here
-        return dict(
-            zip(joined.loc[:, 'stop_number'],  joined.loc[:, 'natzonenum'])
-            )
     @staticmethod
     def neighbour_dict(region: str) -> Dict[int, Any]:
         """Load and convert neighbours dset to a dictionary"""
