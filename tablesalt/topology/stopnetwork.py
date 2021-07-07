@@ -42,7 +42,7 @@ class StopElements(TypedDict):
     TypedDict class for type hints in loading stops.json
     """
 
-    stop_number: int
+    stop_id: int
     stop_code: str
     stop_name: str
     stop_desc: str
@@ -74,7 +74,7 @@ def _load_stopslist(filepath: Union[str, Path]) -> List[StopElements]:
     
     for k, v in data.items():
         stop = v.copy()
-        stop['stop_number'] = int(k)
+        stop['stop_id'] = int(k)
         stoplist.append(stop)
     return stoplist
 
@@ -112,15 +112,15 @@ class Stop:
     """
     A stop dataclass that holds data from a stop point from gtfs data
 
-    :param stop_number: the uic number or stop number of the stop
-    :type stop_number: int
+    :param stop_id: the uic number or stop number of the stop
+    :type stop_id: int
 
     :param : stop_code: the code of the stop
     :type : TYPE
 
     """
 
-    stop_number: int
+    stop_id: int
     stop_code: str
     stop_name: str
     stop_desc: str
@@ -146,7 +146,7 @@ class Stop:
         return cls(**obj)
 
     @property 
-    def alternate_stop_numbers(self) -> Tuple[int, ...]:
+    def alternate_stop_ids(self) -> Tuple[int, ...]:
         """return the possible alternate numbers for the stop.
         an empty tuple is returned if there are not alternate stop 
         numbers
@@ -154,7 +154,7 @@ class Stop:
         :return: a tuple of integers of alternate stop numbers
         :rtype: Tuple[int, ...]
         """
-        return ALTERNATE_STATIONS.get(self.stop_number, ())
+        return ALTERNATE_STATIONS.get(self.stop_id, ())
 
     @property
     def coordinates(self) -> Tuple[float, float]:
@@ -173,8 +173,8 @@ class Stop:
         :return: True if the stop is 
         :rtype: bool
         """
-        return (self.stop_number in BORDER_STATIONS or 
-            any(x in BORDER_STATIONS for x in self.alternate_stop_numbers))
+        return (self.stop_id in BORDER_STATIONS or 
+            any(x in BORDER_STATIONS for x in self.alternate_stop_ids))
     
     def as_point(self) -> Point:
         """return the stop as a shapely Point"""
@@ -183,7 +183,7 @@ class Stop:
 
     def __hash__(self):
 
-        return hash(self.stop_number) + hash(self.stop_name)
+        return hash(self.stop_id) + hash(self.stop_name)
 
 
 
@@ -240,7 +240,7 @@ class StopsList(Iterator):
         :rtype: StopsList
         """
         rail = copy.deepcopy((self))
-        rail.stops = [x for x in rail if len(str(x.stop_number)) == 7]
+        rail.stops = [x for x in rail if len(str(x.stop_id)) == 7]
 
         return rail
 
@@ -253,7 +253,7 @@ class StopsList(Iterator):
         """
 
         bus = copy.deepcopy((self))
-        bus.stops = [x for x in bus if len(str(x.stop_number)) != 7]
+        bus.stops = [x for x in bus if len(str(x.stop_id)) != 7]
 
         return bus
 
@@ -268,9 +268,9 @@ class StopsList(Iterator):
         border_stops = {x for x in self if x.is_border}
         border_dict = {}
         for stop in border_stops:
-            border_dict[stop.stop_number] = tuple(BORDER_STATIONS[stop.stop_number]['zones'])
-            for num in stop.alternate_stop_numbers:
-                border_dict[num] = tuple(BORDER_STATIONS[stop.stop_number]['zones'])
+            border_dict[stop.stop_id] = tuple(BORDER_STATIONS[stop.stop_id]['zones'])
+            for num in stop.alternate_stop_ids:
+                border_dict[num] = tuple(BORDER_STATIONS[stop.stop_id]['zones'])
 
         return border_dict
 
