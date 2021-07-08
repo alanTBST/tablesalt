@@ -88,7 +88,6 @@ def _load_border_stations():
 
     return {int(k): v for k, v in border_stations.items()}
 
-BORDER_STATIONS = _load_border_stations()
 
 def _load_alternate_stations() -> Dict[int, Tuple[int, ...]]:
 
@@ -105,6 +104,7 @@ def _load_alternate_stations() -> Dict[int, Tuple[int, ...]]:
 
     return {k: tuple(v) for k, v in out.items()} 
 
+BORDER_STATIONS = _load_border_stations()
 ALTERNATE_STATIONS = _load_alternate_stations()
 
 @dataclass
