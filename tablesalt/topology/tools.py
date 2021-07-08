@@ -518,7 +518,7 @@ class TakstZones:
         joined = gpd.sjoin(stops, zones)
         # NOTE: decide on whether border stations should be added here
         return dict(
-            zip(joined.loc[:, 'stop_number'],  joined.loc[:, 'natzonenum'])
+            zip(joined.loc[:, 'stop_id'],  joined.loc[:, 'natzonenum'])
             )
 
     def load_tariffzones(
@@ -579,8 +579,8 @@ class TakstZones:
 
         s_stops = mappers['s_uic']
         corr_s_stops = [x - 90000 for x in s_stops]
-        corr_stops = stops_df.query("stop_number in @corr_s_stops").copy(deep=True)
-        corr_stops.loc[:, 'stop_number'] = corr_stops.loc[:, 'stop_number'] + 90_000
+        corr_stops = stops_df.query("stop_id in @corr_s_stops").copy(deep=True)
+        corr_stops.loc[:, 'stop_id'] = corr_stops.loc[:, 'stop_id'] + 90_000
         out_frame = pd.concat([stops_df, corr_stops])
 
         return out_frame
