@@ -355,7 +355,7 @@ class ZoneProperties():
                         len(self.graph.shortest_path(x, zone_leg[1])[0])
                         for x in border_zones
                         ]
-                    min_pos = np.argmin(border_distances)
+                    min_pos = int(np.argmin(border_distances))
                     start_zone = border_zones[min_pos]
                 if stop_leg[1] in BORDER_STATIONS:
                     border_zones = BORDER_STATIONS[stop_leg[1]]
@@ -363,7 +363,7 @@ class ZoneProperties():
                             len(self.graph.shortest_path(zone_leg[0], x)[0])
                             for x in border_zones
                             ]
-                    min_pos = np.argmin(border_distances)
+                    min_pos = int(np.argmin(border_distances))
                     end_zone = border_zones[min_pos]
 
             leg = (start_zone, end_zone)
