@@ -180,6 +180,14 @@ class Stop:
         """return the stop as a shapely Point"""
 
         return Point(self.coordinates)
+    @property
+    def mode(self):
+
+        stopid_str = str(self.stop_id)
+        if len(stopid_str) == 7 or (stopid_str.startswith('86') and len(stopid_str) == 9):
+            return 'rail'
+        return 'bus'
+
 
     def __hash__(self):
 
@@ -207,6 +215,7 @@ class StopsList(Iterator):
         self._data = _load_stopslist(str(self._filepath))
         self.stops: List[Stop]
         self.stops = [Stop.from_dict(x) for x in self._data]
+        self._stops_dict = None
 
         self._index = 0
 
@@ -232,6 +241,22 @@ class StopsList(Iterator):
     def __len__(self) -> int:
         return len(self.stops)
 
+    def _make_stops_dict(self) -> None:
+
+        self._stops_dict = {x['stop_id']: Stop.from_dict(x) for x in self._data}
+    
+    @property
+    def stops_dict(self) -> Dict[int, Stop]:
+        if self._stops_dict is not None:
+            return self._stops_dict      
+        self._make_stops_dict()
+        return self._stops_dict
+
+    def get_stop(self, stop_id: int) -> Stop:
+
+        return self.stops_dict[stop_id]
+
+
     def rail_stops(self) -> 'StopsList':
         """
         return a new instance of a StopList with only rail stops
@@ -240,7 +265,7 @@ class StopsList(Iterator):
         :rtype: StopsList
         """
         rail = copy.deepcopy((self))
-        rail.stops = [x for x in rail if len(str(x.stop_id)) == 7]
+        rail.stops = [x for x in rail if x.mode == 'rail']
 
         return rail
 
@@ -253,7 +278,7 @@ class StopsList(Iterator):
         """
 
         bus = copy.deepcopy((self))
-        bus.stops = [x for x in bus if len(str(x.stop_id)) != 7]
+        bus.stops = [x for x in bus if x.mode == 'bus']
 
         return bus
 
@@ -278,3 +303,8 @@ class StopsList(Iterator):
     def update_stops(self):
         # update the stops in the stops.json from rejseplan gtfs
         return
+
+class Line:
+
+    def __init__(self, stop_list: StopsList):
+        self.stop_list = stop_list
