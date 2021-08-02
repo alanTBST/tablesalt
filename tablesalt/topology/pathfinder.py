@@ -273,7 +273,7 @@ class ZoneProperties():
             if len(all_short_paths) > 1:
                 options = np.array([x for x in all_short_paths]).T
                 visited = (tuple(set(x)) for x in options)
-                visited = tuple(int(x[0]) if len(x) == 1 else x for x in visited)
+                visited = tuple(int(x[0]) if len(x) == 1 else int(x) for x in visited)
             else:
                 visited = all_short_paths[0]
         self.VISITED_CACHE[zone_leg] = visited
