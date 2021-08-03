@@ -28,16 +28,16 @@ OPGETTER = stationoperators.StationOperators(
     'kystbanen', 'local', 'metro', 'suburban', 'fjernregional'
     )
 
-OP_MAP = {v: k for k, v in mappers['operator_id'].items()}
+OP_MAP = {v: k.lower() for k, v in mappers['operator_id'].items()}
 rev_model_dict = {v:k for k, v in mappers['model_dict'].items()}
 CO_TR = (rev_model_dict['Co'], rev_model_dict['Tr'])
 
 
-#TODO load from config
+#TODO load from config with year
 SOLO_ZONE_PRIS = {
     'th': {
         'dsb': 6.38,
-        'movia': 9.18,
+        'movia_h': 9.18,
         'first': 6.42,
         'stog': 7.12,
         's-tog': 7.12,
@@ -45,11 +45,11 @@ SOLO_ZONE_PRIS = {
         },
     'ts': {
         'dsb': 6.55,
-        'movia': 7.94,
+        'movia_s': 7.94,
         },
     'tv': {
         'dsb': 6.74,
-        'movia': 8.43,
+        'movia_v': 8.43,
         },
     'dsb': {
         'dsb': 6.57,
@@ -552,7 +552,7 @@ class ZoneSharer(ZoneProperties):
 
     def share_calculation(
         self,
-        val: Dict[str, Any]
+        properties: Dict[str, Any]
         ) -> Union[Tuple[int, str], Tuple[Tuple[int, str], ...]]:
         """
         Calculate the zone shares for the operators on the trip
@@ -565,16 +565,20 @@ class ZoneSharer(ZoneProperties):
         """
 
         out = {}
+        out_solo = {}
 
-        for i, imputed_leg in enumerate(val['imputed_zone_legs']):
+        for i, imputed_leg in enumerate(properties['imputed_zone_legs']):
+            break
+            region = properties['zone_legs_regions'][i]
+            print(region)
             for zone in imputed_leg:
-                if zone in val['nlegs_in_touched']:
-                    if val['nlegs_in_touched'][zone] == 1:
+                if zone in properties['nlegs_in_touched']:
+                    if properties['nlegs_in_touched'][zone] == 1:
                         out[zone] = 1, self.operator_legs[i][0]
                     else:
-                        counts = Counter(val['ops_in_touched'][zone])
+                        counts = Counter(properties['ops_in_touched'][zone])
                         try:
-                            out[zone] = tuple((v/val['nlegs_in_touched'][zone], k) for
+                            out[zone] = tuple((v/properties['nlegs_in_touched'][zone], k) for
                                               k, v in counts.items())
                         except ZeroDivisionError:
                             out[zone] = 1, self.operator_legs[i][0]
