@@ -33,40 +33,39 @@ rev_model_dict = {v:k for k, v in mappers['model_dict'].items()}
 CO_TR = (rev_model_dict['Co'], rev_model_dict['Tr'])
 
 
-COMPANY_FACTOR: int = 1
 #TODO load from config
 SOLO_ZONE_PRIS = {
     'th': {
         'dsb': 6.38,
-        'movia': 9.18 * COMPANY_FACTOR,
+        'movia': 9.18,
         'first': 6.42,
         'stog': 7.12,
         's-tog': 7.12,
-        'metro': 9.44 * COMPANY_FACTOR
+        'metro': 9.44
         },
     'ts': {
         'dsb': 6.55,
-        'movia': 7.94 * COMPANY_FACTOR,
+        'movia': 7.94,
         'first': 6.42,
         'stog': 7.12,
         's-tog': 7.12,
-        'metro': 9.44  * COMPANY_FACTOR,
+        'metro': 9.44 ,
         },
     'tv': {
         'dsb': 6.74,
-        'movia': 8.43 * COMPANY_FACTOR,
+        'movia': 8.43,
         'first': 6.42,
         'stog': 7.12,
         's-tog': 7.12,
-        'metro': 9.44 * COMPANY_FACTOR,
+        'metro': 9.44,
         },
     'dsb': {
         'dsb': 6.57,
-        'movia': 6.36 * COMPANY_FACTOR,
+        'movia': 6.36,
         'first': 6.42,
         'stog': 7.12,
         's-tog': 7.12,
-        'metro': 9.44 * COMPANY_FACTOR,
+        'metro': 9.44,
         }
     }
 
