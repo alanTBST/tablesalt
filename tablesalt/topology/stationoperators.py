@@ -11,7 +11,7 @@ import h5py  # type: ignore
 import pandas as pd  # type: ignore
 import pkg_resources
 from tablesalt.common.io import mappers
-from tablesalt.topology.tools import determine_takst_region
+from tablesalt.topology.tools import determine_takst_region, TakstZones
 
 M_RANGE: Set[int] = set(range(8603301, 8603400))
 S_RANGE: Set[int] = set(range(8690000, 8699999))
@@ -173,6 +173,7 @@ class StationOperators():
         self._station_dict_set = {
             k: tuple(v) for k, v in self._station_dict.items()
             }
+        
         self._create_lookups()
 
     def _make_query(self, intup: Tuple[str, ...]) -> str:
@@ -249,13 +250,13 @@ class StationOperators():
                 seen.add(val)
         return outdict
 
-    def _station_type(self, uic_number: int) -> Tuple[str, ...]:
+    def _station_type(self, stop_number: int) -> Tuple[str, ...]:
         """
-        return the operator key if the given uic_number
+        return the operator key if the given stop_number
         is in the values
         """
         for k, v in self._station_dict_set.items():
-            if uic_number in v:
+            if stop_number in v:
                 return k
         raise ValueError("station number not found")
 
@@ -272,27 +273,27 @@ class StationOperators():
             k, v in self._lookup_name.items()
             }
 
-    def _get_operator(self, uic_number: int) -> Tuple[str, ...]:
+    def _get_operator(self, stop_number: int) -> Tuple[str, ...]:
         """return the operators that survice the station
 
-        :param uic_number: the stop uic number
-        :type uic_number: int
+        :param stop_number: the stop uic number
+        :type stop_number: int
         :raises KeyError: if the station/stop is not found
         :return:  a tuple of operators that service the stop
         :rtype: Tuple[str, ...]
         """
         try:
-            return self._lookup[uic_number]
+            return self._lookup[stop_number]
         except KeyError:
-            if uic_number > MAX_RAIL_UIC or uic_number < MIN_RAIL_UIC:
+            if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
                 return tuple((self._settings['config']['bus'], ))
         raise KeyError("uic number not found")
 
-    def _get_line(self, uic_number: int) -> Tuple[str, ...]:
+    def _get_line(self, stop_number: int) -> Tuple[str, ...]:
         """return the line names that the station is on
 
-        :param uic_number: the stop uic number
-        :type uic_number: int
+        :param stop_number: the stop uic number
+        :type stop_number: int
         :raises KeyError: the stop uic number
         :return: a tuple of line names that the stop is on
         :rtype: Tuple[str, ...]
@@ -302,17 +303,17 @@ class StationOperators():
             if k in self.lines
             }
         try:
-            return tuple(minidict[x] for x in self._lookup[uic_number])
+            return tuple(minidict[x] for x in self._lookup[stop_number])
         except KeyError:
-             if uic_number > MAX_RAIL_UIC or uic_number < MIN_RAIL_UIC:
+             if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
                 return tuple(('bus', ))
         raise KeyError("uic number not found")
 
-    def _get_operator_id(self, uic_number: int) -> Tuple[int, ...]:
+    def _get_operator_id(self, stop_number: int) -> Tuple[int, ...]:
         """[summary]
 
-        :param uic_number: the stop uic number
-        :type uic_number: int
+        :param stop_number: the stop uic number
+        :type stop_number: int
         :raises KeyError: the stop uic number
         :return:  a tuple of operator ids that the stop is on
         :rtype: Tuple[int, ...]
@@ -320,23 +321,24 @@ class StationOperators():
         try:
             # 1 is movia_H, this must be made generic
             return tuple(
-                self._settings['operator_ids'].get(x, 1) for x in self._lookup[uic_number]
+                self._settings['operator_ids'].get(x, 1) for x in self._lookup[stop_number]
                 )
         except KeyError:
-            if uic_number > MAX_RAIL_UIC or uic_number < MIN_RAIL_UIC:
+            if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
+
                 return tuple((1, )) # 0 index gives 1 for movia_H..all sjælland
         raise KeyError("uic number not found")
 
 
     def get_ops(
-        self, uic_number: int,
+        self, stop_number: int,
         format: Optional[str] = 'operator_id'
         ) -> Tuple[Union[int, str], ...]:
         """
         Returns a tuple of the operators at the given station id
 
-        :param uic_number: uic number of the station
-        :type uic_number: int
+        :param stop_number: uic number of the station
+        :type stop_number: int
         :param format: 'operator_id', 'operator' or 'line', defaults to 'operator_id'
             'operator' - returns str values representing the operators at the stop
             'line' - returns line names of the stop
@@ -377,9 +379,9 @@ class StationOperators():
 
         fdict: Dict[str,  Union[Tuple[int, ...], Tuple[str, ...]]]
         fdict = {
-            'operator_id': self._get_operator_id(uic_number),
-            'operator': self._get_operator(uic_number),
-            'line': self._get_line(uic_number)
+            'operator_id': self._get_operator_id(stop_number),
+            'operator': self._get_operator(stop_number),
+            'line': self._get_line(stop_number)
             }
         return fdict[format]
 
