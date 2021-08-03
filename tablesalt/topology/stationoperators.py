@@ -11,6 +11,7 @@ import h5py  # type: ignore
 import pandas as pd  # type: ignore
 import pkg_resources
 from tablesalt.common.io import mappers
+from tablesalt.topology.tools import determine_takst_region
 
 M_RANGE: Set[int] = set(range(8603301, 8603400))
 S_RANGE: Set[int] = set(range(8690000, 8699999))
