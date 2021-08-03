@@ -19,6 +19,8 @@ S_RANGE: Set[int] = set(range(8690000, 8699999))
 MIN_RAIL_UIC: int = 7400000
 MAX_RAIL_UIC: int = 9999999
 
+OP_MAP = {v: k.lower() for k, v in mappers['operator_id'].items()}
+REV_OP_MAP = {v:k for k, v in OP_MAP.items()}
 
 def _load_default_config() -> Dict[str, str]:
     """load the operator configuration from the package
@@ -140,7 +142,7 @@ def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
     return pas_stations
 
 
-
+# make a separate lookup class
 class StationOperators():
 
     BUS_ID_MAP: Dict[int, int] = load_bus_station_connectors()
@@ -173,6 +175,7 @@ class StationOperators():
         self._station_dict_set = {
             k: tuple(v) for k, v in self._station_dict.items()
             }
+        self._stop_zone_map = TakstZones().stop_zone_map()
         
         self._create_lookups()
 
@@ -287,7 +290,7 @@ class StationOperators():
         except KeyError:
             if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
                 return tuple((self._settings['config']['bus'], ))
-        raise KeyError("uic number not found")
+        raise KeyError("stop_number not found")
 
     def _get_line(self, stop_number: int) -> Tuple[str, ...]:
         """return the line names that the station is on
@@ -307,7 +310,7 @@ class StationOperators():
         except KeyError:
              if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
                 return tuple(('bus', ))
-        raise KeyError("uic number not found")
+        raise KeyError("stop_number not found")
 
     def _get_operator_id(self, stop_number: int) -> Tuple[int, ...]:
         """[summary]
@@ -324,10 +327,13 @@ class StationOperators():
                 self._settings['operator_ids'].get(x, 1) for x in self._lookup[stop_number]
                 )
         except KeyError:
-            if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
-
-                return tuple((1, )) # 0 index gives 1 for movia_H..all sjælland
-        raise KeyError("uic number not found")
+            try:
+                if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
+                    op_name = determine_takst_region(self._stop_zone_map[stop_number])
+                    return tuple((REV_OP_MAP[op_name], ))
+            except KeyError:
+                raise KeyError(f"stop number = {stop_number} is not a valid stop point")
+        raise KeyError(f"stop_number = {stop_number}  not found")
 
 
     def get_ops(
@@ -562,5 +568,3 @@ class StationOperators():
         if format == 'operator_id':
             self.ID_CACHE[(start_uic, end_uic, format)] = returnval
         return returnval
-
-
