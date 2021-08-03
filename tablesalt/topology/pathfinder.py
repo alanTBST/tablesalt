@@ -22,6 +22,7 @@ from tablesalt.common.io import mappers
 from tablesalt.topology import stationoperators
 from tablesalt.topology.stopnetwork import StopsList
 from tablesalt.topology.zonegraph import ZoneGraph
+from tablesalt.topology.tools import determine_takst_region
 
 # put these in lines in a config
 OPGETTER = stationoperators.StationOperators(
@@ -35,7 +36,7 @@ CO_TR = (rev_model_dict['Co'], rev_model_dict['Tr'])
 
 #TODO load from config with year
 SOLO_ZONE_PRIS = {
-    'th': {
+    'movia_h': {
         'dsb': 6.38,
         'movia_h': 9.18,
         'first': 6.42,
@@ -43,11 +44,11 @@ SOLO_ZONE_PRIS = {
         's-tog': 7.12,
         'metro': 9.44
         },
-    'ts': {
+    'movia_s': {
         'dsb': 6.55,
         'movia_s': 7.94,
         },
-    'tv': {
+    'movia_v': {
         'dsb': 6.74,
         'movia_v': 8.43,
         },
@@ -56,25 +57,6 @@ SOLO_ZONE_PRIS = {
         'movia': 6.36,
         }
     }
-
-def _determine_region(zone_sequence: Tuple[int, ...]) -> str:
-    """return a string representation of the region given a sequence
-    of zone numbers
-
-    :param zone_sequence: a sequence of zones
-    :type zone_sequence: Tuple[int, ...]
-    :return: a contraction of the region/takstsæt
-    :rtype: str
-    """
-
-    if all(x < 1100 for x in zone_sequence):
-        return "th"
-    if all(1100 < x <= 1200 for x in zone_sequence):
-        return "tv"
-    if all(1200 < x < 1300 for x in zone_sequence):
-        return "ts"
-    return "dsb"
-
 
 def load_border_stations() -> Dict[int, Tuple[int, ...]]: # put this in TBSTtopology
     "load the border stations dataset from package resources"
@@ -572,9 +554,11 @@ class ZoneSharer(ZoneProperties):
             region = properties['zone_legs_regions'][i]
             print(region)
             for zone in imputed_leg:
+                break
                 if zone in properties['nlegs_in_touched']:
                     if properties['nlegs_in_touched'][zone] == 1:
                         out[zone] = 1, self.operator_legs[i][0]
+                        out_solo[zone] = SOLO_ZONE_PRIS[region][self.operator_legs[i][0]]
                     else:
                         counts = Counter(properties['ops_in_touched'][zone])
                         try:
