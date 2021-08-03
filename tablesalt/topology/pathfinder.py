@@ -228,15 +228,13 @@ class ZoneProperties():
 
         """
 
-
         self.graph = graph
         # self.ring_dict = self.graph.ring_dict(region)
         self.zone_sequence: Tuple[int, ...] = zone_sequence
-        self.stop_sequence: Tuple[int, ...]  = stop_sequence
+        self.stop_sequence: Tuple[int, ...] = stop_sequence
 
         self.stop_legs: Tuple[Tuple[int, ...], ...] = to_legs(stop_sequence)
         self.stop_legs = _to_legs_stops(self.stop_legs)
-
         self.zone_legs: Tuple[Tuple[int, ...], ...] = to_legs(zone_sequence)
 
         self.border_trip: bool = False
@@ -273,7 +271,7 @@ class ZoneProperties():
             if len(all_short_paths) > 1:
                 options = np.array([x for x in all_short_paths]).T
                 visited = (tuple(set(x)) for x in options)
-                visited = tuple(int(x[0]) if len(x) == 1 else int(x) for x in visited)
+                visited = tuple(int(x[0]) if len(x) == 1 else x for x in visited)
             else:
                 visited = all_short_paths[0]
         self.VISITED_CACHE[zone_leg] = visited
