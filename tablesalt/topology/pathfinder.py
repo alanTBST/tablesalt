@@ -46,26 +46,14 @@ SOLO_ZONE_PRIS = {
     'ts': {
         'dsb': 6.55,
         'movia': 7.94,
-        'first': 6.42,
-        'stog': 7.12,
-        's-tog': 7.12,
-        'metro': 9.44 ,
         },
     'tv': {
         'dsb': 6.74,
         'movia': 8.43,
-        'first': 6.42,
-        'stog': 7.12,
-        's-tog': 7.12,
-        'metro': 9.44,
         },
     'dsb': {
         'dsb': 6.57,
         'movia': 6.36,
-        'first': 6.42,
-        'stog': 7.12,
-        's-tog': 7.12,
-        'metro': 9.44,
         }
     }
 
@@ -298,16 +286,8 @@ class ZoneProperties():
 
         return tuple(visited_zones)
 
-
-    def _borderless_properties(self) -> Dict[str, Any]:
-        """get the properties if the trip does not touch a border station
-
-        :return: a dictionary of properties
-        :rtype: Dict[str, Any]
-        """
-
-        visited_zones = self.get_visited_zones(self.touched_zone_legs)
-
+    def _chain_zones(self, visited_zones):
+        # chain visited together preserving order
         chained_zones = []
         try:
             for x in visited_zones:
@@ -318,8 +298,21 @@ class ZoneProperties():
                         chained_zones.append(y)
         except TypeError:
             chained_zones = list(visited_zones)
+        return chained_zones
+
+    def _borderless_properties(self) -> Dict[str, Any]:
+        """get the properties if the trip does not touch a border station
+
+        :return: a dictionary of properties
+        :rtype: Dict[str, Any]
+        """
+
+        visited_zones = self.get_visited_zones(self.touched_zone_legs)
+
+        chained_zones = self._chain_zones(visited_zones)
 
         double_back = bool(max(Counter(chained_zones).values()) > 1)
+        imputed_zone_legs = impute_zone_legs(self.graph, self.zone_legs)
 
         prop_dict = {
             'visited_zones': visited_zones,
@@ -330,7 +323,13 @@ class ZoneProperties():
             'stop_legs': self.stop_legs,
             'zone_sequence': self.zone_sequence,
             'zone_legs': self.zone_legs,
-            'border_legs': self.border_legs
+            'border_legs': self.border_legs,
+            'imputed_zone_legs': imputed_zone_legs,
+            'nlegs_in_touched': {
+                tzone: len([x for x in self.zone_legs if tzone in x])
+                       for tzone in self.touched_zones
+                },
+            'zone_legs_regions': tuple(_determine_region(x) for x in imputed_zone_legs)
             }
 
         return prop_dict
@@ -340,6 +339,21 @@ class ZoneProperties():
         """get the properties of the trip if it touches a border station
         """
 
+        zone_legs = self._zone_legs_for_border_stations()
+
+        # make properties setter
+        self.zone_sequence = tuple(
+            [x[0] for x in zone_legs] + [zone_legs[-1][1]]
+            )
+        
+        self.zone_legs = to_legs(self.zone_sequence)
+        self.touched_zones = get_touched_zones(self.zone_sequence)
+        self.touched_zone_legs = to_legs(self.touched_zones)
+        #---------------
+
+        return self._borderless_properties()
+
+    def _zone_legs_for_border_stations(self):
         zone_legs = []
         for legnr, zone_leg in enumerate(self.zone_legs):
             start_zone = zone_leg[0]
@@ -347,33 +361,29 @@ class ZoneProperties():
             if legnr in self.border_legs:
                 stop_leg = self.stop_legs[legnr]
                 if stop_leg[0] in BORDER_STATIONS:
-                    border_zones = BORDER_STATIONS[stop_leg[0]]
-                    border_distances = [
-                        len(self.graph.shortest_path(x, zone_leg[1])[0])
-                        for x in border_zones
-                        ]
-                    min_pos = int(np.argmin(border_distances))
-                    start_zone = border_zones[min_pos]
+                    start_zone = self._border_startzone(zone_leg, stop_leg)
                 if stop_leg[1] in BORDER_STATIONS:
-                    border_zones = BORDER_STATIONS[stop_leg[1]]
-                    border_distances = [
-                            len(self.graph.shortest_path(zone_leg[0], x)[0])
-                            for x in border_zones
-                            ]
-                    min_pos = int(np.argmin(border_distances))
-                    end_zone = border_zones[min_pos]
+                    end_zone = self._border_endzone(zone_leg, stop_leg)
 
             leg = (start_zone, end_zone)
             zone_legs.append(leg)
+        return zone_legs
 
-        self.zone_sequence = tuple(
-            [x[0] for x in zone_legs] + [zone_legs[-1][1]]
-            )
-        self.zone_legs = to_legs(self.zone_sequence)
-        self.touched_zones = get_touched_zones(self.zone_sequence)
-        self.touched_zone_legs = to_legs(self.touched_zones)
+    def _border_endzone(self, zone_leg, stop_leg):
+        border_zones = BORDER_STATIONS[stop_leg[1]]
+        border_distances = [len(self.graph.shortest_path(zone_leg[0], x)[0])
+                            for x in border_zones]
+        min_pos = int(np.argmin(border_distances))
+        end_zone = border_zones[min_pos]
+        return end_zone
 
-        return self._borderless_properties()
+    def _border_startzone(self, zone_leg, stop_leg):
+        border_zones = BORDER_STATIONS[stop_leg[0]]
+        border_distances = [len(self.graph.shortest_path(x, zone_leg[1])[0]) 
+                            for x in border_zones]
+        min_pos = int(np.argmin(border_distances))
+        start_zone = border_zones[min_pos]
+        return start_zone
 
     def property_dict(self) -> Dict[str, Any]:
         """
@@ -391,7 +401,6 @@ class ZoneProperties():
 
 def _remove_idxs(idxs, legs):
     """remove an item from a sequence of legs"""
-
     return tuple(j for i, j in enumerate(legs) if i not in idxs)
 
 def legops(new_legs):
@@ -631,17 +640,11 @@ class ZoneSharer(ZoneProperties):
             return self._standardise(self._share_single(val))
 
         property_dict = self.property_dict()
-        property_dict['nlegs_in_touched'] = {
-            tzone: len([x for x in property_dict['zone_legs'] if tzone in x])
-            for tzone in property_dict['touched_zones']
-            }
         property_dict['ops_in_touched'] = operators_in_touched_(
             property_dict['touched_zones'],
             property_dict['zone_legs'],
             self.operator_legs
             )
-        property_dict['imputed_zone_legs'] = \
-        impute_zone_legs(self.graph, property_dict['zone_legs'])
 
         shares = self.share_calculation(property_dict)
         self.SHARE_CACHE[val] = shares
