@@ -8,6 +8,7 @@ import json
 import os
 from tablesalt.topology.stopnetwork import StopsList
 import zipfile
+from functools import singledispatch
 from io import BytesIO
 from itertools import chain, groupby
 from operator import itemgetter
@@ -68,6 +69,54 @@ REGION_ZONES = {
     # 'bornholm': (6000, 6100) # 240
     }
 
+@singledispatch
+def determine_takst_region(zone_sequence):
+
+    return zone_sequence
+
+
+@determine_takst_region.register
+def _(zone_sequence: int) -> str:
+
+    if zone_sequence < 1100:
+        return "movia_h"
+    if 1100 < zone_sequence <= 1200:
+        return "movia_v"
+    if 1200 < zone_sequence < 1300:
+        return "movia_s"
+
+@determine_takst_region.register
+def _(zone_sequence: tuple) -> str:
+
+    if all(x < 1100 for x in zone_sequence):
+        return "movia_h"
+    if all(1100 < x <= 1200 for x in zone_sequence):
+        return "movia_v"
+    if all(1200 < x < 1300 for x in zone_sequence):
+        return "movia_s"
+    return "dsb"
+
+@determine_takst_region.register
+def _(zone_sequence: list) -> str:
+
+    if all(x < 1100 for x in zone_sequence):
+        return "movia_h"
+    if all(1100 < x <= 1200 for x in zone_sequence):
+        return "movia_v"
+    if all(1200 < x < 1300 for x in zone_sequence):
+        return "movia_s"
+    return "dsb"
+@determine_takst_region.register
+def _(zone_sequence: set) -> str:
+
+    if all(x < 1100 for x in zone_sequence):
+        return "movia_h"
+    if all(1100 < x <= 1200 for x in zone_sequence):
+        return "movia_v"
+    if all(1200 < x < 1300 for x in zone_sequence):
+        return "movia_s"
+    return "dsb"
+    
 class _StopLoader:
 
     DEFAULT_STOPS_LOC = pkg_resources.resource_filename(
