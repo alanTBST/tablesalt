@@ -30,6 +30,7 @@ OPGETTER = stationoperators.StationOperators(
     )
 
 OP_MAP = {v: k.lower() for k, v in mappers['operator_id'].items()}
+REV_OP_MAP = {v: k for k, v in OP_MAP.items()}
 rev_model_dict = {v:k for k, v in mappers['model_dict'].items()}
 CO_TR = (rev_model_dict['Co'], rev_model_dict['Tr'])
 
@@ -54,7 +55,9 @@ SOLO_ZONE_PRIS = {
         },
     'dsb': {
         'dsb': 6.57,
-        'movia': 6.36,
+        'movia_h': 6.36,
+        'movia_s': 6.36,
+        'movia_v': 6.36,
         }
     }
 
@@ -311,7 +314,7 @@ class ZoneProperties():
                 tzone: len([x for x in self.zone_legs if tzone in x])
                        for tzone in self.touched_zones
                 },
-            'zone_legs_regions': tuple(_determine_region(x) for x in imputed_zone_legs)
+            'zone_legs_regions': tuple(determine_takst_region(x) for x in imputed_zone_legs)
             }
 
         return prop_dict
@@ -489,7 +492,7 @@ class ZoneSharer(ZoneProperties):
 
         self.single: bool = self._is_single()
 
-        self.region: str = _determine_region(self.zone_sequence)
+        self.region: str = determine_takst_region(self.zone_sequence)
 
 
     def _is_single(self) -> bool:
@@ -545,29 +548,33 @@ class ZoneSharer(ZoneProperties):
         :rtype: Union[Tuple[int, str], Tuple[Tuple[int, str], ...]]
 
         """
-
+        # use a default dict here
         out = {}
         out_solo = {}
 
         for i, imputed_leg in enumerate(properties['imputed_zone_legs']):
             break
             region = properties['zone_legs_regions'][i]
-            print(region)
+            op_id = self.operator_legs[i][0]
             for zone in imputed_leg:
-                break
                 if zone in properties['nlegs_in_touched']:
-                    if properties['nlegs_in_touched'][zone] == 1:
-                        out[zone] = 1, self.operator_legs[i][0]
-                        out_solo[zone] = SOLO_ZONE_PRIS[region][self.operator_legs[i][0]]
+                    if properties['nlegs_in_touched'][zone] == 1:                      
+                        out[zone] = (1, op_id)
+                        out_solo[zone] = (1 * SOLO_ZONE_PRIS[region][OP_MAP[op_id]], op_id)
                     else:
+                        break
+                        # need to assign the fraction of the zone for the leg based on itøs region for solo    
                         counts = Counter(properties['ops_in_touched'][zone])
+                        solo_counts = Counter(OP_MAP[x] for x in properties['ops_in_touched'][zone])
                         try:
                             out[zone] = tuple((v/properties['nlegs_in_touched'][zone], k) for
                                               k, v in counts.items())
                         except ZeroDivisionError:
-                            out[zone] = 1, self.operator_legs[i][0]
+                            out[zone] = 1, op_id
+                            out_solo[zone] = (1 * SOLO_ZONE_PRIS[region][OP_MAP[op_id]], op_id)
                 else:
-                    out[zone] = 1, self.operator_legs[i][0]
+                    out[zone] = 1, op_id
+                    out_solo[zone] = (1 * SOLO_ZONE_PRIS[region][OP_MAP[op_id]], op_id)
 
         return aggregated_zone_operators(tuple(out.values()))
 
