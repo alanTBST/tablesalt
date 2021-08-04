@@ -323,8 +323,9 @@ class StationOperators():
         """
         try:
             # 1 is movia_H, this must be made generic
+            op_name = determine_takst_region(self._stop_zone_map[stop_number])
             return tuple(
-                self._settings['operator_ids'].get(x, 1) for x in self._lookup[stop_number]
+                self._settings['operator_ids'].get(x, REV_OP_MAP[op_name]) for x in self._lookup[stop_number]
                 )
         except KeyError:
             try:
