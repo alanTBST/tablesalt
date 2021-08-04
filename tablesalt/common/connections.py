@@ -177,7 +177,6 @@ def make_store(d, db_path, start_size=1, size_limit=30):
             _make_key_val(d, db_path, map_size=MAP_SIZES[i])
             break
         except Exception as e:
-            print(str(e))
             i += 1
         if i >= size_limit:
             raise ValueError(
