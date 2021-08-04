@@ -61,7 +61,7 @@ from tablesalt.topology.tools import TakstZones
 
 THIS_DIR = Path(__file__).parent
 
-CPU_USAGE = 0.5 # %
+CPU_USAGE = 0.75 # %
 DB_START_SIZE = 8 # gb
 
 
@@ -259,21 +259,27 @@ def chunk_shares(
     model_one_shares = {}
     model_two_shares = {} # solo_zone_price
 
-    for k, zones, stops, operators, usage in gen:
-
+    for k, zones, stops, operators, usage in tqdm(gen):
+        """
+        hovedstad = any(x < 1100 for x in zones)
+        vest = any(1100 < x < 1200 for x in zones)
+        syd = any(1200 < x < 1300 for x in zones)
+        if (hovedstad + vest + syd) >= 2: #any two of the three
+            break
+"""
         sharer = ZoneSharer(graph, zones, stops, operators, usage)
+        trip_shares = sharer.share()
 
         if sharer.border_trip:
-            initial_zone_sequence = sharer.zone_sequence
-            trip_shares = sharer.share()
-            model_one_shares[k] = trip_shares
+            initial_zone_sequence = sharer.zone_sequence     
+            model_one_shares[k] = trip_shares['standard']
             final_zone_sequence = sharer.zone_sequence
             if initial_zone_sequence != final_zone_sequence:
                 border_changes[k] = final_zone_sequence
-            model_two_shares[k] = sharer.solo_zone_price()
+            model_two_shares[k] = trip_shares['solo_price']
         else:
-            model_one_shares[k] = sharer.share()
-            model_two_shares[k] = sharer.solo_zone_price()
+            model_one_shares[k] = trip_shares['standard']
+            model_two_shares[k] = trip_shares['solo_price']
 
     num = _get_store_num(store)
 
@@ -291,7 +297,7 @@ def main():
     """
     Main function to create the operator
     shares for the data in the datastores in parallel
-    using CPU_USAGE processing power
+    using CPU_USAGE % processing power
     """
 
     parser = TableArgParser('year')
