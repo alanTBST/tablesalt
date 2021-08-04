@@ -6,7 +6,6 @@ Classes to download and manipulate routing and spatial data
 
 import json
 import os
-from tablesalt.topology.stopnetwork import StopsList
 import zipfile
 from functools import singledispatch
 from io import BytesIO
@@ -23,11 +22,10 @@ import requests  # type: ignore
 import shapely  # type: ignore
 from shapely import wkt  # type: ignore
 from shapely.geometry.linestring import LineString  # type: ignore
-from shapely.geometry.point import Point # type: ignore
+from shapely.geometry.point import Point  # type: ignore
 from shapely.geometry.polygon import Polygon  # type: ignore
 from tablesalt.common.io import mappers
 from tablesalt.topology.stopnetwork import StopsList
-
 
 FILE_PATH = Union[str, bytes, 'os.PathLike[Any]']
 
@@ -84,6 +82,7 @@ def _(zone_sequence: int) -> str:
         return "movia_v"
     if 1200 < zone_sequence < 1300:
         return "movia_s"
+    raise ValueError(f"zone = {zone_sequence} is not supported")
 
 @determine_takst_region.register
 def _(zone_sequence: tuple) -> str:
