@@ -28,11 +28,13 @@ and -m is the model to run (1 --> standard zonework model,
 
 """
 import ast
+from collections import defaultdict
 import os
 import pickle
 import pkg_resources
 from datetime import datetime
 from itertools import groupby, chain
+from functools import lru_cache
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
@@ -140,16 +142,16 @@ def load_valid(valid_kombi_store: str) -> Dict:
         DESCRIPTION.
 
     """
-    env = lmdb.open(valid_kombi_store, readahead=False)
-    valid_kombi = {}
-    with env.begin() as txn:
-        cursor = txn.cursor()
-        for k, v in cursor:
-            valid_kombi[k.decode('utf-8')] = ast.literal_eval(v.decode('utf-8'))
-    env.close()
-    return valid_kombi
+    with lmdb.open(valid_kombi_store, readahead=False) as env:
+        valid_kombi = {}
+        with env.begin() as txn:
+            cursor = txn.cursor()
+            for k, v in cursor:
+                valid_kombi[k.decode('utf-8')] = ast.literal_eval(v.decode('utf-8'))
 
+    return {ast.literal_eval(k): v for k, v in valid_kombi.items()}
 
+@lru_cache(2*16)
 def _date_in_window(test_period, test_date):
     """test that a date is in a validity period"""
     return min(test_period) <= test_date <= max(test_period)
@@ -209,45 +211,6 @@ def assert_internal_zones(zero_travel_price, zone_combo_trips):
 
     return {k: v.intersection(zero_travel_price) for k, v in zone_combo_trips.items()}
 
-def match_trip_to_season(kombi_trips, season_dates, kombi_dates_path: str):
-    """
-    For each user seasonpassID match the valid kombi trips to
-    that seasonpassID time window
-
-    Parameters
-    ----------
-    kombi_trips : dict
-        DESCRIPTION.
-    season_dates : dict
-        DESCRIPTION.
-
-    Returns
-    -------
-    dict
-        DESCRIPTION.
-
-    """
-    out = {k: [] for k, v in season_dates.items()}
-    with lmdb.open(kombi_dates_path, readahead=False) as env:
-        with env.begin() as txn:
-            for k, v in tqdm(kombi_trips.items(), 'matching trips to season passes'):
-                v = (bytes(str(x), 'utf-8') for x in v)
-                utripdates = {x: txn.get(x) for x in v}
-                utripdates = {
-                    k.decode('utf-8'): datetime.strptime(
-                        v.decode('utf-8'), '%Y-%m-%d'
-                        ).date() for k, v in utripdates.items()
-                    }
-                user_seasons = {v: k1 for k1, v in
-                                season_dates.items() if k1[0] == k}
-                for key, date in utripdates.items():
-                    for window, season in user_seasons.items():
-                        if _date_in_window(window, date):
-                            out[season].append(key)
-                            break
-    return {k: tuple(v) for k, v in out.items()}
-
-
 def trips_to_zone_combination(season_trips, zone_combo_users):
 
     zone_combo_trips = {}
@@ -300,23 +263,20 @@ def pendler_reshare(share_tuple):
 
 def get_zone_combination_shares(tofetch, db_path: str, model: int):
 
-
-    with lmdb.open(db_path) as env:
-        final = {}
+    final = {}
+    errors = {'operator_error', 'station_map_error', 'rk_operator_error'}
+    with lmdb.open(db_path) as env:     
         with env.begin() as txn:
-            for combo, trips in tqdm(
-                    tofetch.items(),
-                    'fetching combo results',
-                    total=len(tofetch)
-                    ):
+            for combo, trips in tqdm(tofetch.items(),'fetching combo results',
+                                     total=len(tofetch)):
                 all_trips = {}
                 for trip in trips:
-                    t = bytes(trip, 'utf-8')
+                    t = bytes(str(trip), 'utf-8')
                     res = txn.get(t)
                     if not res:
                         continue
                     res = res.decode('utf-8')
-                    if res not in ('operator_error', 'station_map_error'):
+                    if res not in errors:
                         val = ast.literal_eval(res)
                         if model != 3:
                             all_trips[trip] = val
@@ -324,7 +284,6 @@ def get_zone_combination_shares(tofetch, db_path: str, model: int):
                             all_trips[trip] = pendler_reshare(val)
                 combo_result = get_user_shares(all_trips.values())
                 final[combo] = combo_result
-
 
     return final
 
@@ -355,6 +314,7 @@ def _kombi_by_seasonpass(pendler_kombi, userdict):
 def _get_trips(db_path, tripkeys, model):
 
     tripkeys_ = (bytes(str(x), 'utf-8') for x in tripkeys)
+    errors = {'operator_error', 'station_map_error', 'rk_operator_error'}
 
     out = {}
     with lmdb.open(db_path) as env:
@@ -364,7 +324,7 @@ def _get_trips(db_path, tripkeys, model):
                 if not res:
                     continue
                 res = res.decode('utf-8')
-                if res not in ('operator_error', 'station_map_error'):
+                if res not in errors:
                     val = ast.literal_eval(res)
                     if model != 3:
                         out[int(k.decode('utf-8'))] = val
@@ -377,7 +337,6 @@ def _get_trips(db_path, tripkeys, model):
 def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, db_path, year, model):
 
 
-    zero_travel_price = {int(x) for x in zero_travel_price}
     takstsets = ["vestsjælland", "sydsjælland", "hovedstad", "dsb"]
 
     for takst in takstsets:
@@ -438,12 +397,8 @@ def _chosen_zones(
 
     kombi_trips = load_valid(kombi_valid_db)
 
-    season_trips = match_trip_to_season(
-        kombi_trips, season_times, kombi_dates_db
-        )
-
     zone_combo_trips = trips_to_zone_combination(
-        season_trips, zone_combo_users
+        kombi_trips, zone_combo_users
         )
 
     zone_combo_trips_valid = assert_internal_zones(
@@ -544,13 +499,8 @@ def _zonerelations(year: int, model: int):
 
     frame = pd.DataFrame.from_dict(out, orient='index')
     cp = frame.copy(deep=True)
-    cp.columns = [
-        'DestinationZone', 'StartZone',
-        'PaidZones', 'ValidityZones',
-        'ValidZones', 'first', 'metro',
-        'movia', 'stog', 'dsb', 'n_users',
-        'n_period_cards', 'n_trips'
-        ]
+
+    cp.rename(columns={'StartZone': 'DestinationZone', 'DestinationZone': 'StartZone'}, inplace=True)
     df = pd.concat([frame, cp])
     df = df.fillna(0)
     # add new frame d=o and o=d
@@ -573,7 +523,6 @@ def main():
     stores = paths['store_paths']
 
     zero_travel_price = find_no_pay(stores, year)
-    zero_travel_price = {str(x) for x in zero_travel_price}
 
     db_path = paths['calculated_stores']
 
