@@ -147,7 +147,7 @@ from tablesalt.preprocessing.parsing import TableArgParser #type: ignore
 
 THIS_DIR = Path(__file__).parent
 
-def _load_outconfig() -> Dict[str]:
+def _load_outconfig():
     """load the configuration for sales output"""
     fp = THIS_DIR / 'salesoutconfig.json'
     with open(fp, 'r') as f:
@@ -686,7 +686,7 @@ def _single_tickets(
     any_start = _any_single_merge(
         sales_idxs, location_sales,
         data, single_results,
-        min_trips,loc=loc
+        min_trips, loc=loc
         )
 
     if loc:
@@ -1197,7 +1197,7 @@ def main(year: int, model: int) -> None:
     :type model: int
     """
 
-    data = _load_sales_data(year)
+    data = _load_sales_data(year) # merged sales data. run salesdatamerge.py
     sales_idxs = _sales_ref(data)
     location_idxs = _location_ref(data)
     location_sales = _get_location_sales(location_idxs, sales_idxs)
@@ -1238,24 +1238,22 @@ def main(year: int, model: int) -> None:
     output = pd.concat([single_output, pendler_output, other_output])
     output = output.sort_values('NR')
     output = output.fillna(0)
+    initial_columns = list(data.columns)
 
-    cols = ['dsb', 'first', 's-tog', 'movia', 'metro']
+    stats_columns = ['n_trips', 'n_users', 'n_period_cards', 'note']
+    operator_columns = [
+        x for x in output.columns if x not in initial_columns 
+        and x not in stats_columns
+        ]
 
-    for col in cols:
+    andel_columns = []
+    for col in operator_columns:
+        new_col = f'{col}_Andel'
+        andel_columns.append(new_col)
         output.loc[:, f'{col}_Andel'] = \
             output.loc[:, 'omsætning'] * output.loc[:, col]
 
-    col_order = [
-        'NR', 'salgsvirksomhed', 'indtægtsgruppe',
-        'salgsår', 'salgsmåned', 'takstsæt',
-        'produktgruppe', 'produktnavn', 'kundetype',
-        'salgsmedie', 'betaltezoner', 'startzone',
-        'slutzone', 'valgtezoner', 'omsætning',
-        'antal', 'dsb', 'first', 's-tog',  'movia',
-        'metro', 'n_trips', 'note', 'n_period_cards',
-        'n_users', 'dsb_Andel', 'first_Andel',
-        's-tog_Andel', 'movia_Andel', 'metro_Andel'
-         ]
+    col_order = initial_columns + operator_columns + andel_columns + stats_columns
     output = output[col_order]
 
     fp = (THIS_DIR / '__result_cache__' / f'{year}'/
@@ -1269,9 +1267,5 @@ if __name__ == "__main__":
     parser = TableArgParser('year', 'model')
     args = parser.parse()
     year = args['year']
-    model = args['model']
+    model = args['model'] 
     main(year, model)
-
-
-
-
