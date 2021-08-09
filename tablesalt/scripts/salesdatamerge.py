@@ -194,8 +194,8 @@ def _get_separator(file: AnyStr) -> str:
     """
     with open(file, 'r') as f:
         firstline = f.readline()
-        commas = firstline.count(',')
-        semi = firstline.count(';')
+    commas = firstline.count(',')
+    semi = firstline.count(';')
 
     if commas == 0:
         return ';'
