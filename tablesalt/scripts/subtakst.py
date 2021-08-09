@@ -24,12 +24,14 @@ To run this script for 2019 rabattrin 0 and model 1:
 import ast
 import os
 import pickle
+from collections import defaultdict
 from datetime import datetime
 from functools import partial
 from itertools import chain, groupby
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
+from typing import DefaultDict
 
 import lmdb
 import numpy as np
@@ -88,7 +90,7 @@ def _max_zones(operator_zones, ringdict):
                 break
         out[k] = current_max
     return out
-
+"""
 def _load_data(store, stopzone_map, ringzones, rabatkeys):
 
     reader = StoreReader(store)
@@ -131,6 +133,19 @@ def _load_data(store, stopzone_map, ringzones, rabatkeys):
         pension_mapped_zones_three,
         youth_mapped_zones
         )
+"""
+def _load_data(store, stopzone_map, ringzones, rabatkeys):
+
+    reader = StoreReader(store)
+    allstops = reader.get_data('stops')
+    allstops_rabat_zero = allstops[
+        np.isin(allstops[:, 0], list(rabatkeys))
+        ]
+    allstops_mapped_zones = _map_zones(
+        allstops_rabat_zero, stopzone_map
+        )
+
+    return allstops_mapped_zones
 
 def _aggregate_zones(shares):
     """
@@ -183,17 +198,19 @@ def main():
 
     year = args['year']
 
-    store_loc = find_datastores(r'H://')
+    store_loc = find_datastores()
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
+
     if model == 2:
         db_path = db_path + f'_model_{model}'
 
     ringzones = ZoneGraph.ring_dict('sjælland')
 
     stopzone_map = TakstZones().stop_zone_map()
-
+    # can make these defaultdicts
+    """
     trips = {
         'alltrips': {
             'th': set(),
@@ -218,7 +235,9 @@ def main():
             'tv': set(),
              }
         }
-
+    """
+    alltrips = defaultdict(set)
+    trips = {'alltrips': alltrips}
     rabatkeys = _get_rabatkeys(rabat_level, year)
 
 
@@ -229,11 +248,11 @@ def main():
         rabatkeys=rabatkeys
         )
 
-    with Pool(5) as pool:
+    with Pool(6) as pool:
         results = pool.imap(pfunc, stores)
         for res in tqdm(results, total=len(stores)):
-            alltrips, pension, pension_three, youth = res
-            for k, v in alltrips.items():
+            # alltrips, pension, pension_three, youth = res
+            for k, v in res.items():
                 if all(x < 1100 for x in v):
                     trips['alltrips']["th"].add(k)
                     if all(x in (1001, 1002, 1003, 1004) for x in v):
@@ -244,6 +263,7 @@ def main():
                     trips['alltrips']["ts"].add(k)
                 else:
                     trips['alltrips']["dsb"].add(k)
+            """
             for k, v in pension.items():
                 if all(x < 1100 for x in v):
                     trips['pension']["th"].add(k)
@@ -280,6 +300,7 @@ def main():
                     trips['youth']["ts"].add(k)
                 else:
                     pass
+            """
 
     out = {}
     for k1, v1 in trips.items():
@@ -287,6 +308,7 @@ def main():
         for k2, v2 in v1.items():
             sub[k2] = _get_trips(db_path, v2)
         out[k1] = sub
+
 
     test = {
         k1: {
