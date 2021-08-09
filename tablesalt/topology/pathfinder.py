@@ -525,10 +525,16 @@ class ZoneSharer(ZoneProperties):
                 )
 
         return oplegs
+    
+    @staticmethod
+    def _bump_zones(share_tuple, n_zones):
 
+        return tuple(x if x[0] >= n_zones else (n_zones, x[1] )for x in share_tuple)
+    
     def share_calculation(
         self,
-        properties: Dict[str, Any]
+        properties: Dict[str, Any], 
+        min_zones: int = 0
         ) -> Union[Tuple[int, str], Tuple[Tuple[int, str], ...]]:
         """
         Calculate the zone shares for the operators on the trip
@@ -573,9 +579,10 @@ class ZoneSharer(ZoneProperties):
 
         standard = aggregated_zone_operators(tuple(outd.values()))
         solo_price = aggregated_zone_operators(tuple(out_solo.values()))
-        return {'standard': standard, 'solo_price': solo_price}
+        bumped = self._bump_zones(standard, min_zones)
+        return {'standard': standard, 'solo_price': solo_price, 'bumped': bumped}
 
-    def share(self):
+    def share(self, minimum_operator_zones: int = 0):
         """
         Share the zone work between the operators on the trip
         """
@@ -596,18 +603,24 @@ class ZoneSharer(ZoneProperties):
                 new_op_legs = self._station_operators()
             except (TypeError, KeyError):
                 
-                shares = {'standard': 'station_map_error', 'solo_price': 'station_map_error'}
+                shares = {'standard': 'station_map_error', 
+                          'solo_price': 'station_map_error', 
+                          'bumped': 'station_map_error'}
                 self.SHARE_CACHE[val] = shares
                 return shares
             try:
                 self.operator_legs = legops(new_op_legs)
             except IndexError:
-                shares = {'standard': 'operator_error', 'solo_price': 'operator_error'}
+                shares = {'standard': 'operator_error', 
+                          'solo_price': 'operator_error', 
+                          'bumped': 'operator_error'}
                 self.SHARE_CACHE[val] = shares
                 return shares
 
         if not all(x for x in self.operator_legs):
-            shares = {'standard': 'operator_error', 'solo_price': 'operator_error'}
+            shares = {'standard': 'operator_error', 
+                      'solo_price': 'operator_error', 
+                      'bumped': 'operator_error'}
             self.SHARE_CACHE[val] = shares        
             return shares
 
@@ -622,9 +635,11 @@ class ZoneSharer(ZoneProperties):
             self.operator_legs
             )
         try:
-            shares = self.share_calculation(property_dict)
+            shares = self.share_calculation(property_dict, minimum_operator_zones)
         except KeyError:
-            shares = {'standard': 'rk_operator_error', 'solo_price': 'rk_operator_error'}
+            shares = {'standard': 'rk_operator_error', 
+                      'solo_price': 'rk_operator_error', 
+                      'bumped': 'rk_operator_error'}
             self.SHARE_CACHE[val] = shares        
             return shares
 
