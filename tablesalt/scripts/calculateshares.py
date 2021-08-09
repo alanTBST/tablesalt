@@ -258,17 +258,12 @@ def chunk_shares(
     border_changes = {}
     model_one_shares = {}
     model_two_shares = {} # solo_zone_price
+    model_three_shares = {}
 
     for k, zones, stops, operators, usage in tqdm(gen):
-        """
-        hovedstad = any(x < 1100 for x in zones)
-        vest = any(1100 < x < 1200 for x in zones)
-        syd = any(1200 < x < 1300 for x in zones)
-        if (hovedstad + vest + syd) >= 2: #any two of the three
-            break
-"""
+
         sharer = ZoneSharer(graph, zones, stops, operators, usage)
-        trip_shares = sharer.share()
+        trip_shares = sharer.share(2)
 
         if sharer.border_trip:
             initial_zone_sequence = sharer.zone_sequence     
@@ -277,9 +272,11 @@ def chunk_shares(
             if initial_zone_sequence != final_zone_sequence:
                 border_changes[k] = final_zone_sequence
             model_two_shares[k] = trip_shares['solo_price']
+            model_three_shares[k] = trip_shares['bumped']
         else:
             model_one_shares[k] = trip_shares['standard']
             model_two_shares[k] = trip_shares['solo_price']
+            model_three_shares[k] = trip_shares['bumped']
 
     num = _get_store_num(store)
 
@@ -291,7 +288,7 @@ def chunk_shares(
     with open(fp, 'wb') as f:
         pickle.dump(border_changes, f)
 
-    return model_one_shares, model_two_shares
+    return model_one_shares, model_two_shares, model_three_shares
 
 def main():
     """
@@ -331,9 +328,10 @@ def main():
 
     with Pool(round(os.cpu_count() * CPU_USAGE)) as pool:
         results = pool.imap(pfunc, stores)
-        for model_one, model_two in tqdm(results, total=len(stores)):
+        for model_one, model_two, model_three in tqdm(results, total=len(stores)):
             make_store(model_one, db_path, start_size=DB_START_SIZE)
             make_store(model_two, db_path + '_model_2', start_size=DB_START_SIZE)
+            make_store(model_three, db_path + '_model_3', start_size=DB_START_SIZE)
 
 if __name__ == "__main__":
     if os.name == 'nt':
