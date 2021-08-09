@@ -536,7 +536,7 @@ def _gather_all_store_keys(operators, nparts: int, year: int):
     lst_of_temp = THIS_DIR / '__result_cache__' / f'{year}'
     lst_of_temp = list(lst_of_temp.glob('*.pickle'))
 
-    lst_of_temp = [x for x in lst_of_temp if 'skeys' in x]
+    lst_of_temp = [x for x in lst_of_temp if 'skeys' in x.name]
     lst_of_lsts = split_list(lst_of_temp, wanted_parts=nparts)
 
     all_vals = []
@@ -564,7 +564,7 @@ def _gather_all_store_keys(operators, nparts: int, year: int):
 
 def _get_rabatkeys(rabattrin: int, year: int) -> Set[int]:
 
-    fp = (THIS_DIR / '__result_cache__' / f'{year}',
+    fp = (THIS_DIR / '__result_cache__' / f'{year}' /
          'preprocessed' / f'rabat{rabattrin}trips.pickle')
     try:
         with open(fp, 'rb') as f:
@@ -804,7 +804,8 @@ def main() -> None:
         year,
         model,
         rabat_level,
-        db_path, stores,
+        db_path, 
+        stores,
         stopzone_map,
         ringzones,
         wanted_operators
