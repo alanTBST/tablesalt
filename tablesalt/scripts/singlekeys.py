@@ -788,7 +788,7 @@ def main() -> None:
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
 
-    if model == 2:
+    if model > 1:
         db_path = db_path + f'_model_{model}'
 
 
