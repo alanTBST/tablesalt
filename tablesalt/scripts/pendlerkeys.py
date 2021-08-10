@@ -529,7 +529,7 @@ def main():
     model = args['model']
 
     if model > 1:
-        db_path = db_path + '_model_{model}'
+        db_path = db_path + f'_model_{model}'
 
     zone_path = args['zones']
     product_path = args['products']
