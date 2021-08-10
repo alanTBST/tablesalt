@@ -273,7 +273,7 @@ class StopsList(Iterator):
         """
         return a new instance of a StopsList with only bus stops
 
-        :return: a new onstance of a StopsList
+        :return: a new instance of a StopsList
         :rtype: StopsList
         """
 
