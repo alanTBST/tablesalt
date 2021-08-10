@@ -278,10 +278,10 @@ def get_zone_combination_shares(tofetch, db_path: str, model: int):
                     res = res.decode('utf-8')
                     if res not in errors:
                         val = ast.literal_eval(res)
-                        if model != 3:
-                            all_trips[trip] = val
-                        else:
-                            all_trips[trip] = pendler_reshare(val)
+                        # if model != 3:
+                        all_trips[trip] = val
+                        # else:
+                        #     all_trips[trip] = pendler_reshare(val)
                 combo_result = get_user_shares(all_trips.values())
                 final[combo] = combo_result
 
@@ -326,10 +326,10 @@ def _get_trips(db_path, tripkeys, model):
                 res = res.decode('utf-8')
                 if res not in errors:
                     val = ast.literal_eval(res)
-                    if model != 3:
-                        out[int(k.decode('utf-8'))] = val
-                    else:
-                        out[int(k.decode('utf-8'))] = pendler_reshare(val)
+                    # if model != 3:
+                    out[int(k.decode('utf-8'))] = val
+                    # else:
+                        # out[int(k.decode('utf-8'))] = pendler_reshare(val)
 
     return out
 
@@ -528,14 +528,15 @@ def main():
 
     model = args['model']
 
-    if model != 1:
-        db_path = db_path + '_model_2'
+    if model > 1:
+        db_path = db_path + '_model_{model}'
 
     zone_path = args['zones']
     product_path = args['products']
 
     userdict = PendlerKombiUsers(
-        year, products_path=product_path,
+        year, 
+        products_path=product_path,
         product_zones_path=zone_path,
         min_valid_days=14
         )
