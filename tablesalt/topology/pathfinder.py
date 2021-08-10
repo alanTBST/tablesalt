@@ -85,7 +85,7 @@ def load_border_stations() -> Dict[int, Tuple[int, ...]]: # put this in TBSTtopo
 
 BORDER_STATIONS = load_border_stations()
 
-@lru_cache(2**16)
+@lru_cache(2**8)
 def _is_bus(stopid: int) -> bool:
 
     return (stopid > stationoperators.MAX_RAIL_UIC or
@@ -151,7 +151,7 @@ def to_legs(sequence: Tuple[int, ...]) ->Tuple[int, ...]:
     """
     return triptools.sep_legs(sequence)
 
-@lru_cache(2**16)
+@lru_cache(2**8)
 def _to_legs_stops(stop_legs):
     """convert to legs and map the bus id to station if possible"""
     return tuple(
@@ -160,7 +160,7 @@ def _to_legs_stops(stop_legs):
             for leg in stop_legs
             )
 
-@lru_cache(2**16)
+@lru_cache(2**8)
 def _chain_vals(vals):
     """chain zones together for legs removing duplicates at end"""
     lvals = len(vals)
@@ -431,7 +431,7 @@ def operators_in_touched_(
 
     return ops_in_touched
 
-@lru_cache(2**16)
+@lru_cache(2**8)
 def aggregated_zone_operators(v):
     "aggregate all the operators for the zone shares"
 
