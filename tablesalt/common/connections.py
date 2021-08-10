@@ -127,29 +127,27 @@ def _make_key_val(d, db_path, map_size=None):
     None.
 
     """
-    env = lmdb.open(db_path, map_size=map_size) # 18 gb.
-    with env.begin(write=True) as txn:
-        for k, v in d.items():
-            if not isinstance(v, bytes):
-                if not isinstance(v, str):
-                    v = str(v)
-                v = bytes(v, 'utf-8')
-            if not isinstance(k, bytes):
-                if not isinstance(k, str):
-                    k = str(k)
-                k = bytes(k, 'utf-8')
-            txn.put(k, v)
-        # print(env.stat()['entries'])
-    env.close()
+    with lmdb.open(db_path, map_size=map_size) as env:# 18 gb.
+        with env.begin(write=True) as txn:
+            for k, v in d.items():
+                if not isinstance(v, bytes):
+                    if not isinstance(v, str):
+                        v = str(v)
+                    v = bytes(v, 'utf-8')
+                if not isinstance(k, bytes):
+                    if not isinstance(k, str):
+                        k = str(k)
+                    k = bytes(k, 'utf-8')
+                txn.put(k, v)
 
-def make_store(d, db_path, start_size=1, size_limit=30):
+def make_store(d, db_path, start_size: int = 1, size_limit: int = 30):
     """
     Create an lmdb database
 
     Parameters
     ----------
     d : dict
-        DESCRIPTION.
+        A .
     db_path : str/path
         the path location of the store to create.
     start_size : int, optional
@@ -169,6 +167,7 @@ def make_store(d, db_path, start_size=1, size_limit=30):
 
     """
     MAP_SIZES = {x: x * 1024 *1024 * 1024 for x in range(size_limit + 1)}
+
     i = start_size
     if os.name == 'posix':
         i = size_limit
