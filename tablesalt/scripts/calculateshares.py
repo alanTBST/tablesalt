@@ -61,7 +61,7 @@ from tablesalt.topology.tools import TakstZones
 
 THIS_DIR = Path(__file__).parent
 
-CPU_USAGE = 0.75 # %
+CPU_USAGE = 0.5 # % of processors
 DB_START_SIZE = 8 # gb
 
 
@@ -332,6 +332,7 @@ def main():
             make_store(model_one, db_path, start_size=DB_START_SIZE)
             make_store(model_two, db_path + '_model_2', start_size=DB_START_SIZE)
             make_store(model_three, db_path + '_model_3', start_size=DB_START_SIZE)
+            gc.collect()
 
 if __name__ == "__main__":
     if os.name == 'nt':
