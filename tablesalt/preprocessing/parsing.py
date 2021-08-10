@@ -3,13 +3,9 @@ Parsing contains a class to parse command line arguments for
 tablesalt scripts. It defines allowable arguments and default
 values
 """
-from argparse import (
-    ArgumentParser,
-    RawTextHelpFormatter
-    )
-from typing import Dict, NamedTuple, Union, Any, Optional, Type
-
 import pathlib
+from argparse import ArgumentParser, RawTextHelpFormatter
+from typing import Any, Dict, NamedTuple, Optional, Type, Union
 
 
 class ArgTuple(NamedTuple):

@@ -19,3 +19,5 @@ tablesalt/scripts/__result_cache__/
 docs/
 #monkeytype
 mtype*
+*.dot
+*.png

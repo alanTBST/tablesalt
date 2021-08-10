@@ -27,7 +27,7 @@ import msgpack  # type: ignore
 from numpy import arange  # type: ignore
 
 # from iomapping import Mappers
-from records import (
+from .records import (
     StopRecord,
     TimeRecord,
     TripOrderError,

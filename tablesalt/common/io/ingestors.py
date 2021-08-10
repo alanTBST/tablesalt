@@ -1,33 +1,21 @@
 """
 Classes to read delrejser data
 """
+import time
+import zipfile
 from itertools import groupby
-from operator import itemgetter
 from multiprocessing import Process, Queue
+from operator import itemgetter
 from pathlib import Path
 from threading import Thread
-import time
-from typing import (
-    Any,
-    ClassVar,
-    IO,
-    Dict,
-    Generator,
-    Optional,
-    List,
-    Sequence,
-    Tuple,
-    Union,
-    Set
-    )
-import zipfile
+from typing import (IO, Any, ClassVar, Dict, Generator, List, Optional,
+                    Sequence, Set, Tuple, Union)
 
 import pandas as pd  # type: ignore
-from pandas._libs.parsers import TextReader #type: ignore
+from pandas.io.parsers import CParserWrapper  # type: ignore
 # from pandas.io.parsers import TextFileReader
-from tablesalt.common.io import mappers #type: ignore
-from datastores import make_store
-
+from tablesalt.common.io import mappers  # type: ignore
+from tablesalt.common.io.datastores import make_store
 
 MODEL_MAP = {v:k for k, v in mappers['model_dict'].items()}
 CARD_MAP = mappers['card_id']
@@ -214,9 +202,9 @@ class DataGenerator(_DelrejserInspector):
     def _reader(
             self,
             file_handle: Union[IO[bytes], IO[str]]
-            ) -> pd._libs.parsers.TextReader:
+            ) -> pd.io.parsers.CParserWrapper:
 
-        return TextReader(
+        return CParserWrapper(
             file_handle,
             encoding='iso-8859-1',
             usecols=[self.column_index[x] for x in self.columns]
@@ -267,8 +255,10 @@ class DataGenerator(_DelrejserInspector):
                     while True:
                         try:
                             chunk = textgen.read(chunksize)
+                            chunk_dict = chunk[2]
+                            chunk_dict = {k.lower(): v for k, v in chunk_dict.items()}
                             try:
-                                yield self._process(chunk)
+                                yield self._process(chunk_dict)
                             except AttributeError:
                                 yield chunk
                         except StopIteration:
@@ -279,8 +269,9 @@ class DataGenerator(_DelrejserInspector):
                 while True:
                     try:
                         chunk = textgen.read(chunksize)
+                        chunk_dict = chunk[2]
                         try:
-                            yield self._process(chunk)
+                            yield self._process(chunk_dict)
                         except AttributeError:
                             yield chunk
                     except StopIteration:
@@ -310,9 +301,9 @@ class TimeDataGenerator(DataGenerator):
 
     def _process(self, chunk):
         combined = zip(
-            (int(x) for x in chunk[self.column_index['turngl']]),
-            (int(x) for x in chunk[self.column_index['applicationtransactionsequencenu']]),
-            (x for x in chunk[self.column_index['msgreportdate']]),
+            (int(x) for x in chunk['turngl']),
+            (int(x) for x in chunk['applicationtransactionsequencenu']),
+            (x for x in chunk['msgreportdate']),
             )
 
         combined_sorted = sorted(combined, key=itemgetter(0, 1))
@@ -340,8 +331,8 @@ class TripUserGenerator(DataGenerator):
     def _process(self, chunk):
 
         return dict(zip(
-                chunk[self.column_index['turngl']],
-                chunk[self.column_index['kortnrkrypt']]))
+                chunk['turngl'],
+                chunk['kortnrkrypt']))
 
 class StopDataGenerator(DataGenerator):
 
@@ -366,10 +357,10 @@ class StopDataGenerator(DataGenerator):
         "stop specific processing"
 
         combined = zip(
-            (int(x) for x in chunk[self.column_index['turngl']]),
-            (int(x) for x in chunk[self.column_index['applicationtransactionsequencenu']]),
-            (int(x) for x in chunk[self.column_index['stoppointnr']]),
-            (MODEL_MAP[x] for x in chunk[self.column_index['model']])
+            (int(x) for x in chunk['turngl']),
+            (int(x) for x in chunk['applicationtransactionsequencenu']),
+            (int(x) for x in chunk['stoppointnr']),
+            (MODEL_MAP[x] for x in chunk['model'])
             )
 
         combined_sorted = sorted(combined, key=itemgetter(0, 1))
@@ -407,14 +398,14 @@ class PassengerDataGenerator(DataGenerator):
         "passenger specific processing"
 
         combined = zip(
-            (int(x) for x in chunk[self.column_index['turngl']]),
-            (int(x) for x in chunk[self.column_index['passagerantal1']]),
-            (int(x) for x in chunk[self.column_index['passagerantal2']]),
-            (int(x) for x in chunk[self.column_index['passagerantal3']]),
-            (int(x) for x in self._pre_process(chunk[self.column_index['passagertype1']])),
-            (int(x) for x in self._pre_process(chunk[self.column_index['passagertype2']])),
-            (int(x) for x in self._pre_process(chunk[self.column_index['passagertype3']])),
-            (CARD_MAP[x] for x in chunk[self.column_index['korttype']]),
+            (int(x) for x in chunk['turngl']),
+            (int(x) for x in chunk['passagerantal1']),
+            (int(x) for x in chunk['passagerantal2']),
+            (int(x) for x in chunk['passagerantal3']),
+            (int(x) for x in self._pre_process(chunk['passagertype1'])),
+            (int(x) for x in self._pre_process(chunk['passagertype2'])),
+            (int(x) for x in self._pre_process(chunk['passagertype3'])),
+            (CARD_MAP[x] for x in chunk['korttype']),
             )
         combined_sorted = sorted(combined, key=itemgetter(0))
         combined_filtered = [
@@ -458,10 +449,10 @@ class PriceDataGenerator(DataGenerator):
     def _process(self, chunk):
         """price specific processing"""
         combined = zip(
-            chunk[self.column_index['turngl']],
-            chunk[self.column_index['rejsepris']],
-            chunk[self.column_index['tidsrabat']],
-            chunk[self.column_index['zonerrejst']]
+            chunk['turngl'],
+            chunk['rejsepris'],
+            chunk['tidsrabat'],
+            chunk['zonerrejst']
             )
         combined = (x for x in combined if x[3] > 0)
 
@@ -496,11 +487,11 @@ class OperatorGenerator(DataGenerator):
 
     def _process(self, chunk):
         combined = zip(
-            chunk[self.column_index['turngl']],
-            chunk[self.column_index['applicationtransactionsequencenu']],
-            chunk[self.column_index['nyudfører']],
-            chunk[self.column_index['contractorid']],
-            chunk[self.column_index['ruteid']]
+            chunk['turngl'],
+            chunk['applicationtransactionsequencenu'],
+            chunk['nyudfører'],
+            chunk['contractorid'],
+            chunk['ruteid']
             )
         combined_sorted = sorted(combined, key=itemgetter(0, 1))
 
@@ -687,6 +678,7 @@ def delrejser_setup(input_path: str, output_path: str) -> None:
 
     the_queue = Queue()
     # producers
+    
     producers = []
     for gen in generators:
         gener = gen(input_path)
