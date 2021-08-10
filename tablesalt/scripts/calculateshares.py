@@ -36,7 +36,7 @@ and the values are bytestrings of tuples of the form
 b'((float, operator), (float, operatr), ...)'
 
 """
-
+import gc
 import os
 import pickle
 from functools import partial
