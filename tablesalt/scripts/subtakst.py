@@ -203,7 +203,7 @@ def main():
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
 
-    if model == 2:
+    if model > 1:
         db_path = db_path + f'_model_{model}'
 
     ringzones = ZoneGraph.ring_dict('sjælland')
