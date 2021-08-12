@@ -15,9 +15,11 @@ to be queried
 """
 
 import json
-from datetime import datetime, date
+from datetime import date, datetime
 from pathlib import Path
-from typing import Dict, Union, Tuple, Sequence, TypeVar, Set
+from types import SimpleNamespace
+from typing import Dict, Sequence, Set, Tuple, TypeVar, Union
+
 
 class TripOrderError(Exception):
     """An error raised when the applicationsequence and the
@@ -468,8 +470,11 @@ class OperatorRecord(Record):
         return not self.__eq__(other)
 
     def __contains__(self, val) -> bool:
-        val = val.lower()
-        return (val in self.all_operators) or (val in self.routes)
+        try:
+            val = val.lower()
+            return (val in self.all_operators) or (val in self.routes)
+        except AttributeError:
+            return False
 
     @property
     def start_operator(self) -> str:
@@ -537,16 +542,15 @@ class OperatorRecord(Record):
 
         return _legify(self.all_operators)
 
-    def start(self):
-        return self.start_operator
-    def end(self):
-        return self.end_operator
+    start = start_operator
+    end = end_operator
+
 
 class PriceRecord(Record):
 
     def __init__(
             self,
-            tripkey: Union[bytes, str, int],
+            tripkeys: Union[bytes, str, int],
             data: Dict[str, Union[int, float]]
             ) -> None:
         """
@@ -561,7 +565,7 @@ class PriceRecord(Record):
 
         """
 
-        self.tripkey = tripkey
+        self.tripkey = tripkeys
         self.data = data
 
     def __repr__(self) -> str:
@@ -588,10 +592,10 @@ class TripRecord:
 
     def __init__(
             self,
-            tripkey: Union[bytes, str, int]
+            *record: Record
             ) -> None:
         """
-        Class to unify the Records class
+        Class to unify the Records classes
 
         :param tripkey: The tripkey in the datastore
         :type tripkey: Union[bytes, str, int]
@@ -599,4 +603,51 @@ class TripRecord:
         :rtype: None
 
         """
-        self.tripkey = tripkey
+        assert len({x.tripkey for x in record}) == 1, "tripkeys must be equal"
+        self._records = {x.__class__.__name__: x for x in record}  
+        self._records = SimpleNamespace(**self._records)
+    
+    def __contains__(self, val):
+        return ((val in self._records.OperatorRecord) or 
+                (val in self._records.StopRecord) or 
+                (val in self._records.PassengerRecord))
+    
+    @property
+    def origin(self):
+
+        return self._records.StopRecord.origin
+
+    @property
+    def destination(self):
+        return self._records.StopRecord.destination
+    
+    @property
+    def stop_ids(self):
+        return self._records.StopRecord.stop_ids
+    
+    @property
+    def transfers(self):
+        return self._records.StopRecord.transfers
+    
+    def stop_legs(self):
+        return self._records.StopRecord.legs()
+    
+    def time_legs(self):
+        return self._records.TimeRecord.legs()
+    
+    def operator_legs(self):
+        return self._records.OperatorRecord.legs()
+
+    def trip_date(self):
+        return self._records.TimeRecord.trip_date()
+    
+    def trip_duration(self):
+        return self._records.TimeRecord.trip_duration()    
+    
+    def price(self):
+        return self._records.PriceRecord.paid
+
+    
+
+#trip = TripRecord(STOP, OP, TIME, PAS)    
+
