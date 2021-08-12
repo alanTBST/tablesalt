@@ -198,7 +198,7 @@ class StopRecord(Record):
         """
         legs = self.legs()
         return {i: j[0] for i, j in enumerate(legs) if j[0]==j[1]}
-    start = origin
+    start = origin # to play nicely with _BaseStore._check_conditions
     end = destination
 
 
