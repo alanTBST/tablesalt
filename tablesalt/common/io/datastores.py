@@ -13,6 +13,7 @@ from typing import (
     Any,
     Generator,
     DefaultDict,
+    Iterable,
     Set,
     Optional,
     Union,
@@ -144,36 +145,37 @@ class DelrejserStore:
         self.passenger_store = PassengerStore(self.path / 'pas')
         self.trip_user_store = TripUserStore(self.path / 'tripcard')
         self.operator_store = OperatorStore(self.path / 'operator')
-        self.price_store = TimeStore(self.path / 'price')
+        self.price_store = PriceStore(self.path / 'price')
 
+    def query(self, **kwargs):
+        
+        chunksize = kwargs.pop('chunksize', 1000)
+        users = kwargs.pop('users', None)
+        if users is not None:
+            pass
 
-        self._price_kws = {}
-        self._stop_kws = {}
-        self._pas_kws = {}
-        self._op_kws = {}
-        self._time_kws = {}
-
-
-    def _user_filters(self, *users):
-
-        return
-    def _stop_filters(self):
-
-        return
-    def _time_filters(self):
-        return
-
-    def query(self):
-        return self
-
-    def get_trips(self):
-
-        return self
+        stop_records = self.stop_store.query(chunksize=chunksize, **kwargs)
+        operator_records = self.operator_store.query(chunksize=chunksize, **kwargs)
+        time_records = self.time_store.query(chunksize=chunksize, **kwargs)
+        passenger_records = self.passenger_store.query(chunksize=chunksize, **kwargs)
+        price_records = self.passenger_store.query(chunksize=chunksize, **kwargs)
+        chunk = []
+        for a, b, c, d in zip(stop_records, operator_records, time_records, passenger_records):
+            vals = zip(a, b, c, d)
+            for w, x, y, z in vals:
+                record = TripRecord(w, x, y, z)
+                chunk.append(record)
+                if len(chunk) == chunksize:
+                    yield chunk
+                    chunk.clear()
+            else:
+                yield chunk 
 
 # ABC_QueryableBaseStore
 # @abstractmethod
 # def query():
 #     pass
+
 class _BaseStore:
     def __init__(self, path: Path) -> None:
         """
@@ -274,6 +276,12 @@ class _BaseStore:
 
         return all(x for x in flags)
 
+    def _get_defined_keys(self, tripkeys: Iterable[bytes], cursor_obj: lmdb.Cursor, obj: R):
+
+        vals = cursor_obj.getmulti(tripkeys)
+
+        return [obj(x[0], msgpack.unpackb(x[1], strict_map_key=False)) for x in vals]
+
     def query(self, obj: R, **kwargs) -> Generator[List[R], None, None]:
         """
         Query the data store
@@ -315,31 +323,43 @@ class _BaseStore:
 
         """
 
-        if isinstance(self, (TripUserStore, PriceStore)):
+        if isinstance(self, TripUserStore):
             raise AttributeError(
                 f"{self.__class__.__name__} does not support queries"
                 )
 
         chunksize = kwargs.pop('chunksize', 10_000)
+        tripkeys = kwargs.pop('tripkeys', None)
         chunk = []
         with self as store:
             with store.begin() as txn:
                 cursor = txn.cursor()
-                for k, v in cursor:
-                    try:
-                        val = msgpack.unpackb(v, strict_map_key=False)
-                    except TypeError:
-                        continue
-                    record = obj(k, val)
-                    break
-
-                    if self._check_conditions(record, **kwargs):
-                        chunk.append(record)
-                        if len(chunk) == chunksize:
-                            yield chunk
-                            chunk.clear()
+                if tripkeys is not None:
+                    if tripkeys is not None:
+                        records = self._get_defined_keys(tripkeys, cursor, obj)
+                        for record in records:
+                            if self._check_conditions(record, **kwargs):
+                                chunk.append(record)
+                                if len(chunk) == chunksize:
+                                    yield chunk
+                                    chunk.clear()
+                        else:
+                            yield chunk    
+                
                 else:
-                    yield chunk
+                    for k, v in cursor:
+                        try:
+                            val = msgpack.unpackb(v, strict_map_key=False)
+                        except TypeError:
+                            continue
+                        record = obj(k, val)
+                        if self._check_conditions(record, **kwargs):
+                            chunk.append(record)
+                            if len(chunk) == chunksize:
+                                yield chunk
+                                chunk.clear()
+                    else:
+                        yield chunk
 
 
 class TripUserStore(_BaseStore):
@@ -418,6 +438,7 @@ class StopStore(_BaseStore):
         origin: Optional[int] = None,
         destination: Optional[int] = None,
         visits: Optional[Union[Tuple[int, ...], List[int], Set[int]]] = None,
+        tripkeys: Optional[bytes] = None,
         chunksize: int = 10_000
         ) -> Generator[List[R], None, None]:
         """
@@ -441,7 +462,8 @@ class StopStore(_BaseStore):
             origin=origin,
             destination=destination,
             visits=visits,
-            chunksize=chunksize
+            chunksize=chunksize, 
+            tripkeys=tripkeys
             )
 
 class WeekdayDateError(Exception):
@@ -470,6 +492,7 @@ class TimeStore(_BaseStore):
         self,
         start_hour: Optional[Union[int, Tuple[int, ...]]] = None,
         # weekday: Optional[Union[int, Tuple[int, ...]]] = None,
+        tripkeys: Iterable[bytes] = None,
         chunksize: int = 10_000
         )  -> Generator[List[R], None, None]:
         """
@@ -490,6 +513,7 @@ class TimeStore(_BaseStore):
             TimeRecord,
             start_hour=start_hour,
             # weekday=weekday,
+            tripkeys=tripkeys,
             chunksize=chunksize
             )
 
@@ -519,6 +543,7 @@ class PassengerStore(_BaseStore):
         handicap: Optional[bool] = None,
         bike: Optional[bool] = None,
         dog: Optional[bool] = None,
+        tripkeys: Iterable[bytes] = None,
         chunksize: int = 10_000
         ) -> Generator[List[R], None, None]:
         """
@@ -555,6 +580,7 @@ class PassengerStore(_BaseStore):
             handicap=handicap,
             bike=bike,
             dog=dog,
+            tripkeys=tripkeys,
             chunksize=chunksize
             )
 
@@ -580,6 +606,7 @@ class OperatorStore(_BaseStore):
         uses_operator: Optional[Union[str, Tuple[str, ...], Set[str]]] = None,
         startswith: Optional[str] = None,
         endswith: Optional[str] = None,
+        tripkeys: Iterable[bytes] = None,
         chunksize: int = 10_000
         ) -> Generator[List[R], None, None]:
         """
@@ -607,6 +634,7 @@ class OperatorStore(_BaseStore):
             uses_operator=uses_operator,
             startswith=startswith,
             endswith=endswith,
+            tripkeys=tripkeys,
             chunksize=chunksize
             )
 
@@ -625,6 +653,12 @@ class PriceStore(_BaseStore):
 
         self.path = path
         super().__init__(path)
+
+    def query(self, tripkeys: Iterable[bytes] = None,):
+        return super().query(
+            OperatorRecord,
+            tripkeys=tripkeys
+            )
 
     def get_zeros_trips(self) -> Set[bytes]:
         """
