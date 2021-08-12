@@ -252,18 +252,18 @@ class _BaseStore:
                 if v is not None:
                     try:
                         if isinstance(v, (tuple, list, set)):
-                            flags.append(any(x == record.start() for x in v))
+                            flags.append(any(x == record.start for x in v))
                         else:
-                            flags.append(v == record.start())
+                            flags.append(v == record.start)
                     except TripOrderError:
                         pass
             elif k in end_kws:
                 if v is not None:
                     try:
                         if isinstance(v, (tuple, list, set)):
-                            flags.append(any(x == record.end() for x in v))
+                            flags.append(any(x == record.end for x in v))
                         else:
-                            flags.append(v == record.end())
+                            flags.append(v == record.end)
                     except TripOrderError:
                         pass
             else:
@@ -331,6 +331,8 @@ class _BaseStore:
                     except TypeError:
                         continue
                     record = obj(k, val)
+                    break
+
                     if self._check_conditions(record, **kwargs):
                         chunk.append(record)
                         if len(chunk) == chunksize:
