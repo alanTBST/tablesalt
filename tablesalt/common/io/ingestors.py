@@ -608,7 +608,7 @@ def _determine_path(d) -> str:
         return 'operator'
     return 'time'
 
-def _data_producer(data_generator: DataGenerator, queue) -> None:
+def _data_producer(data_generator: DataGenerator, queue: Queue, chunksize: int) -> None:
     """
     Create data from the DataGenerator on put it in a queue to be written
 
@@ -622,10 +622,10 @@ def _data_producer(data_generator: DataGenerator, queue) -> None:
     """
 
 
-    generator = data_generator.generate(50_000)
+    generator = data_generator.generate(chunksize)
     for x in generator:
         queue.put(x)
-        time.sleep(0.01)
+        time.sleep(0.005)
 
 
 def _data_consumer(queue, base_path: str) -> None:
@@ -654,7 +654,7 @@ def _data_consumer(queue, base_path: str) -> None:
         write_path = Path(base_path) / path
         make_store(res, str(write_path))
 
-def delrejser_setup(input_path: str, output_path: str) -> None:
+def delrejser_setup(input_path: str, output_path: str, chunksize: int) -> None:
     """
     Setup all of the lmdb key-value stores
 
@@ -682,7 +682,7 @@ def delrejser_setup(input_path: str, output_path: str) -> None:
     producers = []
     for gen in generators:
         gener = gen(input_path)
-        p = Process(target=_data_producer, args=(gener, the_queue))
+        p = Process(target=_data_producer, args=(gener, the_queue, chunksize))
         producers.append(p)
 
     st = time.time()
