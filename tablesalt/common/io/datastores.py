@@ -5,8 +5,9 @@ the Delrejser Rejsekort Data.
 These classes read data from lmdb key-value
 stores that are created by running ingestors.py
 """
-
+import inspect
 from collections import defaultdict
+from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from typing import (
     Dict,
@@ -122,6 +123,7 @@ def make_store(
                 f"size {db_path} > {size_limit}gb limit"
                 )
 
+
 class DelrejserStore:
     """DelrejserStore\n"""
 
@@ -147,29 +149,27 @@ class DelrejserStore:
         self.operator_store = OperatorStore(self.path / 'operator')
         self.price_store = PriceStore(self.path / 'price')
 
+        self._stop_kwargs = set(inspect.signature(self.stop_store.query).parameters.keys())
+    
     def query(self, **kwargs):
         
         chunksize = kwargs.pop('chunksize', 1000)
         users = kwargs.pop('users', None)
         if users is not None:
             pass
-
-        stop_records = self.stop_store.query(chunksize=chunksize, **kwargs)
-        operator_records = self.operator_store.query(chunksize=chunksize, **kwargs)
+        stop_kws = {k: kwargs.pop(k, None) for k in self._stop_kwargs}
+        del stop_kws['chunksize']
+        
+        stop_records = self.stop_store.query(chunksize=chunksize, **stop_kws)
+        operator_records = self.operator_store.query(chunksize=chunksize, **kwargs)       
         time_records = self.time_store.query(chunksize=chunksize, **kwargs)
-        passenger_records = self.passenger_store.query(chunksize=chunksize, **kwargs)
-        price_records = self.passenger_store.query(chunksize=chunksize, **kwargs)
-        chunk = []
-        for a, b, c, d in zip(stop_records, operator_records, time_records, passenger_records):
-            vals = zip(a, b, c, d)
-            for w, x, y, z in vals:
-                record = TripRecord(w, x, y, z)
-                chunk.append(record)
-                if len(chunk) == chunksize:
-                    yield chunk
-                    chunk.clear()
-            else:
-                yield chunk 
+        passenger_records = self.passenger_store.query(chunksize=chunksize, **kwargs)        
+        
+        for stops, ops, times in zip(stop_records, operator_records, time_records):
+            break
+            vals = [TripRecord(x, y, z) for x, y, z in zip(stops, ops, times)]
+            break
+        
 
 # ABC_QueryableBaseStore
 # @abstractmethod
