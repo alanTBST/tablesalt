@@ -182,12 +182,6 @@ class DelrejserStore:
                    k, v in self._store_arguments.items())
     
         return max(counts, key=lambda x: x[1])[0]
-
-
-    def _query_remaining_stores():
-        # put the other functions in a threadpool and call
-
-        return 
     
     def query(self, **kwargs) -> Generator[List[TripRecord], None, None]:
         """[summary]
@@ -215,7 +209,7 @@ class DelrejserStore:
         trip_chunks = []
         for records in first_values:
             tripkeys={x.tripkey for x in records}
-            new_records, first_records = self._get_other_records(
+            new_records, first_records = self._query_remaining_stores(
                 kwargs, functions, records, tripkeys
                 )
             
@@ -227,7 +221,7 @@ class DelrejserStore:
             else:
                 yield trip_chunks
 
-    def _get_other_records(self, kwargs, functions, records, tripkeys):
+    def _query_remaining_stores(self, kwargs, functions, records, tripkeys):
         
         common_keys = set()           
         new_records = []
