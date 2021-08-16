@@ -611,7 +611,9 @@ class TripRecord:
         return ((val in self._records.OperatorRecord) or 
                 (val in self._records.StopRecord) or 
                 (val in self._records.PassengerRecord))
-    
+    @property
+    def tripkey(self):
+        return self._records.StopRecord.tripkey
     @property
     def origin(self):
 
