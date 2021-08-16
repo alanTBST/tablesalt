@@ -8,6 +8,7 @@ stores that are created by running ingestors.py
 import inspect
 from collections import defaultdict
 from multiprocessing.pool import ThreadPool
+from operator import attrgetter
 from pathlib import Path
 from typing import (
     Dict,
@@ -124,8 +125,14 @@ def make_store(
                 )
 
 
+def _delrejser_query():
+
+    return 
+
+
+
 class DelrejserStore:
-    """DelrejserStore\n"""
+    """DelrejserStore"""
 
     def __init__(self, path: str) -> None:
         """
@@ -149,28 +156,81 @@ class DelrejserStore:
         self.operator_store = OperatorStore(self.path / 'operator')
         self.price_store = PriceStore(self.path / 'price')
 
-        self._stop_kwargs = set(inspect.signature(self.stop_store.query).parameters.keys())
+
+
+        self._store_arguments = {
+            'stops': set(inspect.signature(self.stop_store.query).parameters),
+            'time': set(inspect.signature(self.time_store.query).parameters),
+            'passenger': set(inspect.signature(self.passenger_store.query).parameters),
+            'operator':set(inspect.signature(self.operator_store.query).parameters)
+            }
+        
+        self._store_functions = {
+            'stops': self.stop_store.query,
+            'time': self.time_store.query,
+            'passenger': self.passenger_store.query,
+            'operator': self.operator_store.query
+            }
+    
+    def _determine_first_query(self, **kwargs):
+
+        query_arguments = set(kwargs.keys())
+
+        counts = ((k, len(v.intersection(query_arguments))) for 
+                   k, v in self._store_arguments.items())
+    
+        return max(counts, key=lambda x: x[1])[0]
+
+
+    def _query_remaining_stores():
+        # put the other functions in a threadpool and call
+
+        return 
     
     def query(self, **kwargs):
         
-        chunksize = kwargs.pop('chunksize', 1000)
+        init_chunksize = 1_000
+        chunksize = kwargs.pop('chunksize', 1_000)
+        
+        
         users = kwargs.pop('users', None)
         if users is not None:
             pass
-        stop_kws = {k: kwargs.pop(k, None) for k in self._stop_kwargs}
-        del stop_kws['chunksize']
-        
-        stop_records = self.stop_store.query(chunksize=chunksize, **stop_kws)
-        operator_records = self.operator_store.query(chunksize=chunksize, **kwargs)       
-        time_records = self.time_store.query(chunksize=chunksize, **kwargs)
-        passenger_records = self.passenger_store.query(chunksize=chunksize, **kwargs)        
-        
-        for stops, ops, times in zip(stop_records, operator_records, time_records):
-            break
-            vals = [TripRecord(x, y, z) for x, y, z in zip(stops, ops, times)]
-            break
-        
+        functions = self._store_functions.copy()
 
+        first_query = self._determine_first_query(**kwargs)
+        first_query_function = functions.pop(first_query)
+        first_query_kws = {k: v for k, v in kwargs.items() if k in self._store_arguments[first_query]}
+        
+        first_values = first_query_function(chunksize=init_chunksize, **first_query_kws)
+        
+        trip_chunks = []
+        for records in first_values:
+            tripkeys={x.tripkey for x in records}
+            common_keys = set()
+            
+            new_records = []
+            for store, store_query in functions.items():
+                store_query_kws = {k: v for k, v in kwargs.items() if k in self._store_arguments[store]}
+                next_store_records = list(store_query(tripkeys=tripkeys, **store_query_kws))[0]
+                if not common_keys:
+                    common_keys = tripkeys
+                new_records.append(next_store_records)
+                common_keys.intersection_update({rec.tripkey for rec in next_store_records})
+            
+            new_records = ([y for y in rec if y.tripkey in common_keys] for rec in new_records)
+            first_records = (x for x in records if x.tripkey in common_keys)
+            new_records = (sorted(x, key=attrgetter('tripkey')) for x in new_records)
+            first_records = sorted(first_records, key=attrgetter('tripkey'))
+            
+            for n in zip(first_records, *new_records):
+                trip_chunks.append(TripRecord(*n))
+                if len(trip_chunks) == chunksize:
+                    yield trip_chunks
+                    trip_chunks.clear()
+            else:
+                yield trip_chunks
+                
 # ABC_QueryableBaseStore
 # @abstractmethod
 # def query():
@@ -439,7 +499,7 @@ class StopStore(_BaseStore):
         destination: Optional[int] = None,
         visits: Optional[Union[Tuple[int, ...], List[int], Set[int]]] = None,
         tripkeys: Optional[bytes] = None,
-        chunksize: int = 10_000
+        chunksize: int = 1_000
         ) -> Generator[List[R], None, None]:
         """
          Get stop values from the key-value store.
@@ -518,7 +578,7 @@ class TimeStore(_BaseStore):
             )
 
 class PassengerStore(_BaseStore):
-    """PassengerStore\n"""
+    """PassengerStore"""
 
     def __init__(self, path: Path) -> None:
         """
@@ -654,9 +714,9 @@ class PriceStore(_BaseStore):
         self.path = path
         super().__init__(path)
 
-    def query(self, tripkeys: Iterable[bytes] = None,):
+    def query(self, tripkeys: Iterable[bytes] = None):
         return super().query(
-            OperatorRecord,
+            PriceRecord,
             tripkeys=tripkeys
             )
 
