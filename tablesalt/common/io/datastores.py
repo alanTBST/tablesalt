@@ -162,14 +162,16 @@ class DelrejserStore:
             'stops': set(inspect.signature(self.stop_store.query).parameters),
             'time': set(inspect.signature(self.time_store.query).parameters),
             'passenger': set(inspect.signature(self.passenger_store.query).parameters),
-            'operator':set(inspect.signature(self.operator_store.query).parameters)
+            'operator': set(inspect.signature(self.operator_store.query).parameters),
+            'price': set(inspect.signature(self.operator_store.query).parameters)
             }
         
         self._store_functions = {
             'stops': self.stop_store.query,
             'time': self.time_store.query,
             'passenger': self.passenger_store.query,
-            'operator': self.operator_store.query
+            'operator': self.operator_store.query,
+            'price': self.passenger_store.query
             }
     
     def _determine_first_query(self, **kwargs):
@@ -200,7 +202,8 @@ class DelrejserStore:
 
         first_query = self._determine_first_query(**kwargs)
         first_query_function = functions.pop(first_query)
-        first_query_kws = {k: v for k, v in kwargs.items() if k in self._store_arguments[first_query]}
+        first_query_kws = {k: v for k, v in kwargs.items() if 
+                           k in self._store_arguments[first_query]}
         
         first_values = first_query_function(chunksize=init_chunksize, **first_query_kws)
         
@@ -211,7 +214,8 @@ class DelrejserStore:
             
             new_records = []
             for store, store_query in functions.items():
-                store_query_kws = {k: v for k, v in kwargs.items() if k in self._store_arguments[store]}
+                store_query_kws = {k: v for k, v in kwargs.items() if 
+                                   k in self._store_arguments[store]}
                 next_store_records = list(store_query(tripkeys=tripkeys, **store_query_kws))[0]
                 if not common_keys:
                     common_keys = tripkeys
