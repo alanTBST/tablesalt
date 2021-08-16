@@ -6,4 +6,4 @@ rejsekort delrejser data
 from .rejsekortcollections import _load_collection, proc_collection
 mappers = proc_collection(_load_collection())
 from .storereader import StoreReader
-# from .raw import RawReader
+from .datastores import DelrejserStore
