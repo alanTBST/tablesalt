@@ -607,13 +607,20 @@ class TripRecord:
         self._records = {x.__class__.__name__: x for x in record}  
         self._records = SimpleNamespace(**self._records)
     
+    def __repr__(self):
+
+        
+        return f'{self.__class__.__name__}({int(self.tripkey)}, {self._records.StopRecord.data})'
+    
     def __contains__(self, val):
         return ((val in self._records.OperatorRecord) or 
                 (val in self._records.StopRecord) or 
                 (val in self._records.PassengerRecord))
+
     @property
     def tripkey(self):
         return self._records.StopRecord.tripkey
+    
     @property
     def origin(self):
 
@@ -648,8 +655,3 @@ class TripRecord:
     
     def price(self):
         return self._records.PriceRecord.paid
-
-    
-
-#trip = TripRecord(STOP, OP, TIME, PAS)    
-
