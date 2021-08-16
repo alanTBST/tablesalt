@@ -189,7 +189,12 @@ class DelrejserStore:
 
         return 
     
-    def query(self, **kwargs):
+    def query(self, **kwargs) -> Generator[List[TripRecord], None, None]:
+        """[summary]
+
+        :yield: a list of TripRecords of the given chunksize
+        :rtype: Generator[List[TripRecord], None, None]
+        """
         
         init_chunksize = 1_000
         chunksize = kwargs.pop('chunksize', 1_000)
@@ -210,22 +215,9 @@ class DelrejserStore:
         trip_chunks = []
         for records in first_values:
             tripkeys={x.tripkey for x in records}
-            common_keys = set()
-            
-            new_records = []
-            for store, store_query in functions.items():
-                store_query_kws = {k: v for k, v in kwargs.items() if 
-                                   k in self._store_arguments[store]}
-                next_store_records = list(store_query(tripkeys=tripkeys, **store_query_kws))[0]
-                if not common_keys:
-                    common_keys = tripkeys
-                new_records.append(next_store_records)
-                common_keys.intersection_update({rec.tripkey for rec in next_store_records})
-            
-            new_records = ([y for y in rec if y.tripkey in common_keys] for rec in new_records)
-            first_records = (x for x in records if x.tripkey in common_keys)
-            new_records = (sorted(x, key=attrgetter('tripkey')) for x in new_records)
-            first_records = sorted(first_records, key=attrgetter('tripkey'))
+            new_records, first_records = self._get_other_records(
+                kwargs, functions, records, tripkeys
+                )
             
             for n in zip(first_records, *new_records):
                 trip_chunks.append(TripRecord(*n))
@@ -234,6 +226,26 @@ class DelrejserStore:
                     trip_chunks.clear()
             else:
                 yield trip_chunks
+
+    def _get_other_records(self, kwargs, functions, records, tripkeys):
+        
+        common_keys = set()           
+        new_records = []
+        for store, store_query in functions.items():
+            store_query_kws = {k: v for k, v in kwargs.items() if 
+                                   k in self._store_arguments[store]}
+            next_store_records = list(store_query(tripkeys=tripkeys, **store_query_kws))[0]
+            if not common_keys:
+                common_keys = tripkeys
+            new_records.append(next_store_records)
+            common_keys.intersection_update({rec.tripkey for rec in next_store_records})
+            
+        new_records = ([y for y in rec if y.tripkey in common_keys] for rec in new_records)
+        first_records = (x for x in records if x.tripkey in common_keys)
+        new_records = (sorted(x, key=attrgetter('tripkey')) for x in new_records)
+        first_records = sorted(first_records, key=attrgetter('tripkey'))
+        
+        return new_records,first_records
                 
 # ABC_QueryableBaseStore
 # @abstractmethod
