@@ -305,6 +305,118 @@ class StopsList(Iterator):
         return
 
 class Line:
+    def __init__(
+        self, 
+        line_id: int, 
+        line_name: str, 
+        *line_stops: Stop
+        ):
+        
+        self.line_id = line_id
+        self.line_name = line_name
+        self.line_stops = list(line_stops)
+    
+    def __iter__(self) -> 'StopsList':
+        self._index = 0
+        return self
 
-    def __init__(self, stop_list: StopsList):
-        self.stop_list = stop_list
+    def __next__(self):
+        if self._index < len(self.line_stops):
+            res = self.line_stops[self._index]
+            self._index += 1
+            return res
+        raise StopIteration
+  
+    def __getitem__(self, index) -> Stop:
+        # update to deal with slicing and returning a StopList
+        # right now slice returns normal list of Stop
+        return self.line_stops.__getitem__(index)
+    
+    def __contains__(self, stop_id):
+
+        return any(stop_id == stop.stop_id for stop in self.line_stops)
+    
+    def line_shape():
+
+        return NotImplemented
+    
+    def to_linestring():
+
+        return NotImplemented
+
+    def shape_length():
+
+        return NotImplemented
+    
+    def plot():
+
+        return NotImplemented
+
+
+class BusLine(Line):
+
+    def __init__(self, line_id: int, line_name: str, *line_stops: Stop):
+        super().__init__(line_id, line_name, *line_stops)
+
+
+class RailLine(Line):
+
+    def __init__(self, line_id: int, line_name: str, *line_stops: Stop):
+        super().__init__(line_id, line_name, *line_stops)
+
+
+
+
+class RailNetwork:
+
+    DEFAULT_PATH = HERE / 'rail_lines.json'
+    def __init__(self, *rail_lines: RailLine):
+
+        self.rail_lines = list(rail_lines)
+
+    @classmethod
+    def from_json(cls, filepath: str):
+
+        stops = StopsList().stops_dict
+
+        with open(filepath, 'r', encoding='iso-8859-1') as f:
+            data = json.load(f)
+
+
+        rail_lines = []
+        for line_name, d in data.items():
+            line_id = d['line_id']
+            s = d['stops']
+            stoplist = [stops.get(x) for x in d['stops']]
+
+            # STOPPED here
+            
+
+
+        network = [RailLine(v['line_id'], k, *v['stops']) for k, v in data.items()]
+
+        return 
+
+
+class BusNetwork:
+
+    def __init__(self, *bus_lines: BusLine):
+
+        self.bus_lines = list(bus_lines)
+
+    def plot():
+
+        return NotImplemented
+
+
+class RegionNetwork:
+
+    def __init__(self) -> None:
+        pass
+
+
+
+
+def line_factory():
+
+    return 
