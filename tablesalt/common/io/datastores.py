@@ -30,7 +30,7 @@ import msgpack  # type: ignore
 from numpy import arange  # type: ignore
 
 # from iomapping import Mappers
-from .records import (
+from tablesalt.common.io.records import (
     StopRecord,
     TimeRecord,
     TripOrderError,
