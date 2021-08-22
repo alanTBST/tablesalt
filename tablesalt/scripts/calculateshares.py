@@ -36,6 +36,7 @@ and the values are bytestrings of tuples of the form
 b'((float, operator), (float, operatr), ...)'
 
 """
+
 import gc
 import os
 import pickle
@@ -61,7 +62,7 @@ from tablesalt.topology.tools import TakstZones
 
 THIS_DIR = Path(__file__).parent
 
-CPU_USAGE = 0.5 # % of processors
+CPU_USAGE = 0.6 # % of processors
 DB_START_SIZE = 8 # gb
 
 
@@ -258,12 +259,12 @@ def chunk_shares(
     border_changes = {}
     model_one_shares = {}
     model_two_shares = {} # solo_zone_price
-    model_three_shares = {}
+    model_three_shares = {} # bumped
+    model_four_shares = {}
 
     for k, zones, stops, operators, usage in tqdm(gen):
-
         sharer = ZoneSharer(graph, zones, stops, operators, usage)
-        trip_shares = sharer.share(2)
+        trip_shares = sharer.share()
 
         if sharer.border_trip:
             initial_zone_sequence = sharer.zone_sequence     
@@ -273,10 +274,12 @@ def chunk_shares(
                 border_changes[k] = final_zone_sequence
             model_two_shares[k] = trip_shares['solo_price']
             model_three_shares[k] = trip_shares['bumped']
+            model_four_shares[k] = trip_shares['bumped_solo']
         else:
             model_one_shares[k] = trip_shares['standard']
             model_two_shares[k] = trip_shares['solo_price']
             model_three_shares[k] = trip_shares['bumped']
+            model_four_shares[k] = trip_shares['bumped_solo']
 
     num = _get_store_num(store)
 
@@ -288,7 +291,7 @@ def chunk_shares(
     with open(fp, 'wb') as f:
         pickle.dump(border_changes, f)
 
-    return model_one_shares, model_two_shares, model_three_shares
+    return model_one_shares, model_two_shares, model_three_shares, model_four_shares
 
 def main():
     """
@@ -328,10 +331,11 @@ def main():
 
     with Pool(round(os.cpu_count() * CPU_USAGE)) as pool:
         results = pool.imap(pfunc, stores)
-        for model_one, model_two, model_three in tqdm(results, total=len(stores)):
+        for model_one, model_two, model_three, model_four in tqdm(results, total=len(stores)):
             make_store(model_one, db_path, start_size=DB_START_SIZE)
             make_store(model_two, db_path + '_model_2', start_size=DB_START_SIZE)
             make_store(model_three, db_path + '_model_3', start_size=DB_START_SIZE)
+            make_store(model_four, db_path + '_model_4', start_size=DB_START_SIZE)
             gc.collect()
 
 if __name__ == "__main__":
