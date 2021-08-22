@@ -1202,14 +1202,8 @@ def main(year: int, model: int) -> None:
     location_idxs = _location_ref(data)
     location_sales = _get_location_sales(location_idxs, sales_idxs)
 
-    if model == 3:
-        single_model = 1
-        other_model = 1
-    else:
-        single_model = model
-        other_model = model
 
-    single_results = _get_single_results(year, single_model)
+    single_results = _get_single_results(year, model)
 
     single_output = _single_tickets(
         sales_idxs,
@@ -1232,7 +1226,7 @@ def main(year: int, model: int) -> None:
         sales_idxs,
         data,
         year,
-        other_model
+        model
         )
 
     output = pd.concat([single_output, pendler_output, other_output])
