@@ -347,8 +347,10 @@ class _BaseStore:
         return all(x for x in flags)
 
     def _get_defined_keys(self, tripkeys: Iterable[bytes], cursor_obj: lmdb.Cursor, obj: R):
-
-        vals = cursor_obj.getmulti(tripkeys)
+        try:
+            vals = cursor_obj.getmulti(tripkeys) # needs python-lmdb version >= 1.1.0
+        except AttributeError:
+            vals = (cursor_obj.get(x) for x in tripkeys)
 
         return [obj(x[0], msgpack.unpackb(x[1], strict_map_key=False)) for x in vals]
 
@@ -360,7 +362,7 @@ class _BaseStore:
         :type obj: TypeVar('R', StopRecord, TimeRecord, PassengerRecord, PriceRecord, OperatorRecord)
         :param **kwargs: query filters
 
-        - passenger_kws = (
+        -  = (
             'adult',
             'child',
             'youth',
