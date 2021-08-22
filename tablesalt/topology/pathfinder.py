@@ -427,7 +427,7 @@ def operators_in_touched_(
                 ops.extend(l_ops)
         # modulo:  only put in one operator value per leg
         ops_in_touched[tzone] = \
-        tuple(j for i, j in enumerate(ops) if i % 2 == 0)
+            tuple(j for i, j in enumerate(ops) if i % 2 == 0)
 
     return ops_in_touched
 
@@ -439,7 +439,7 @@ def aggregated_zone_operators(v):
 
     out_list = []
     for x in vals:
-        if isinstance(x[0], int):
+        if isinstance(x[0], (int, float)):
             out_list.append(x)
             continue
         for y in x:
@@ -527,62 +527,121 @@ class ZoneSharer(ZoneProperties):
         return oplegs
     
     @staticmethod
-    def _bump_zones(share_tuple, n_zones):
+    def _bump_zone_normal(share_tuple, n_zones):
 
-        return tuple(x if x[0] >= n_zones else (n_zones, x[1] )for x in share_tuple)
+        return tuple(x if x[0] >= n_zones else (n_zones, x[1]) for x in share_tuple)
+
+        return     
+    @staticmethod
+    def leg_solo_price(region, op_id):
+
+        return SOLO_ZONE_PRIS[region][OP_MAP[op_id]]
+
+    def _single_zone_share(self, zone, region, op_id, touched_zones, touched_zone_leg_count, ops_in_touched_zones):
+        
+        zone_share = 1          
+        if zone in touched_zones:                  
+            if touched_zone_leg_count[zone] == 1:                            
+                res = (zone_share, op_id)                  
+                solo = (zone_share * self.leg_solo_price(region, op_id), op_id)
+            else:
+                # need to assign the fraction of the zone for the leg based on it's region for solo    
+                n_legs_in_zone = touched_zone_leg_count[zone]
+                n_op_id_legs_in_zone = Counter(ops_in_touched_zones[zone])[op_id]
+                try:                  
+                    zone_share = n_op_id_legs_in_zone / n_legs_in_zone
+                    res = (zone_share, op_id)
+                    
+                    solo_zone_share = zone_share * self.leg_solo_price(region, op_id)
+                    solo = (solo_zone_share, op_id)                                       
+                except ZeroDivisionError:
+                    res = (zone_share, op_id)     
+                    solo = (zone_share * self.leg_solo_price(region, op_id), op_id)
+        else:
+            res = (zone_share, op_id)   
+            solo = (zone_share * self.leg_solo_price(region, op_id), op_id)
+
+        return res, solo
     
     def share_calculation(
         self,
         properties: Dict[str, Any], 
-        min_zones: int = 0
+        min_zones: Optional[int] = 0
         ) -> Union[Tuple[int, str], Tuple[Tuple[int, str], ...]]:
         """
         Calculate the zone shares for the operators on the trip
 
-        :param val: property_dict from ZoneProperties
+        :param val: property_dict from ZoneProperties 
         :type val: Dict[str, Any]
         :return: the zone shares for the trip
         :rtype: Union[Tuple[int, str], Tuple[Tuple[int, str], ...]]
 
         """
+        
 
-        outd = defaultdict(list)
+        imputed_zone_legs = properties['imputed_zone_legs']
+        zone_leg_regions = properties['zone_legs_regions']
+
+        touched_zones = properties['touched_zones']
+        touched_zone_leg_count = properties['nlegs_in_touched']
+        ops_in_touched_zones = properties['ops_in_touched']
+        
+        out_standard = defaultdict(list)
         out_solo = defaultdict(list)
-
-        for i, imputed_leg in enumerate(properties['imputed_zone_legs']):
-            region = properties['zone_legs_regions'][i]
-            op_id = self.operator_legs[i][0]
+        out_bumped = []
+        out_bumped_solo = []
+        
+        current_op_sum = 0
+        previous_op_id = None
+        for legnum, imputed_leg in enumerate(imputed_zone_legs):          
+            
+            leg_region = zone_leg_regions[legnum]
+            op_id = self.operator_legs[legnum][0]
+            
+            if not op_id == previous_op_id and previous_op_id is not None:
+                current_op_sum = 0
+           
             for zone in imputed_leg:
-                if zone in properties['nlegs_in_touched']:
-                    if properties['nlegs_in_touched'][zone] == 1:    
-                        outd[zone].append((1, op_id))                  
-                        out_solo[zone].append((1 * SOLO_ZONE_PRIS[region][OP_MAP[op_id]], op_id))
-                    else:
-                        # need to assign the fraction of the zone for the leg based on itøs region for solo    
-                        n_legs_in_zone = properties['nlegs_in_touched'][zone]
-                        n_op_id_legs_in_zone = Counter(properties['ops_in_touched'][zone])[op_id]
-                        try:
-                            zone_share = n_op_id_legs_in_zone / n_legs_in_zone
-                            outd[zone].append((zone_share, op_id)) 
-                            solo_zone_share = zone_share * SOLO_ZONE_PRIS[region][OP_MAP[op_id]]
-                            out_solo[zone].append((solo_zone_share, op_id))   
-                                               
-                        except ZeroDivisionError:
-                            outd[zone].append((1, op_id))      
-                            out_solo[zone].append((1 * SOLO_ZONE_PRIS[region][OP_MAP[op_id]], op_id))
-                else:
-                    outd[zone].append((1, op_id))   
+                res, solo = self._single_zone_share(
+                    zone, leg_region, op_id, touched_zones, 
+                    touched_zone_leg_count, 
+                    ops_in_touched_zones
+                    )
 
-                    out_solo[zone].append((1 * SOLO_ZONE_PRIS[region][OP_MAP[op_id]], op_id))
-        outd = {k: tuple(v) for k, v in outd.items()}
-        out_solo = {k: tuple(v) for k, v in out_solo.items()}
-
-        standard = aggregated_zone_operators(tuple(outd.values()))
+                out_standard[zone].append(res)
+                out_solo[zone].append(solo)
+                
+                current_op_sum += res[0]
+                
+            try:
+                next_op_id = self.operator_legs[legnum+1][0]
+                if op_id != next_op_id:
+                    if current_op_sum < min_zones:
+                        current_op_sum = min_zones               
+            except IndexError:
+                if current_op_sum < min_zones:
+                    current_op_sum = min_zones
+            
+            out_bumped.append((current_op_sum, res[1]))
+            solo_price = current_op_sum * self.leg_solo_price(leg_region, res[1])               
+            out_bumped_solo.append((solo_price, res[1]))
+            
+            previous_op_id = op_id
+                
+        out_standard = {k: tuple(v) for k, v in out_standard.items()}
+        standard = aggregated_zone_operators(tuple(out_standard.values()))
+        
+        out_solo = {k: tuple(v) for k, v in out_solo.items()}      
         solo_price = aggregated_zone_operators(tuple(out_solo.values()))
-        bumped = self._bump_zones(standard, min_zones)
-        return {'standard': standard, 'solo_price': solo_price, 'bumped': bumped}
+        bumped = aggregated_zone_operators(tuple(out_bumped))
+        bumped_solo = aggregated_zone_operators(tuple(out_bumped_solo))
 
-    def share(self, minimum_operator_zones: int = 0):
+        return {'standard': standard, 
+                'solo_price': solo_price, 
+                'bumped': bumped,
+                'bumped_solo': bumped_solo}
+
+    def share(self, minimum_operator_zones: Optional[int] = 2):
         """
         Share the zone work between the operators on the trip
         """
@@ -605,7 +664,8 @@ class ZoneSharer(ZoneProperties):
                 
                 shares = {'standard': 'station_map_error', 
                           'solo_price': 'station_map_error', 
-                          'bumped': 'station_map_error'}
+                          'bumped': 'station_map_error', 
+                          'bumped_solo': 'station_map_error'}
                 self.SHARE_CACHE[val] = shares
                 return shares
             try:
@@ -613,14 +673,16 @@ class ZoneSharer(ZoneProperties):
             except IndexError:
                 shares = {'standard': 'operator_error', 
                           'solo_price': 'operator_error', 
-                          'bumped': 'operator_error'}
+                          'bumped': 'operator_error', 
+                          'bumped_solo': 'operator_error'}
                 self.SHARE_CACHE[val] = shares
                 return shares
 
-        if not all(x for x in self.operator_legs):
+        if not all(len(set(x)) == 1 for x in self.operator_legs):
             shares = {'standard': 'operator_error', 
                       'solo_price': 'operator_error', 
-                      'bumped': 'operator_error'}
+                      'bumped': 'operator_error', 
+                      'bumped_solo': 'operator_error'}
             self.SHARE_CACHE[val] = shares        
             return shares
 
@@ -639,7 +701,8 @@ class ZoneSharer(ZoneProperties):
         except KeyError:
             shares = {'standard': 'rk_operator_error', 
                       'solo_price': 'rk_operator_error', 
-                      'bumped': 'rk_operator_error'}
+                      'bumped': 'rk_operator_error', 
+                      'bumped_solo': 'rk_operator_error'}
             self.SHARE_CACHE[val] = shares        
             return shares
 
