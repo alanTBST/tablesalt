@@ -6,29 +6,105 @@
 import ast
 import glob
 import os
-import pkg_resources
 from collections import defaultdict
 from datetime import datetime
 from itertools import chain, groupby
 from operator import itemgetter
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from queue import PriorityQueue
+from typing import Any, Dict, List, Tuple, Union
 
 import lmdb
 import msgpack
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-
+import pkg_resources
 from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.preprocessing.tools import db_paths, find_datastores
 from tablesalt.season.users import PendlerKombiUsers
+from tablesalt.topology.tools import determine_takst_region
+from tqdm import tqdm
+
 from pendlerkeys import find_no_pay
 
-THIS_DIR = Path(os.path.join(os.path.realpath(__file__))).parent
+THIS_DIR = Path(__file__).parent
 
 
 USER_SHARES = Dict[Tuple[str, int], Dict[str, Union[int, float]]]
+
+
+def sort_df_by_colums(df):
+
+    priority = {
+        'EncryptedCardEngravedID': 1, 
+        'SeasonPassID': 2, 
+        'SeasonPassTemplateID': 3,
+        'SeasonPassName': 4, 
+        'Fareset': 5, 
+        'PsedoFareset': 6, 
+        'takstsæt': 6,
+        'SeasonPassType': 7, 
+        'PassengerGroupType1': 8, 
+        'SeasonPassStatus': 9, 
+        'ValidityStartDT': 10, 
+        'ValidityEndDT': 11, 
+        'ValidDays': 12,  
+        'FromZoneNr': 13,
+        'startzone': 14,  
+        'ToZoneNr': 15, 
+        'slutzone': 16,
+        'ViaZoneNr': 17, 
+        'SeasonPassZones': 18,  
+        'PassagerType': 19, 
+        'TpurseRequired': 20, 
+        'SeasonPassCategory': 21,  
+        'Pris': 22, 
+        'RefundType': 23, 
+        'productdate': 24, 
+        'valgtezoner': 25,
+        'betaltezoner': 26,
+        'dsb': 27, 
+        's-tog': 28, 
+        'first': 29,
+        'metro': 31, 
+        'movia_h': 31, 
+        'movia_v': 32,  
+        'movia_s': 33,
+        'dsb_andel': 34, 
+        's-tog': 35, 
+        'first': 36,
+        'metro': 37, 
+        'movia_h': 38, 
+        'movia_v': 39,  
+        'movia_s': 40,  
+        'n_trips': 41, 
+        'n_users': 42,
+        'n_period_cards': 43,
+        'note': 44
+    }
+
+    q = PriorityQueue()
+
+    cols = df.columns
+    for col in cols:
+        q.put((priority[col], col))
+    
+    column_order = []
+    while not q.empty():
+        column_order.append(q.get()[1])
+
+    return df[column_order]
+
+
+def determine_takst_region(zone_sequence: tuple) -> str:
+
+    if all(x < 1100 for x in zone_sequence):
+        return "th"
+    if all(1100 < x <= 1200 for x in zone_sequence):
+        return "tv"
+    if all(1200 < x < 1300 for x in zone_sequence):
+        return "ts"
+    return "dsb"
 
 def _aggregate_zones(shares):
     """
@@ -56,13 +132,13 @@ def load_valid(valid_kombi_store: str):
 
     """
 
-    env = lmdb.open(valid_kombi_store)
-    valid_kombi = {}
-    with env.begin() as txn:
-        cursor = txn.cursor()
-        for k, v in cursor:
-            valid_kombi[k.decode('utf-8')] = ast.literal_eval(v.decode('utf-8'))
-    env.close()
+    with lmdb.open(valid_kombi_store) as env:
+        valid_kombi = {}
+        with env.begin() as txn:
+            cursor = txn.cursor()
+            for k, v in cursor:
+                valid_kombi[k.decode('utf-8')] = ast.literal_eval(v.decode('utf-8'))
+
     return valid_kombi
 
 def _make_date(x):
@@ -73,52 +149,6 @@ def _date_in_window(test_period, test_date):
     """test that a date is in a validity period"""
     return min(test_period) <= test_date <= max(test_period)
 
-def match_trip_to_season(kombi_trips, userdata, kombi_dates_store):
-    """
-
-    :param kombi_trips: DESCRIPTION
-    :type kombi_trips: TYPE
-    :param userdata: DESCRIPTION
-    :type userdata: TYPE
-    :param kombi_dates_store: DESCRIPTION
-    :type kombi_dates_store: TYPE
-    :return: DESCRIPTION
-    :rtype: TYPE
-
-    """
-
-    out = {}
-    with lmdb.open(kombi_dates_store) as env:
-        with env.begin() as txn:
-            for k, v in tqdm(kombi_trips.items()):
-                v = (bytes(str(x), 'utf-8') for x in v)
-                utripdates = ((x, txn.get(x)) for x in v)
-
-                utripdates = {
-                    k.decode('utf-8'): _make_date(v)
-                    for k, v in utripdates
-                    }
-                user_seasons = tuple(
-                    (v, k1) for k1, v in userdata.items() if k1[0] == k
-                    )
-
-                for window, season in user_seasons:
-                    if season not in out:
-                        out[season] = []
-
-                for key, date in utripdates.items():
-                    for window, season in user_seasons:
-                        if _date_in_window(window, date):
-                            break
-                    else:
-                        continue
-
-                    cur = out.get(season)
-                    if cur is not None:
-                        cur.append(key)
-                    out[season] = cur
-
-    return out
 
 
 
@@ -203,68 +233,25 @@ def _get_closest_kombi(chosen_zones):
     new_chosen_zones = [1001] + list(chosen_zones)
     return tuple(new_chosen_zones)
 
-def _match_pendler_record(
-        record,
-        kombi_results,
-        zone_relation_results,
-        paid_zones_results,
-        min_trips
-        ):
 
-    chosen_zones = ast.literal_eval(record.valgtezoner)
-    takst = record.takstsæt
-    try:
-        start = int(record.startzone)
-    except ValueError:
-        if '/' in record.startzone:
-            start = int(record.startzone.split('/')[1])
-        else:
-            raise ValueError("Can't determine startzone")
+def _get_closest_chosen_zones(kombi_results, chosen_zones):
 
-    end = int(record.slutzone)
-    paid = int(record.betaltezoner)
+    takst = determine_takst_region(chosen_zones)
+    test_combination = set(chosen_zones)
+    n_zones = len(test_combination)
 
-    note = []
-    flag = False
-    if chosen_zones:
 
-        mro = ['kombimatch', f'kombi_paid_zones_{takst}']
-        if 1002 in chosen_zones and 1001 not in chosen_zones:
-            note.append('INVALID_KOMBI')
-            flag = True
+    zone_combinations = list(kombi_results.keys())
 
-        if flag:
-            mro = ['kombimatch', 'closekombi', f'kombi_paid_zones_{takst}']
+    possibilities = []
+    for combo in zone_combinations:
+        if determine_takst_region(combo) == takst:
+            if n_zones - 3 < len(combo) < n_zones + 3:
+                symdiff = set(combo).symmetric_difference(test_combination)
+                if len(symdiff) <= 2:
+                    possibilities.append(combo)
+    return sorted(possibilities, key=lambda x: len(x), reverse=True)
 
-        for method in mro:
-            note.append(method)
-            if method == 'closekombi':
-                chosen_zones = _get_closest_kombi(chosen_zones)
-            r = kombi_results.get(chosen_zones, {})
-
-            if r and r['n_trips'] >= min_trips:
-                break
-            else:
-                r = paid_zones_results[takst].get(paid, {})
-
-    else:
-        mro = ['zonerelation_match', f'kombi_paid_zones_{takst}']
-        for method in mro:
-            note.append(method)
-            r = zone_relation_results.get((start, end, paid), {})
-
-            if r and r['n_trips'] >= min_trips:
-                break
-            else:
-                r = paid_zones_results[takst].get(paid, {})
-
-    if r['n_trips'] < min_trips:
-        note.append(f'kombi_paid_all_zones_{takst}')
-        r = paid_zones_results[takst].get(99, {})
-
-    out = r.copy()
-    out['note'] = _join_note_p(note)
-    return out
 
 def _join_note_p(notelist: List[str]) -> str:
 
@@ -320,9 +307,47 @@ def _load_nzone_shares(year: int, model: int):
     return out
 
 
-def _user_share_dict_df(user_shares: USER_SHARES):
+def _load_zone_relation_results(kombi_results):
+    """load the relations and results for the zone relations and merge them
+
+    :param kombi_results: [description]
+    :type kombi_results: [type]
+    :return: [description]
+    :rtype: [type]
+    """
+
+    zone_relations = _load_zone_relations()
+
+    test = {}
+    for x in zone_relations:
+        try:
+            rel = (x['StartZone'], x['DestinationZone'], x['PaidZones'])
+            validzones = x['ValidZones']
+        except Exception as e:
+            continue
+        test[rel] = validzones
+
+    zone_relation_results = {}
+    for k, v in test.items():
+        try:
+            zone_relation_results[k] = kombi_results[v]
+        except KeyError:
+            pass
+    return zone_relation_results
+
+def _valid_zones_to_paid():
+    zone_relations = _load_zone_relations()
+    d = {}
+    for x in zone_relations:
+        try:
+            d[x['ValidZones']] = x['PaidZones']
+        except KeyError:
+            pass
+    return d
+
+def _user_share_dict_df(usershares: USER_SHARES):
     ushares = pd.DataFrame.from_dict(
-        user_shares, orient='index'
+        usershares, orient='index'
         )
     ushares = ushares.reset_index()
     ushares.rename(
@@ -337,23 +362,164 @@ def _user_share_dict_df(user_shares: USER_SHARES):
 
 def _match_user_specific_results(
         kombi_products: pd.core.frame.DataFrame,
-        user_shares: USER_SHARES
+        usershares: USER_SHARES, 
+        year: int, 
+        model: int
         ):
 
-    ushares = _user_share_dict_df(user_shares)
-    merge1 = pd.merge(
-        kombi_products, ushares,
+    usershares_df = _user_share_dict_df(usershares)
+
+    merged = pd.merge(
+        kombi_products, usershares_df,
         on=['EncryptedCardEngravedID', 'SeasonPassID'],
         how='left'
         )
-
-    merge1 = merge1.fillna(0)
-    missed = merge1.query("n_trips == 0").copy()
-    kombi_match = merge1.query("n_trips != 0").copy()
+    merged = merged.fillna(0)
+    missed = merged.query("n_trips == 0").copy()
+    
+    kombi_match = merged.query("n_trips != 0").copy()
     kombi_match['note'] = 'user_period_shares'
+    
     missed = missed[kombi_products.columns]
+
+    missed = _match_pendler(missed, year, model)
     return kombi_match, missed
 
+
+def _match_pendler_record(
+        record: Tuple[Any, ...],
+        kombi_results,
+        zone_relation_results,
+        paid_zones_results,
+        min_trips: int
+        ):
+    """match a sales record to a result
+
+    :param record: [description]
+    :type record: Tuple[Any, ...]
+    :param kombi_results: [description]
+    :type kombi_results: [type]
+    :param zone_relation_results: [description]
+    :type zone_relation_results: [type]
+    :param paid_zones_results: [description]
+    :type paid_zones_results: [type]
+    :param min_trips: the minimum number of samples allowed
+    :type min_trips: int
+    :raises ValueError: if the startzone can't be determined
+    :return: [description]
+    :rtype: Dict
+    """
+
+    chosen_zones = ast.literal_eval(record.valgtezoner)
+    takst = record.takstsæt.lower()
+    try:
+        start = int(record.startzone)
+    except ValueError:
+        if '/' in record.startzone:
+            start = int(record.startzone.split('/')[1])
+        else:
+            raise ValueError("Can't determine startzone")
+
+    end = int(record.slutzone)
+    paid = int(record.betaltezoner)
+
+    note = []
+    flag = False
+    if chosen_zones:
+
+        mro = ['kombimatch', f'kombi_paid_zones_{takst}']
+        if 1002 in chosen_zones and 1001 not in chosen_zones:
+            note.append('INVALID_KOMBI')
+            flag = True
+
+        if flag:
+            mro = ['kombimatch', 'closekombi', f'kombi_paid_zones_{takst}']
+
+        for method in mro:
+            note.append(method)
+            if method == 'closekombi':
+                chosen_zones = _get_closest_kombi(chosen_zones)
+            r = kombi_results.get(chosen_zones, {})
+
+            if r and r['n_trips'] >= min_trips:
+                break
+            else:
+                r = paid_zones_results[takst].get(paid, {})
+
+        if not r:
+            note.append('from_to_zones')
+            from_to_results = {
+                k[:2]:v for k, v in zone_relation_results.items() if 
+                k[0]==start and k[1]==end
+                }
+            r = from_to_results.get((start, end), {})
+
+        if not r:
+            note.append('closest_chosenzones_match')
+            possibilities = _get_closest_chosen_zones(kombi_results, chosen_zones)
+            for pos in possibilities:
+                r = kombi_results.get(pos, {})
+                if r:
+                    note.append(f'_{pos}')
+                    break
+        
+    else:
+        mro = ['zonerelation_match', f'kombi_paid_zones_{takst}']
+        for method in mro:
+            note.append(method)
+            r = zone_relation_results.get((start, end, paid), {})
+
+            if r and r['n_trips'] >= min_trips:
+                break
+            else:
+                r = paid_zones_results[takst].get(paid, {})
+
+    
+    if r['n_trips'] < min_trips:
+        note.append(f'kombi_paid_all_zones_{takst}')
+        r = paid_zones_results[takst].get(99, {})
+
+    out = r.copy()
+    out['note'] = _join_note_p(note)
+    return out
+
+def _match_pendler(pendler_df, year, model):
+
+    pendler_df.loc[:, 'NR'] = list(range(len(pendler_df)))
+
+    sub_tuples = list(pendler_df.itertuples(index=False, name='Sale'))
+
+    kombi_results = _load_kombi_shares(year, model)
+    zone_relation_results = _load_zone_relation_results(kombi_results)
+    paid_zones_results = _load_nzone_shares(year, model)
+    
+    bad = set()
+    out = {}
+    for record in sub_tuples:
+        try:
+            result =  _match_pendler_record(
+                record, kombi_results,
+                zone_relation_results,
+                paid_zones_results,
+                1
+                )
+            # if 'INVALID_KOMBI' in result['note']:
+            #     break
+            out[record.NR] = result
+        except:
+            bad.add(record.NR)
+    # merge into _result_frame func
+    out_frame = pd.DataFrame.from_dict(out).T
+    out_frame.index.name = 'NR'
+    out_frame = out_frame.reset_index()
+
+    output = pd.merge(pendler_df, out_frame, on='NR', how='left')
+    output.note = output.note.fillna('no_result')
+    output = output.fillna(0)
+
+    output = output.drop(['NR','key'], axis=1)
+
+    return output
 
 def make_output(usershares, product_path, zone_path, model, year):
     """
@@ -372,168 +538,74 @@ def make_output(usershares, product_path, zone_path, model, year):
     :rtype: TYPE
 
     """
-
+    # this might need to change based on input data structure
     period_products = pd.read_csv(
         product_path, sep=';', encoding='iso-8859-1'
         )
-
+    
+    # this might need to change based on input data structure
     period_products.Pris = \
     period_products.Pris.str.replace(',','').str.replace('.','').astype(float) / 100
+    pendler_product_zones = _load_process_zones(zone_path)
 
+    keys = dict(zip(zip(pendler_product_zones.EncryptedCardEngravedID, 
+               pendler_product_zones.SeasonPassID), pendler_product_zones.valgtezoner))
+    
+    period_products['key'] = period_products.loc[
+        :, ('EncryptedCardEngravedID', 'SeasonPassID')
+        ].apply(tuple, axis=1)
 
-    kombi = period_products.loc[
+    paid_map = _valid_zones_to_paid()
+    paid_map = {str(k): v for k, v in paid_map.items()}
+    period_products.loc[:, 'valgtezoner'] = period_products.loc[:, 'key'].map(keys)
+    
+    period_products.loc[:, 'valgtezoner'] = period_products.loc[:, 'valgtezoner'].astype(str)    
+    period_products.loc[:, 'betaltezoner'] = period_products.loc[:, 'valgtezoner'].map(paid_map)
+    period_products.rename(columns={'FromZoneNr': 'startzone', 'ToZoneNr': 'slutzone', 'PsedoFareset': 'takstsæt'}, inplace=True)
+    
+    period_products.takstsæt = period_products.takstsæt.str.lower()
+    takst_map = {'hovedstaden': 'th', 'sjælland': 'dsb', 'sydsjælland': 'ts', 'vestsjælland': 'tv'}
+    
+    period_products.takstsæt = period_products.takstsæt.map(takst_map)
+
+    initial_columns = list(period_products.columns)
+    
+    kombi_products = period_products.loc[
         period_products.loc[:, 'SeasonPassName'].str.lower().str.contains('kombi')
         ]
 
+    kombi_match, missed = _match_user_specific_results(
+        kombi_products, usershares, year, model
+        )   
+     # =============================================================================
+    # end of direct card match
+    # =============================================================================   
     pendler = period_products.loc[~
         period_products.loc[:, 'SeasonPassName'].str.lower().str.contains('kombi')
         ]
 
-    kombi_match, missed = _match_user_specific_results(kombi, usershares)
-    # =============================================================================
-    # end of direct card match
-    # =============================================================================
+    pendler = _match_pendler(pendler, year, model)
 
-    missed['key'] = missed.loc[
-        :, ('EncryptedCardEngravedID', 'SeasonPassID')
-        ].apply(tuple, axis=1)
-
-    # load zones
-
-    pendler_product_zones = _load_process_zones(zone_path)
-
-    period_products_zones = pd.merge(
-        period_products, pendler_product_zones,
-        on=['EncryptedCardEngravedID', 'SeasonPassID'],
-        how='left'
-        )
-
-    missed.loc[:, 'ValidZones'] = missed['key'].map(pendler_product_zones)
-    missed.loc[:, 'ValidZones'] = missed.loc[:, 'ValidZones'].astype(str)
-
-    missed = missed.drop(
-        ['movia','stog', 'dsb', 'first', 'metro', 'n_trips'], axis=1
-        )
-
-
-    # do same method as normal pendlerkort mro
-    # load the chosenzones results
-    fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__',
-        f'{year}',
-        'pendler',
-        f'pendlerchosenzones{year}_model_{model}.csv'
-        )
-    pendlerchosen = pd.read_csv(fp ,index_col=0)
-    pendlerchosen.index.name = 'ValidZones'
-    pendlerchosen = pendlerchosen.reset_index()
-
-    merge2 = pd.merge(missed, pendlerchosen, on='ValidZones', how='left')
-    merge2 = merge2.drop(['key','ValidZones'], axis=1)
-    merge2 = merge2.fillna(0)
-
-    matched = merge2.query("n_trips != 0").copy()
-    matched['note'] = 'kombi_match'
-
-    missed = merge2.query("n_trips == 0").copy()
-    missed['note'] = 'waiting'
-    out = pd.concat([kombi_match, matched, missed])
-    out = out.fillna(0)
-
-    #
-
-    # write kombi output
-    fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__',
-        f'{year}',
-        'pendler',
-        f'kombiusershares{year}_model_{model}.csv'
-        )
-    out.to_csv(fp, index=False)
-
-    pendler['key'] = pendler.loc[
-        :, ('EncryptedCardEngravedID', 'SeasonPassID')
-        ].apply(tuple, axis=1)
-
-    pendler.loc[:, 'ValidZones'] = pendler['key'].map(pendler_product_zones)
-    pendler.loc[:, 'ValidZones'] = pendler.loc[:, 'ValidZones'].astype(str)
-
-    merge1 = pd.merge(pendler, pendlerchosen, on='ValidZones', how='left')
-    merge1.fillna(0)
-    merge1 = merge1.drop(['key','ValidZones'], axis=1)
-    missed = merge1.query("n_trips == 0").copy()
-
-    pendler_match = merge1.query("n_trips != 0").copy()
-    pendler_match['note'] = 'kombi_match'
-
-    fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__',
-        f'{year}',
-        'pendler',
-        f'zonerelations{year}_model_{model}.csv'
-        )
-
-    relations = pd.read_csv(fp)
-    missed = missed[
-        ['EncryptedCardEngravedID', 'SeasonPassID',
-         'SeasonPassTemplateID', 'SeasonPassName',
-         'Fareset', 'PsedoFareset', 'SeasonPassType',
-         'PassengerGroupType1', 'SeasonPassStatus',
-         'ValidityStartDT', 'ValidityEndDT', 'ValidDays',
-         'FromZoneNr', 'ToZoneNr', 'ViaZoneNr',
-         'SeasonPassZones', 'PassagerType',
-         'TpurseRequired', 'SeasonPassCategory',
-         'Pris', 'RefundType', 'productdate']
+    final = pd.concat([kombi_match, missed, pendler])
+    final = final.drop('key', axis=1)
+    
+    stats_columns = ['n_trips', 'n_users', 'n_period_cards', 'note']
+    operator_columns = [
+        x for x in final.columns if x not in initial_columns 
+        and x not in stats_columns
         ]
+    
+    andel_columns = []
+    for col in operator_columns:
+        new_col = f'{col}_andel'
+        andel_columns.append(new_col)
+        final.loc[:, f'{col}_andel'] = \
+            final.loc[:, 'Pris'] * final.loc[:, col]
 
-    relations = relations[['StartZone', 'DestinationZone',
-        'movia', 'stog', 'first', 'metro', 'dsb', 'n_users',
-        'n_period_cards', 'n_trips']]
-    relations.rename(columns={
-        'StartZone': 'FromZoneNr',
-        'DestinationZone': 'ToZoneNr'}, inplace=True)
+    final = sort_df_by_colums(final)
 
-    merge = pd.merge(
-        missed, relations,
-        on=['FromZoneNr', 'ToZoneNr'],
-        how='left'
-        )
-
-    # same as waiting - do the method resolution order.
-
-    merge.loc[:, 'note'] = 'from_to'
-
-    out = pd.concat([pendler_match, merge])
-    fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__',
-        f'{year}',
-        'pendler',
-        f'rejsekort_pendler{year}_model_{model}.csv'
-        )
-    out.to_csv(fp, index=False)
-
-def divide_dict(dictionary, chunk_size):
-
-    """
-    Divide one dictionary into several dictionaries
-    Return a list, each item is a dictionary
-    """
-    count_ar = np.linspace(0, len(dictionary), chunk_size+1, dtype= int)
-    group_lst = []
-    temp_dict = defaultdict(lambda : None)
-    i = 1
-    for key, value in dictionary.items():
-        temp_dict[key] = value
-        if i in count_ar:
-            group_lst.append(temp_dict)
-            temp_dict = defaultdict(lambda : None)
-        i += 1
-    return [dict(x) for x in group_lst]
-
+    fp = THIS_DIR / '__result_cache__'/ f'{year}' / f'rejsekort_shares_model{model}.csv'
+    final.to_csv(fp, index=False, encoding='iso-8859-1')
 
 def process_user_data(udata):
 
@@ -569,7 +641,6 @@ def pendler_reshare(share_tuple):
 
     return tuple((1/n_ops, x[1]) for x in share_tuple)
 
-
 def fetch_trip_results(db_path, tofetch, model):
 
     with lmdb.open(db_path) as env:
@@ -578,15 +649,14 @@ def fetch_trip_results(db_path, tofetch, model):
             for card_season, trips in tqdm(tofetch.items()):
                 all_trips = []
                 for trip in trips:
-                    t = txn.get(bytes(trip, 'utf-8'))
-                    if t:
+                    t = txn.get(bytes(str(trip), 'utf-8'))
+                    if t is not None:
                         all_trips.append(t.decode('utf-8'))
                 all_trips = tuple(
                     ast.literal_eval(x) for x in all_trips
-                    if x not in ('station_map_error', 'operator_error')
+                    if x not in ('station_map_error', 'operator_error', 'rk_operator_error')
                     )
-                if model == 3:
-                    all_trips = tuple(pendler_reshare(x) for x in all_trips)
+                card_season = ast.literal_eval(card_season)
                 final[card_season] = get_user_shares(all_trips)
 
     return final
@@ -595,27 +665,24 @@ def main():
 
     # Use zero price
     parser = TableArgParser(
-        'year', 'zones', 'products', 'model'
+        'year', 'zones', 'products'
         )
     args = parser.parse()
 
     year = args['year']
-    model = args['model']
     paths = db_paths(find_datastores(), year)
     db_path = paths['calculated_stores']
+    
+    products = args['products']
+    zones = args['zones']
 
     stores = paths['store_paths']
-
-    if model == 2:
-        db_path = db_path + '_model_2'
-
     valid_kombi_store = paths['kombi_valid_trips']
-    kombi_dates = paths['kombi_dates_db']
 
     userdata = PendlerKombiUsers(
         year,
-        products_path=args['products'],
-        product_zones_path=args['zones'],
+        products_path=products,
+        product_zones_path=zones,
         min_valid_days=0
         ).get_data()
 
@@ -627,24 +694,17 @@ def main():
         k: set(v).intersection(zero_travel_price) for
         k, v in kombi_trips.items()
         }
+    for model in [1, 2, 3, 4]:
+        if model > 1:
+            db_path = db_path + f'_model_{model}'
+        results = fetch_trip_results(db_path, valid, model)
 
-    tofetch = match_trip_to_season(
-        valid, userdata, kombi_dates
-        )
+        make_output(results,
+                    products,
+                    zones,
+                    model,
+                    year)
 
-    results = fetch_trip_results(db_path, tofetch, model)
-
-    make_output(results,
-                args['products'],
-                args['zones'],
-                model,
-                year)
-# =============================================================================
-#
-# =============================================================================
 if __name__ == "__main__":
-    parser = TableArgParser('year', 'zones', 'products', 'model')
-    args = parser.parse()
 
-
-
+    main()
