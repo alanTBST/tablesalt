@@ -472,10 +472,9 @@ def _match_pendler_record(
             if r and r['n_trips'] >= min_trips:
                 break
             else:
-                r = paid_zones_results[takst].get(paid, {})
-
+                r = paid_zones_results[takst].get(paid, {})    
     
-    if r['n_trips'] < min_trips:
+    if not r or r['n_trips'] < min_trips:
         note.append(f'kombi_paid_all_zones_{takst}')
         r = paid_zones_results[takst].get(99, {})
 
@@ -503,8 +502,6 @@ def _match_pendler(pendler_df, year, model):
                 paid_zones_results,
                 1
                 )
-            # if 'INVALID_KOMBI' in result['note']:
-            #     break
             out[record.NR] = result
         except:
             bad.add(record.NR)
@@ -514,12 +511,46 @@ def _match_pendler(pendler_df, year, model):
     out_frame = out_frame.reset_index()
 
     output = pd.merge(pendler_df, out_frame, on='NR', how='left')
+    
     output.note = output.note.fillna('no_result')
     output = output.fillna(0)
 
     output = output.drop(['NR','key'], axis=1)
 
     return output
+
+
+def _process_pendler_df(period_products, zone_path):
+
+    period_products.Pris = \
+    period_products.Pris.str.replace(',','', regex=False
+    ).str.replace('.','', regex=False).astype(float) / 100
+    
+    pendler_product_zones = _load_process_zones(zone_path)
+
+    keys = dict(zip(zip(pendler_product_zones.EncryptedCardEngravedID, 
+               pendler_product_zones.SeasonPassID), pendler_product_zones.valgtezoner))
+    
+    period_products['key'] = period_products.loc[
+        :, ('EncryptedCardEngravedID', 'SeasonPassID')
+        ].apply(tuple, axis=1)
+
+    paid_map = _valid_zones_to_paid()
+    paid_map = {str(k): v for k, v in paid_map.items()}
+    period_products.loc[:, 'valgtezoner'] = period_products.loc[:, 'key'].map(keys)
+    
+    period_products.loc[:, 'valgtezoner'] = period_products.loc[:, 'valgtezoner'].astype(str)    
+    period_products.loc[:, 'betaltezoner'] = period_products.loc[:, 'valgtezoner'].map(paid_map)
+    period_products.loc[:, 'betaltezoner'] = period_products.loc[:, 'betaltezoner'].fillna(0)
+    period_products.rename(columns={'FromZoneNr': 'startzone', 'ToZoneNr': 'slutzone', 'PsedoFareset': 'takstsæt'}, inplace=True)
+    
+    period_products.takstsæt = period_products.takstsæt.str.lower()
+    takst_map = {'hovedstaden': 'th', 'sjælland': 'dsb', 'sydsjælland': 'ts', 'vestsjælland': 'tv'}
+    
+    period_products.takstsæt = period_products.takstsæt.map(takst_map)
+
+    return period_products
+
 
 def make_output(usershares, product_path, zone_path, model, year):
     """
@@ -542,32 +573,10 @@ def make_output(usershares, product_path, zone_path, model, year):
     period_products = pd.read_csv(
         product_path, sep=';', encoding='iso-8859-1'
         )
+
+    period_products = _process_pendler_df(period_products, zone_path)
     
     # this might need to change based on input data structure
-    period_products.Pris = \
-    period_products.Pris.str.replace(',','').str.replace('.','').astype(float) / 100
-    pendler_product_zones = _load_process_zones(zone_path)
-
-    keys = dict(zip(zip(pendler_product_zones.EncryptedCardEngravedID, 
-               pendler_product_zones.SeasonPassID), pendler_product_zones.valgtezoner))
-    
-    period_products['key'] = period_products.loc[
-        :, ('EncryptedCardEngravedID', 'SeasonPassID')
-        ].apply(tuple, axis=1)
-
-    paid_map = _valid_zones_to_paid()
-    paid_map = {str(k): v for k, v in paid_map.items()}
-    period_products.loc[:, 'valgtezoner'] = period_products.loc[:, 'key'].map(keys)
-    
-    period_products.loc[:, 'valgtezoner'] = period_products.loc[:, 'valgtezoner'].astype(str)    
-    period_products.loc[:, 'betaltezoner'] = period_products.loc[:, 'valgtezoner'].map(paid_map)
-    period_products.rename(columns={'FromZoneNr': 'startzone', 'ToZoneNr': 'slutzone', 'PsedoFareset': 'takstsæt'}, inplace=True)
-    
-    period_products.takstsæt = period_products.takstsæt.str.lower()
-    takst_map = {'hovedstaden': 'th', 'sjælland': 'dsb', 'sydsjælland': 'ts', 'vestsjælland': 'tv'}
-    
-    period_products.takstsæt = period_products.takstsæt.map(takst_map)
-
     initial_columns = list(period_products.columns)
     
     kombi_products = period_products.loc[
@@ -582,11 +591,11 @@ def make_output(usershares, product_path, zone_path, model, year):
     # =============================================================================   
     pendler = period_products.loc[~
         period_products.loc[:, 'SeasonPassName'].str.lower().str.contains('kombi')
-        ]
+        ].copy()
 
-    pendler = _match_pendler(pendler, year, model)
+    pendler_results = _match_pendler(pendler, year, model)
 
-    final = pd.concat([kombi_match, missed, pendler])
+    final = pd.concat([kombi_match, missed, pendler_results])
     final = final.drop('key', axis=1)
     
     stats_columns = ['n_trips', 'n_users', 'n_period_cards', 'note']
@@ -603,9 +612,7 @@ def make_output(usershares, product_path, zone_path, model, year):
             final.loc[:, 'Pris'] * final.loc[:, col]
 
     final = sort_df_by_colums(final)
-
-    fp = THIS_DIR / '__result_cache__'/ f'{year}' / f'rejsekort_shares_model{model}.csv'
-    final.to_csv(fp, index=False, encoding='iso-8859-1')
+    return final
 
 def process_user_data(udata):
 
@@ -641,7 +648,7 @@ def pendler_reshare(share_tuple):
 
     return tuple((1/n_ops, x[1]) for x in share_tuple)
 
-def fetch_trip_results(db_path, tofetch, model):
+def fetch_trip_results(db_path, tofetch):
 
     with lmdb.open(db_path) as env:
         final = {}
@@ -697,13 +704,16 @@ def main():
     for model in [1, 2, 3, 4]:
         if model > 1:
             db_path = db_path + f'_model_{model}'
-        results = fetch_trip_results(db_path, valid, model)
+        results = fetch_trip_results(db_path, valid)
 
-        make_output(results,
+        final = make_output(results,
                     products,
                     zones,
                     model,
                     year)
+        fp = THIS_DIR / '__result_cache__'/ f'{year}' / f'rejsekort_shares_model{model}.csv'
+        final.to_csv(fp, index=False, encoding='iso-8859-1')
+
 
 if __name__ == "__main__":
 
