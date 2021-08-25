@@ -708,3 +708,35 @@ class ZoneSharer(ZoneProperties):
 
         self.SHARE_CACHE[val] = shares
         return shares
+
+    @staticmethod
+    def _weight_solo(share_tuple, solo_price_map):
+        """weight the shares by the solo zoner pris"""
+
+        if not isinstance(share_tuple[0], tuple):
+            share_tuple = (share_tuple, )
+
+        total_zones = round(sum(x[0] for x in share_tuple))
+        original_share = tuple(
+            (x[0] / total_zones, x[1])
+            for x in share_tuple
+            )
+
+        operator_prices = tuple(
+            (x[0] * solo_price_map[x[1]], x[1])
+            for x in share_tuple
+            )
+        total_price = sum(x[0] for x in operator_prices)
+
+        solo_share = tuple(
+            (x[0] / total_price, x[1])
+            for x in operator_prices
+            )
+
+        weighted_solo = tuple(
+            (j[0] * (solo_share[i][0] / original_share[i][0]), j[1])
+            for i, j in enumerate(share_tuple)
+            )
+
+        return weighted_solo
+
