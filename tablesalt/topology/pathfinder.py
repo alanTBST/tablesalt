@@ -537,13 +537,20 @@ class ZoneSharer(ZoneProperties):
 
         return SOLO_ZONE_PRIS[region][OP_MAP[op_id]]
 
-    def _single_zone_share(self, zone, region, op_id, touched_zones, touched_zone_leg_count, ops_in_touched_zones):
+    def _single_zone_share(
+        self, 
+        zone, 
+        region, 
+        op_id, 
+        touched_zones, 
+        touched_zone_leg_count, 
+        ops_in_touched_zones
+        ):
         
         zone_share = 1          
         if zone in touched_zones:                  
             if touched_zone_leg_count[zone] == 1:                            
                 res = (zone_share, op_id)                  
-                solo = (zone_share * self.leg_solo_price(region, op_id), op_id)
             else:
                 # need to assign the fraction of the zone for the leg based on it's region for solo    
                 n_legs_in_zone = touched_zone_leg_count[zone]
@@ -551,17 +558,47 @@ class ZoneSharer(ZoneProperties):
                 try:                  
                     zone_share = n_op_id_legs_in_zone / n_legs_in_zone
                     res = (zone_share, op_id)
-                    
-                    solo_zone_share = zone_share * self.leg_solo_price(region, op_id)
-                    solo = (solo_zone_share, op_id)                                       
                 except ZeroDivisionError:
-                    res = (zone_share, op_id)     
-                    solo = (zone_share * self.leg_solo_price(region, op_id), op_id)
+                    res = (zone_share, op_id)
         else:
             res = (zone_share, op_id)   
-            solo = (zone_share * self.leg_solo_price(region, op_id), op_id)
 
-        return res, solo
+        return res
+    
+    @staticmethod
+    def _weight_solo(disaggregate_zones, solo_price_legs):
+        """weight the shares by the solo zoner pris"""
+        combined = list(zip(chain(*disaggregate_zones), 
+                            chain(*solo_price_legs)))
+        
+        
+        total_zones = round(sum(x[0][0] for x in combined))
+        total_price = sum(x[0][0]*x[1] for x in combined)
+        
+        out = []
+        for zone_operator, soloprice in combined:
+            zone, operator = zone_operator
+            val = ((zone * soloprice) / total_price) * total_zones
+            out.append((val, operator))
+        return aggregated_zone_operators(tuple(out))
+
+    @staticmethod
+    def _weight_solo_bumped(out_bumped, out_bumped_solo):
+        """weight the shares by the solo zoner pris"""
+
+        out_bumped_solo = [x[0] for x in out_bumped_solo]
+        combined = list(zip(out_bumped, out_bumped_solo))
+        
+        
+        total_zones = round(sum(x[0][0] for x in combined))
+        total_price = sum(x[0][0]*x[1] for x in combined)
+        
+        out = []
+        for zone_operator, soloprice in combined:
+            zone, operator = zone_operator
+            val = ((zone * soloprice) / total_price) * total_zones
+            out.append((val, operator))
+        return aggregated_zone_operators(tuple(out))       
     
     def share_calculation(
         self,
@@ -597,19 +634,19 @@ class ZoneSharer(ZoneProperties):
             
             leg_region = zone_leg_regions[legnum]
             op_id = self.operator_legs[legnum][0]
-            
+            leg_solo_price = self.leg_solo_price(leg_region, op_id)
             if not op_id == previous_op_id and previous_op_id is not None:
                 current_op_sum = 0
            
             for zone in imputed_leg:
-                res, solo = self._single_zone_share(
+                res = self._single_zone_share(
                     zone, leg_region, op_id, touched_zones, 
                     touched_zone_leg_count, 
                     ops_in_touched_zones
                     )
 
                 out_standard[zone].append(res)
-                out_solo[zone].append(solo)
+                out_solo[zone].append(leg_solo_price)
                 
                 current_op_sum += res[0]
                 
@@ -623,18 +660,22 @@ class ZoneSharer(ZoneProperties):
                     current_op_sum = min_zones
             
             out_bumped.append((current_op_sum, res[1]))
-            solo_price = current_op_sum * self.leg_solo_price(leg_region, res[1])               
-            out_bumped_solo.append((solo_price, res[1]))
+            out_bumped_solo.append((leg_solo_price, res[1]))
             
             previous_op_id = op_id
                 
         out_standard = {k: tuple(v) for k, v in out_standard.items()}
         standard = aggregated_zone_operators(tuple(out_standard.values()))
+        if len(standard) == 1:
+            solo_price = standard
+        else:
+            solo_price = self._weight_solo(out_standard.values(), out_solo.values())
         
-        out_solo = {k: tuple(v) for k, v in out_solo.items()}      
-        solo_price = aggregated_zone_operators(tuple(out_solo.values()))
         bumped = aggregated_zone_operators(tuple(out_bumped))
-        bumped_solo = aggregated_zone_operators(tuple(out_bumped_solo))
+        if len(bumped) == 1:
+            bumped_solo = bumped
+        else:
+            bumped_solo = self._weight_solo_bumped(out_bumped, out_bumped_solo)
 
         return {'standard': standard, 
                 'solo_price': solo_price, 
@@ -708,35 +749,4 @@ class ZoneSharer(ZoneProperties):
 
         self.SHARE_CACHE[val] = shares
         return shares
-
-    @staticmethod
-    def _weight_solo(share_tuple, solo_price_map):
-        """weight the shares by the solo zoner pris"""
-
-        if not isinstance(share_tuple[0], tuple):
-            share_tuple = (share_tuple, )
-
-        total_zones = round(sum(x[0] for x in share_tuple))
-        original_share = tuple(
-            (x[0] / total_zones, x[1])
-            for x in share_tuple
-            )
-
-        operator_prices = tuple(
-            (x[0] * solo_price_map[x[1]], x[1])
-            for x in share_tuple
-            )
-        total_price = sum(x[0] for x in operator_prices)
-
-        solo_share = tuple(
-            (x[0] / total_price, x[1])
-            for x in operator_prices
-            )
-
-        weighted_solo = tuple(
-            (j[0] * (solo_share[i][0] / original_share[i][0]), j[1])
-            for i, j in enumerate(share_tuple)
-            )
-
-        return weighted_solo
 
