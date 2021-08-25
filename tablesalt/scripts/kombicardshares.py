@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """
+What does it do?
+================
 
+This script calculates the shares
 """
 
 import ast
@@ -703,8 +706,8 @@ def main():
         }
     for model in [1, 2, 3, 4]:
         if model > 1:
-            db_path = db_path + f'_model_{model}'
-        results = fetch_trip_results(db_path, valid)
+            path = db_path + f'_model_{model}'
+        results = fetch_trip_results(path, valid)
 
         final = make_output(results,
                     products,
