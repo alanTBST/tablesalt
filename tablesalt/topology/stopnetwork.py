@@ -363,8 +363,8 @@ class Line:
         ids = (x.stop_id for x in self.line_stops)
         return (f"{self.__class__.__name__}"
                 f"(line_id={self.line_id},"
-                "line_name={self.line_name},"
-                "stops={', '.join(map(str(ids)))})")
+                f"line_name={self.line_name},"
+                f"stops={', '.join(map(str(ids)))})")
     def __iter__(self) -> 'StopsList':
         self._index = 0
         return self
@@ -442,9 +442,9 @@ class RailNetwork:
 
     def __repr__(self):
 
-        names = (x.line_name for x in self.rail_lines)
+        names = [x.line_name for x in self.rail_lines]
 
-        return f"{self.__class__.__name__}(rail_lines={', '.join(map(str, names))})"
+        return f"{self.__class__.__name__}(rail_lines=[{', '.join(map(str, names))}])"
 
     @classmethod
     def from_json(cls, filepath: Optional[str] = None) -> 'RailNetwork':
