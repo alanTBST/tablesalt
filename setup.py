@@ -10,17 +10,17 @@ from setuptools import setup, find_packages
 import versioneer
 
 with open('README.rst', 'r') as f:
-    long_description = fh.read()
+    long_description = f.read()
     
     
 setup(name='tablesalt',
       version=versioneer.get_version(),
       cmdclass=versioneer.get_cmdclass(),
-      description='Package for Rejsekort analysis at TBST',
+      description='Package for Transit and Rejsekort analysis at Trafikstyrelsen',
       long_description=long_description,
       long_description_content_type="text/x-rst",
-      author='Alan Jones Trafik, Bygge of Boligstyrelsen: Plan & Klima',
-      author_email='alkj@tbst.dk, alanksjones@gmail.com',
+      author='Alan Jones, Trafikstyrelsen: Plan & Klima',
+      author_email='alkj@tbst.dk, alkj@trafikstyrelsen.dk, alanksjones@gmail.com',
       package_dir = {'tablesalt':'tablesalt'},
       packages = find_packages(),
       package_data={
@@ -40,6 +40,13 @@ setup(name='tablesalt',
               'networktopodk/DKTariffZones/*.sbn',
               'networktopodk/DKTariffZones/*.cpg',
               'networktopodk/DKTariffZones/*.dbf',
+              'networktopodk/DKrail/*.shp',
+              'networktopodk/DKrail/*.prj',
+              'networktopodk/DKrail/*.shx',
+              'networktopodk/DKrail/*.sbx',
+              'networktopodk/DKrail/*.sbn',
+              'networktopodk/DKrail/*.cpg',
+              'networktopodk/DKrail/*.dbf',
               'networktopodk/DKTariffZones/takstsjaelland/*.shp',
               'networktopodk/DKTariffZones/takstsjaelland/*.prj',
               'networktopodk/DKTariffZones/takstsjaelland/*.shx',
