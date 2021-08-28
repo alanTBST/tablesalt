@@ -27,6 +27,7 @@ import json
 from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import InitVar, asdict, dataclass, field
+from itertools import chain
 from json import JSONDecodeError
 from pathlib import Path
 from typing import (Any, ClassVar, Dict, List, Optional, Set, Tuple, TypedDict,
@@ -103,6 +104,7 @@ def _load_alternate_stations() -> Dict[int, Tuple[int, ...]]:
 
     return {k: tuple(v) for k, v in out.items()} 
 
+# only for denmark
 BORDER_STATIONS = _load_border_stations()
 ALTERNATE_STATIONS = _load_alternate_stations()
 
@@ -218,9 +220,15 @@ class StopsList(Iterator):
         self.stops = list(stops)
         self._stops_dict = None
 
-        self._id_set: Set[int] = {
+        stop_ids: Set[int] = {
             x.stop_id for x in self.stops
-            }
+        }
+        alternate_stops = set(chain.from_iterable(
+            [x.alternate_stop_ids for x in self.stops]
+                )
+            )
+        self._stop_ids = stop_ids.union(alternate_stops)
+        
 
         self._index = 0
 
@@ -248,7 +256,8 @@ class StopsList(Iterator):
     
     def __contains__(self, val):
 
-        return val in self._id_set
+        return val in self._stop_ids
+    
     @property
     def stops_dict(self) -> Dict[int, Stop]:
         """return the StopsList as a dictionary with keys 
@@ -257,8 +266,18 @@ class StopsList(Iterator):
         :return: dictionary of Stops
         :rtype: Dict[int, Stop]
         """
+
+        # TODO include alternate stop numbers!!!!!!!!!!!!!!!!!!!!11
         if self._stops_dict is None:
-            self._stops_dict = {x.stop_id: x for x in self.stops}
+            d = {}
+            for x in self.stops:
+                alt_ids = x.alternate_stop_ids
+                d[x.stop_id] = x
+                if alt_ids:
+                    for i in alt_ids:
+                        d[i] = x
+
+            self._stops_dict = d
 
         return self._stops_dict
 
@@ -281,6 +300,7 @@ class StopsList(Iterator):
 
     def get_stop(self, stop_id: int) -> Stop:
         """Return a Stop from the list by stop id
+        None is returned if the stop does not exist
 
         :param stop_id: the stop id
         :type stop_id: int
@@ -338,6 +358,14 @@ class StopsList(Iterator):
         # update the stops in the stops.json from rejseplan gtfs
         return
 
+    def to_dataframe(self):
+
+        return
+
+    def to_geodataframe(self):
+
+        return 
+
 class Line:
     def __init__(
         self, 
@@ -359,12 +387,23 @@ class Line:
         self.line_name = line_name
         self.line_stops = list(line_stops)
 
+        stop_ids: Set[int] = {
+            x.stop_id for x in self.line_stops
+        }
+        alternate_stops = set(chain.from_iterable(
+            [x.alternate_stop_ids for x in self.line_stops]
+                )
+            )
+        self._stop_ids = stop_ids.union(alternate_stops)
+
+
     def __repr__(self) -> str:
         ids = (x.stop_id for x in self.line_stops)
         return (f"{self.__class__.__name__}"
                 f"(line_id={self.line_id},"
                 f"line_name={self.line_name},"
-                f"stops={', '.join(map(str(ids)))})")
+                f"stops={', '.join(map(str, ids))}")
+    
     def __iter__(self) -> 'StopsList':
         self._index = 0
         return self
@@ -383,7 +422,7 @@ class Line:
     
     def __contains__(self, stop_id):
 
-        return stop_id in self.line_stops
+        return stop_id in self._stop_ids
     
     @classmethod
     def from_stopslist(

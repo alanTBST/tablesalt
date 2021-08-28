@@ -544,7 +544,7 @@ class TakstZones:
         :rtype: None
 
         """
-        self._list_of_stops = StopsList(self.DEFAULT_STOPS_LOC)
+        self._list_of_stops = StopsList().from_json()
 
 
     def stop_zone_map(
