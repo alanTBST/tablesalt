@@ -26,14 +26,13 @@ import copy
 import json
 from collections import defaultdict
 from collections.abc import Iterator
-from dataclasses import asdict, dataclass, field
-from itertools import chain
+from dataclasses import InitVar, asdict, dataclass, field
 from json import JSONDecodeError
 from pathlib import Path
 from typing import (Any, ClassVar, Dict, List, Optional, Set, Tuple, TypedDict,
-                    Union)
+                    Union, Iterable)
 
-from shapely.geometry import Point  # type: ignore
+from shapely.geometry import LineString, MultiLineString, Point  # type: ignore
 
 HERE = Path(__file__).parent
 
@@ -109,6 +108,7 @@ ALTERNATE_STATIONS = _load_alternate_stations()
 
 @dataclass
 class Stop:
+    
     """
     A stop dataclass that holds data from a stop point from gtfs data
 
@@ -131,6 +131,8 @@ class Stop:
     parent_station: Optional[Union[str, int]] = None
     wheelchair_boarding: Optional[Union[str, int]] = None
     platform_code: Optional[Union[str, int]] = None
+
+    operators: InitVar[str] = None
  
     @classmethod
     def from_dict(cls, obj: StopElements) -> 'Stop':
@@ -147,7 +149,7 @@ class Stop:
 
     @property 
     def alternate_stop_ids(self) -> Tuple[int, ...]:
-        """return the possible alternate numbers for the stop.
+        """Return the possible alternate numbers for the stop.
         an empty tuple is returned if there are not alternate stop 
         numbers
 
@@ -180,8 +182,9 @@ class Stop:
         """return the stop as a shapely Point"""
 
         return Point(self.coordinates)
+    
     @property
-    def mode(self):
+    def mode(self) -> str:
 
         stopid_str = str(self.stop_id)
         if len(stopid_str) == 7 or (stopid_str.startswith('86') and len(stopid_str) == 9):
@@ -201,26 +204,28 @@ class StopsList(Iterator):
     
     def __init__(
             self,
-            filepath: Optional[str] = None
+            *stops: Stop
             ) -> None:
         """Load a list of Stops from a json file
 
-        :param filepath: the path to a stops.json file, defaults to None. If 
+        :param stops: the path to a stops.json file, defaults to None. If 
             no file is given, the default stops are used
         
-        :type filepath: Optional[str], optional
+        :type stops: Stop
         """
 
-        self._filepath = Path(filepath) if filepath is not None else self.DEFAULT_PATH
-        self._data = _load_stopslist(str(self._filepath))
         self.stops: List[Stop]
-        self.stops = [Stop.from_dict(x) for x in self._data]
+        self.stops = list(stops)
         self._stops_dict = None
+
+        self._id_set: Set[int] = {
+            x.stop_id for x in self.stops
+            }
 
         self._index = 0
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}('{str(self._filepath.absolute())}')"
+        return f"{self.__class__.__name__}(stops={self.stops})"
 
     def __getitem__(self, index) -> Stop:
         # update to deal with slicing and returning a StopList
@@ -240,26 +245,55 @@ class StopsList(Iterator):
 
     def __len__(self) -> int:
         return len(self.stops)
-
-    def _make_stops_dict(self) -> None:
-
-        self._stops_dict = {x['stop_id']: Stop.from_dict(x) for x in self._data}
     
+    def __contains__(self, val):
+
+        return val in self._id_set
     @property
     def stops_dict(self) -> Dict[int, Stop]:
-        if self._stops_dict is not None:
-            return self._stops_dict      
-        self._make_stops_dict()
+        """return the StopsList as a dictionary with keys 
+        as stop_ids and values as Stop instances
+
+        :return: dictionary of Stops
+        :rtype: Dict[int, Stop]
+        """
+        if self._stops_dict is None:
+            self._stops_dict = {x.stop_id: x for x in self.stops}
+
         return self._stops_dict
 
-    def get_stop(self, stop_id: int) -> Stop:
+    @classmethod
+    def from_json(cls, filepath: Optional[str] = None) -> 'StopsList':
+        """Create an instance of a StopsList from a json file
 
-        return self.stops_dict[stop_id]
+        :param filepath: the path to the json file, defaults to None. If filepath is None, 
+                         the default Danish stops network is used.
+        :type filepath: Optional[str], optional
+        :return: an instance of a StopsList
+        :rtype: StopsList
+        """
+        
+        filepath = filepath if filepath is not None else StopsList.DEFAULT_PATH
+        _data = _load_stopslist(str(filepath))
+        stops = [Stop.from_dict(x) for x in _data]
+
+        return cls(*stops) 
+
+    def get_stop(self, stop_id: int) -> Stop:
+        """Return a Stop from the list by stop id
+
+        :param stop_id: the stop id
+        :type stop_id: int
+        :return: a stop
+        :rtype: Stop
+        """
+
+        return self.stops_dict.get(stop_id)
 
 
     def rail_stops(self) -> 'StopsList':
         """
-        return a new instance of a StopList with only rail stops
+        Return a new instance of a StopList with only rail stops
 
         :return: a new onstance of a StopsList
         :rtype: StopsList
@@ -283,7 +317,7 @@ class StopsList(Iterator):
         return bus
 
     def border_stations_and_zones(self) -> Dict[int, Tuple[int, ...]]:
-        """return a dictionary of railways stations on tariff zone borders
+        """Return a dictionary of railways stations on tariff zone borders
         with zone numbers
 
         :return: dictionary of station uic numbers and correcsponding zones
@@ -300,7 +334,7 @@ class StopsList(Iterator):
         return border_dict
 
     @classmethod
-    def update_stops(self):
+    def update_default_stops(self):
         # update the stops in the stops.json from rejseplan gtfs
         return
 
@@ -311,11 +345,26 @@ class Line:
         line_name: str, 
         *line_stops: Stop
         ):
+        """A network line
+
+        :param line_id: the id number of the line
+        :type line_id: int
+        :param line_name: the name of the line
+        :type line_name: str
+        :param line_stops: the stops that make up the line
+        :type line_stops: Stop
+        """
         
         self.line_id = line_id
         self.line_name = line_name
         self.line_stops = list(line_stops)
-    
+
+    def __repr__(self) -> str:
+        ids = (x.stop_id for x in self.line_stops)
+        return (f"{self.__class__.__name__}"
+                f"(line_id={self.line_id},"
+                "line_name={self.line_name},"
+                "stops={', '.join(map(str(ids)))})")
     def __iter__(self) -> 'StopsList':
         self._index = 0
         return self
@@ -334,13 +383,30 @@ class Line:
     
     def __contains__(self, stop_id):
 
-        return any(stop_id == stop.stop_id for stop in self.line_stops)
+        return stop_id in self.line_stops
     
-    def line_shape():
+    @classmethod
+    def from_stopslist(
+        cls, 
+        stoplist: StopsList, 
+        line_id: int, 
+        line_name: str, 
+        stop_numbers: Optional[Iterable[int]] = None
+        ):
+        """Create an instance of a Line from an instance of a StopsList
 
-        return NotImplemented
-    
-    def to_linestring():
+        :param stoplist: an instance of a StopsList
+        :type stoplist: StopsList
+        :param line_id: the id of the line
+        :type line_id: int
+        :param line_name: the name of the line
+        :type line_name: str
+        :param stop_numbers: an iterable of stop ids to inc
+        :type stop_numbers: Optional[Iterable[int]], defaults to None
+        """
+        stop_numbers = stop_numbers if stop_numbers is not None else []
+        return 
+    def to_simple_linestring():
 
         return NotImplemented
 
@@ -365,37 +431,47 @@ class RailLine(Line):
         super().__init__(line_id, line_name, *line_stops)
 
 
-
-
 class RailNetwork:
 
     DEFAULT_PATH = HERE / 'rail_lines.json'
-    def __init__(self, *rail_lines: RailLine):
+    def __init__(self, *rail_lines: RailLine) -> None:
+        """A Network of rail lines
+        """
 
         self.rail_lines = list(rail_lines)
 
+    def __repr__(self):
+
+        names = (x.line_name for x in self.rail_lines)
+
+        return f"{self.__class__.__name__}(rail_lines={', '.join(map(str, names))})"
+
     @classmethod
-    def from_json(cls, filepath: str):
+    def from_json(cls, filepath: Optional[str] = None) -> 'RailNetwork':
+        """Load a Rail Network from a json file
 
-        stops = StopsList().stops_dict
+        :param filepath: path to a json file, defaults to None. If filepath is None, 
+                         the default Danish rail network is used.
+        :type filepath: Optional[str], optional
+        :return: RailNetwork instance
+        :rtype: RailNetwork
+        """
 
-        with open(filepath, 'r', encoding='iso-8859-1') as f:
+        path = filepath if filepath is not None else RailNetwork.DEFAULT_PATH
+        
+        stoplist = StopsList.from_json().rail_stops()
+        with open(path, 'r', encoding='iso-8859-1') as f:
             data = json.load(f)
 
-
-        rail_lines = []
+        network = []
         for line_name, d in data.items():
             line_id = d['line_id']
-            s = d['stops']
-            stoplist = [stops.get(x) for x in d['stops']]
-
-            # STOPPED here
-            
-
-
-        network = [RailLine(v['line_id'], k, *v['stops']) for k, v in data.items()]
-
-        return 
+            stops = (stoplist.get_stop(x) for x in d['stops'])
+            stops = [x for x in stops if x is not None]
+            if stops:
+                line = RailLine(line_id, line_name, *stops)
+                network.append(line)
+        return cls(*network)
 
 
 class BusNetwork:
