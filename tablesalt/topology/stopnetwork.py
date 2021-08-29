@@ -33,6 +33,9 @@ from pathlib import Path
 from typing import (Any, ClassVar, Dict, List, Optional, Set, Tuple, TypedDict,
                     Union, Iterable)
 
+import pandas as pd
+import geopandas as gpd
+
 from shapely.geometry import LineString, MultiLineString, Point  # type: ignore
 
 HERE = Path(__file__).parent
@@ -168,7 +171,7 @@ class Stop:
         :return: a tuple of latitude, longitude
         :rtype: Tuple[float, float]
         """
-        return self.stop_lat, self.stop_lon
+        return self.stop_lon, self.stop_lat
 
     @property
     def is_border(self) -> bool:
@@ -360,11 +363,16 @@ class StopsList(Iterator):
 
     def to_dataframe(self):
 
-        return
+        return pd.DataFrame()
 
-    def to_geodataframe(self):
+    def to_geodataframe(self, crs: Optional[int] = 4326):
+        stops = pd.DataFrame(self.stops)
+        gdf = gpd.GeoDataFrame(
+            stops, geometry=gpd.points_from_xy(stops.stop_lon, stops.stop_lat)
+            )
+        gdf.crs = crs
 
-        return 
+        return gdf
 
 class Line:
     def __init__(
