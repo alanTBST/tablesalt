@@ -10,7 +10,7 @@ HERE = Path(__file__).parent
 def a_stopslist():
 
     fp = HERE / 'unit' / 'test_stops.json'
-    slist = StopsList(fp)
+    slist = StopsList.from_json(fp)
     
     return slist
 
