@@ -5,7 +5,12 @@ from pathlib import Path
 
 import pytest
 from shapely.geometry import Point  # type: ignore
-from tablesalt.topology.stopnetwork import Stop, StopsList, _load_stopslist, _load_border_stations  # noqa
+from tablesalt.topology.stopnetwork import (
+    Stop, 
+    StopsList, 
+    _load_stopslist, 
+    _load_border_stations
+    )  # noqa
 
 HERE = Path(__file__).parent
 
@@ -23,7 +28,7 @@ class MockJson:
             'stop_lat': 56.937271416304,
             'stop_lon': 9.753533239882,
             'stop_name': 'Østervang (Øster Hornumvej / Øster Hornum)',
-            'stop_number': 845301102,
+            'stop_id': 845301102,
             'wheelchair_boarding': ''
             }
 
@@ -36,7 +41,7 @@ class MockJson:
             'stop_lat': 56.083154489147994,
             'stop_lon': 12.468205271773,
             'stop_name': 'Karinebæk St.',
-            'stop_number': 8601620,
+            'stop_id': 8601620,
             'wheelchair_boarding': ''
             }
 
