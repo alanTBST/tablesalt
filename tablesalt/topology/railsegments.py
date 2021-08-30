@@ -28,7 +28,7 @@ class LineDict(TypedDict):
     points: List[Point]
 
 
-def _load_railways_shapefile() -> gpd.GeoDataFrame:
+def _load_railwaysegments_shapefile() -> gpd.GeoDataFrame:
     
     fp = pkg_resources.resource_filename(
         'tablesalt', os.path.join(
@@ -36,7 +36,7 @@ def _load_railways_shapefile() -> gpd.GeoDataFrame:
             'networktopodk',
             'DKrail', 
             'railways', 
-            'railways.shp'
+            'railsegments.shp'
             )
     )
 
@@ -67,7 +67,8 @@ class RailLineStringCreator:
         self.stopsdict = self.stopslist.stops_dict
         self.network = RailNetwork.from_json(railinefailepath)
 
-        self._shapes_frame = _load_railways_shapefile()
+        self._shapes_frame = _load_railwaysegments_shapefile()
+        
         self._points_dict = _convert_linestrings_to_points(self._shapes_frame)
         self._stops_frame = self.stopslist.to_geodataframe()
         
