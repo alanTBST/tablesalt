@@ -92,23 +92,20 @@ def test_stop_equality():
 
     assert stop1 == stop2
 
-
 def test_stop_methods():
 
     d = MockJson().load()[0]
 
     stop = Stop.from_dict(d)
-    assert stop.coordinates == (56.937271416304, 9.753533239882)
-    assert stop.as_point() == Point((56.937271416304, 9.753533239882))
-
+    assert stop.coordinates == (9.753533239882, 56.937271416304)
+    assert stop.as_point() == Point((9.753533239882, 56.937271416304))
 
 def test_stopslist_from_file():
     
     fp = HERE / 'test_stops.json'
-    slist = StopsList(fp)
+    slist = StopsList.from_json(fp)
 
     assert isinstance(slist, StopsList)
-
 
 def test_stoplist_getitem(a_stopslist):
 
