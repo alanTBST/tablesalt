@@ -19,3 +19,13 @@ def a_stopslist():
 def a_stop(a_stopslist):
 
     return a_stopslist[0]
+
+@pytest.fixture
+def a_line():
+
+    return 
+
+@pytest.fixture
+def a_railLine():
+
+    return 
