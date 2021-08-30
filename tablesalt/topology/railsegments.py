@@ -1,10 +1,12 @@
-"""This module is to create linestrings for each rail segment 
-between any two stations
+"""
+This module is to create linestrings for each rail segment 
+between any two stations. The LineStrings created can be used
+to create dedicated plots for each segment between stations 
 
 """
 
 import os
-from itertools import chain, repeat
+from itertools import chain, repeat, combinations
 from operator import itemgetter
 from pathlib import Path
 from typing import Dict, List, Optional, TypedDict
@@ -16,7 +18,7 @@ import pkg_resources
 from scipy.spatial import cKDTree
 from shapely.geometry import LineString, Point
 from tablesalt.topology.stopnetwork import StopsList, RailNetwork
-
+from tablesalt.topology.pathfinder import to_legs
 
 class LineDict(TypedDict):
 
@@ -53,12 +55,6 @@ def _convert_linestrings_to_points(gdf: gpd.GeoDataFrame) -> Dict[int, LineDict]
     return records_dict
 
 
-def _load_rail() -> Dict[int, LineDict]:
-   
-    df = _load_railways_shapefile()
-
-    return _convert_linestrings_to_points(df)
-
 class RailLineStringCreator:
 
 
@@ -67,9 +63,9 @@ class RailLineStringCreator:
         railinefailepath: Optional[str] = None
         ):
 
-        self.stopslist = StopsList.from_json().rail_stops()
+        self.stopslist = StopsList.from_json(stopfilepath).rail_stops()
         self.stopsdict = self.stopslist.stops_dict
-        self.network = RailNetwork.from_json()
+        self.network = RailNetwork.from_json(railinefailepath)
 
         self._shapes_frame = _load_railways_shapefile()
         self._points_dict = _convert_linestrings_to_points(self._shapes_frame)
@@ -77,7 +73,20 @@ class RailLineStringCreator:
         
         self._nearest = self._ckdnearest()
     
-    def create_linestring(self, start_stop_id: int, end_stop_id: int) -> LineString:
+    def create_linestring(
+        self, 
+        start_stop_id: int, 
+        end_stop_id: int
+        ) -> LineString:
+        """Create a LineString object from a given start and end uic
+
+        :param start_stop_id: uic number of the start of the linestring
+        :type start_stop_id: int
+        :param end_stop_id: uic number of the end of the linestring
+        :type end_stop_id: int
+        :return: a LineString between the given stop ids
+        :rtype: LineString
+        """
        
         start_stop = self.stopsdict.get(start_stop_id)
         start_id = start_stop.stop_id
@@ -97,7 +106,14 @@ class RailLineStringCreator:
 
         return LineString(points)
     
+
+    
     def _ckdnearest(self) -> gpd.GeoDataFrame:
+        """Find the closest linestring to each Stop 
+
+        :return: a geodataframe of the stop points and osm_id of the closest linestring
+        :rtype: gpd.GeoDataFrame
+        """
 
         # https://gis.stackexchange.com/questions/222315/geopandas-find-nearest-point-in-other-dataframe
         A = np.concatenate(
