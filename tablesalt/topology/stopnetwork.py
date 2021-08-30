@@ -190,6 +190,8 @@ class Stop:
     
     @property
     def mode(self) -> str:
+        # denmark specific
+        # try make it based on route with routes.txt, route_type
 
         stopid_str = str(self.stop_id)
         if len(stopid_str) == 7 or (stopid_str.startswith('86') and len(stopid_str) == 9):
@@ -366,11 +368,14 @@ class StopsList(Iterator):
         return pd.DataFrame()
 
     def to_geodataframe(self, crs: Optional[int] = 4326):
+        
         stops = pd.DataFrame(self.stops)
         gdf = gpd.GeoDataFrame(
             stops, geometry=gpd.points_from_xy(stops.stop_lon, stops.stop_lat)
             )
-        gdf.crs = crs
+        current_proj = int(gdf.crs.to_string().split(':')[1])
+
+        #gdf.crs = crs
 
         return gdf
 
@@ -481,6 +486,7 @@ class RailLine(Line):
 class RailNetwork:
 
     DEFAULT_PATH = HERE / 'rail_lines.json'
+    
     def __init__(self, *rail_lines: RailLine) -> None:
         """A Network of rail lines
         """
@@ -536,8 +542,6 @@ class RegionNetwork:
 
     def __init__(self) -> None:
         pass
-
-
 
 
 def line_factory():
