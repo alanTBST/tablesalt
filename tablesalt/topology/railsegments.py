@@ -102,7 +102,7 @@ class RailLineStringCreator:
         start_distances = [start_point.distance(pt) for pt in shape_points]
         end_distances = [end_point.distance(pt) for pt in shape_points]
 
-        points = shape_points[np.argmin(start_distances):np.argmin(end_distances)]
+        points = shape_points[np.argmin(start_distances): np.argmin(end_distances)]
 
         return LineString(points)
     
