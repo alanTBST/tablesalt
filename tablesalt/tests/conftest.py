@@ -1,4 +1,6 @@
 # place for fixtures: ie setup for tests
+
+import shutil
 from pathlib import Path
 import pytest
 from tablesalt.topology.stopnetwork import StopsList
@@ -29,3 +31,10 @@ def a_line():
 def a_railLine():
 
     return 
+
+
+@pytest.fixture
+def lib_dir(tmp_path):
+    d = tmp_path / 'rejskortstores'
+    yield d
+    shutil.rmtree(str(d))
