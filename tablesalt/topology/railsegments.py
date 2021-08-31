@@ -29,14 +29,14 @@ class LineDict(TypedDict):
 
 
 def _load_railwaysegments_shapefile() -> gpd.GeoDataFrame:
-    
+    #TODO remember to add reversed from and to
     fp = pkg_resources.resource_filename(
         'tablesalt', os.path.join(
             'resources',
             'networktopodk',
             'DKrail', 
             'railways', 
-            'railsegments.shp'
+            'rail_segments.shp'
             )
     )
 
@@ -55,7 +55,7 @@ def _convert_linestrings_to_points(gdf: gpd.GeoDataFrame) -> Dict[int, LineDict]
     return records_dict
 
 
-class RailLineStringCreator:
+class RailLineStringSelector:
 
 
     def __init__(
@@ -69,12 +69,12 @@ class RailLineStringCreator:
 
         self._shapes_frame = _load_railwaysegments_shapefile()
         
-        self._points_dict = _convert_linestrings_to_points(self._shapes_frame)
-        self._stops_frame = self.stopslist.to_geodataframe()
+        #self._points_dict = _convert_linestrings_to_points(self._shapes_frame)
+        #self._stops_frame = self.stopslist.to_geodataframe()
         
-        self._nearest = self._ckdnearest()
+        #self._nearest = self._ckdnearest()
     
-    def create_linestring(
+    def select_linestring_(
         self, 
         start_stop_id: int, 
         end_stop_id: int
