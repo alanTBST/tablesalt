@@ -27,17 +27,20 @@ import json
 from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import InitVar, asdict, dataclass, field
+from functools import lru_cache
 from itertools import chain
 from json import JSONDecodeError
 from pathlib import Path
-from typing import (Any, ClassVar, Dict, List, Optional, Set, Tuple, TypedDict,
-                    Union, Iterable)
+from typing import (Any, ClassVar, Dict, Iterable, List, Optional, Set, Tuple,
+                    TypedDict, Union)
 
-import pandas as pd
 import geopandas as gpd
-
+import pandas as pd
+from pyproj import Transformer
 from shapely.geometry import LineString, MultiLineString, Point  # type: ignore
+from shapely.ops import transform
 
+  # apply projection
 HERE = Path(__file__).parent
 
 class StopElements(TypedDict):
@@ -106,6 +109,22 @@ def _load_alternate_stations() -> Dict[int, Tuple[int, ...]]:
         out[v].append(k)
 
     return {k: tuple(v) for k, v in out.items()} 
+
+@lru_cache()
+def _get_transformer(initial_proj: int, out_proj: int):
+
+    return Transformer.from_crs(initial_proj, out_proj, always_xy=True)
+
+
+def _transform_projection(
+    initial_proj: int, 
+    out_proj: int, 
+    initial_point: Point
+    ) -> Point:
+    transformer =  _get_transformer(initial_proj, out_proj)
+    
+    return transform(transformer.transform, initial_point)    
+    
 
 # only for denmark
 BORDER_STATIONS = _load_border_stations()
@@ -183,9 +202,18 @@ class Stop:
         return (self.stop_id in BORDER_STATIONS or 
             any(x in BORDER_STATIONS for x in self.alternate_stop_ids))
     
-    def as_point(self) -> Point:
-        """return the stop as a shapely Point"""
+    
+    def as_point(self, proj: Optional[int] = 4326) -> Point:
+        """Return the stop as a shapely Point.
 
+        :param proj: the desired output projection, defaults to 4326
+        :type proj: Optional[int], optional
+        :return: a point in the desired projection
+        :rtype: Point
+        """
+        if proj != 4326:
+            point = Point(self.coordinates)
+            return _transform_projection(4326, proj, point)
         return Point(self.coordinates)
     
     @property
@@ -232,9 +260,7 @@ class StopsList(Iterator):
             [x.alternate_stop_ids for x in self.stops]
                 )
             )
-        self._stop_ids = stop_ids.union(alternate_stops)
-        
-
+        self._stop_ids: Set[int] = stop_ids.union(alternate_stops)
         self._index = 0
 
     def __repr__(self) -> str:
@@ -272,7 +298,6 @@ class StopsList(Iterator):
         :rtype: Dict[int, Stop]
         """
 
-        # TODO include alternate stop numbers!!!!!!!!!!!!!!!!!!!!11
         if self._stops_dict is None:
             d = {}
             for x in self.stops:
@@ -302,6 +327,9 @@ class StopsList(Iterator):
         stops = [Stop.from_dict(x) for x in _data]
 
         return cls(*stops) 
+    @classmethod
+    def default_denmark(cls):
+        return cls.from_json()
 
     def get_stop(self, stop_id: int) -> Stop:
         """Return a Stop from the list by stop id
@@ -323,7 +351,7 @@ class StopsList(Iterator):
         :return: a new onstance of a StopsList
         :rtype: StopsList
         """
-        rail = copy.deepcopy((self))
+        rail = copy.deepcopy(self)
         rail.stops = [x for x in rail if x.mode == 'rail']
 
         return rail
@@ -336,7 +364,7 @@ class StopsList(Iterator):
         :rtype: StopsList
         """
 
-        bus = copy.deepcopy((self))
+        bus = copy.deepcopy(self)
         bus.stops = [x for x in bus if x.mode == 'bus']
 
         return bus
@@ -367,7 +395,7 @@ class StopsList(Iterator):
 
         return pd.DataFrame()
 
-    def to_geodataframe(self, crs: Optional[int] = 4326):
+    def to_geodataframe(self, proj: Optional[int] = 4326):
         
         stops = pd.DataFrame(self.stops)
         gdf = gpd.GeoDataFrame(
@@ -457,8 +485,16 @@ class Line:
         :type stop_numbers: Optional[Iterable[int]], defaults to None
         """
         stop_numbers = stop_numbers if stop_numbers is not None else []
-        return 
-    def to_simple_linestring():
+        return cls()
+    
+    def to_simple_linestring() -> LineString:
+        """Create a simple linestring for the points in the Line.
+        A LineString with straight lines between the stop points.
+
+
+        :return: a sahpely LineString
+        :rtype: LineString
+        """
 
         return NotImplemented
 
