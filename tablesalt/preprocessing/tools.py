@@ -22,28 +22,19 @@ from typing import (
 
 import pandas as pd #type: ignore
 
-THIS_DIR = os.path.dirname(os.path.realpath(__file__))
+THIS_DIR = Path(__file__).parent
 
 def find_datastores(start_dir: Optional[str] = None) -> str:
+    """Find the location of the rejsekort datastores
+
+    :param start_dir: [description], defaults to None
+    :type start_dir: Optional[str], 
+        The path to the root directory to start the seard
+    :raises FileNotFoundError: If no rejsekort datastores can be found
+    :return: The path to the directory containing the stores
+    :rtype: str
     """
-    Find the location of the processed rejsekort datastores
 
-    Parameters
-    ----------
-    start_dir : Optional[AnyStr], optional
-        The directory to start searching from . The default is None.
-
-    Raises
-    ------
-    FileNotFoundError
-        If no rejsekort datastores can be found.
-
-    Returns
-    -------
-    str
-        The directory of the rejsekort datastores.
-
-    """
 
     if start_dir is None:
         if socket.gethostname() == "tsdw03": # TBST server
@@ -59,65 +50,53 @@ def find_datastores(start_dir: Optional[str] = None) -> str:
         )
 
 def _hdfstores(store_loc: str, year: int) -> List[str]:
-    """Return path of the hdf5 files"""
-    return glob.glob(
-        os.path.join(
-            store_loc,
-            'rejsekortstores',
-            f'{year}DataStores',
-            'hdfstores',
-            '*.h5'
-            )
-        )
+    """Return a list of the hdf5 data sets to analyse
 
-
-def setup_directories(year: int, dstores: Optional[str] = None) -> List[str]:
+    :param store_loc: The location of the rejsekort datastores
+    :type store_loc: str
+    :param year: The year of analysis
+    :type year: int
+    :return: a list of filepaths
+    :rtype: List[str]
     """
-    Setup the directories needed for the chosen year
 
-    Parameters
-    ----------
-    dstores : path like object
-        the directory path of the datastores.
+    path = Path(store_loc) / 'rejsekortstores' / f'{year}Datastores' / 'hdfstores'
+    
+    return list(path.glob('*.h5'))
 
+
+def setup_directories(year: int, dstores: Optional[str] = None) -> Dict[str, str]:
+    """Setup the directories needed for the chosen year
+
+    :param year: the year of analysis
+    :type year: int
+    :param dstores: the directory path of the root of the datastores. defaults to None
+        If None, the datastores will be placed in the tablesalt directory
+    :type dstores: Optional[str], optional
+    :return: a list of the new paths created
+    :rtype: Dict[str, str]
     """
+
+    dstores = Path(dstores) if dstores is not None else dstores
+
     if not dstores:
-        dstores = os.path.join(
-            Path(THIS_DIR).parent,
-            'datastores',
-            'rejsekortstores'
-            )
+        dstores = THIS_DIR.parent / 'datastores' / 'rejsekortstores' / f'{year}DataStores'
     else:
-        dstores = os.path.join(
-            dstores,
-            'rejsekortstores'
-            )
-    if not os.path.isdir(dstores):
-        os.makedirs(dstores)
+        dstores = dstores / 'rejsekortstores' / f'{year}DataStores'
+            
+    substores = ('hdfstores', 'dbs', 'packs')
+    dstores = [dstores / x for x in substores]
 
-    dstore_paths = ('hdfstores', 'dbs', 'packs')
+    result_paths = ('other', 'pendler', 'single', 'preprocessed')
+    
+    result_cache =  THIS_DIR.parent / 'scripts' / '__result_cache__'/ f'{year}' 
+    result_paths = [result_cache / x for x in result_paths]
+    dstores.extend(result_paths)
 
-    new_paths = {}
-    for d in dstore_paths:
-        new_path = os.path.join(dstores, f'{year}DataStores', d)
-        new_paths[d] = new_path
+    for p in dstores:
+        p.mkdir(parents=True, exist_ok=True)
 
-    result_paths = ['other', 'pendler', 'single', 'preprocessed']
-    for d in result_paths:
-        new_path =  os.path.join(
-            Path(THIS_DIR).parent,
-            'scripts',
-            '__result_cache__',
-            f'{year}',
-            d
-            )
-        new_paths[d] = new_path
-
-    for _, path in new_paths.items():
-        if not os.path.isdir(path):
-            os.makedirs(path)
-
-    return new_paths
+    return {x.stem: x for x in dstores}
 
 def db_paths(store_location: str, year: int) -> Dict[str, Union[str, List[str]]]:
     """
