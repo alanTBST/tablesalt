@@ -65,7 +65,7 @@ def _hdfstores(store_loc: str, year: int) -> List[str]:
     return list(path.glob('*.h5'))
 
 
-def setup_directories(year: int, dstores: Optional[str] = None) -> Dict[str, str]:
+def setup_directories(year: int, dstores: Optional[Union[str, Path]] = None) -> Dict[str, str]:
     """Setup the directories needed for the chosen year
 
     :param year: the year of analysis
@@ -85,18 +85,18 @@ def setup_directories(year: int, dstores: Optional[str] = None) -> Dict[str, str
         dstores = dstores / 'rejsekortstores' / f'{year}DataStores'
             
     substores = ('hdfstores', 'dbs', 'packs')
-    dstores = [dstores / x for x in substores]
+    paths = [dstores / x for x in substores]
 
-    result_paths = ('other', 'pendler', 'single', 'preprocessed')
+    result_subpaths = ('other', 'pendler', 'single', 'preprocessed')
     
     result_cache =  THIS_DIR.parent / 'scripts' / '__result_cache__'/ f'{year}' 
-    result_paths = [result_cache / x for x in result_paths]
-    dstores.extend(result_paths)
+    result_paths = [result_cache / x for x in result_subpaths]
+    paths.extend(result_paths)
 
-    for p in dstores:
+    for p in paths:
         p.mkdir(parents=True, exist_ok=True)
 
-    return {x.stem: x for x in dstores}
+    return {x.stem: x for x in paths}
 
 def db_paths(store_location: str, year: int) -> Dict[str, Union[str, List[str]]]:
     """
@@ -181,7 +181,7 @@ def get_columns(
     return [x.lower() for x in file_columns]
 
 def check_all_file_headers(
-        file_list: Sequence[Union[str, 'os.PathLike[Any]', IO[bytes]]]
+        file_list: Sequence[Union[str, Path, IO[bytes]]]
         ) -> bool:
     """test to see if all file headers are like the first"""
     if len(file_list) == 1:
@@ -234,12 +234,15 @@ def col_index_dict(
             colindices[col] = file_columns.index(col)
         except ValueError:
             pass
-    coltypes: Dict[int, Union[str, int, float]]
+    coltypes: Dict[str, Union[str, int, float]]
+    
     coltypes = {x[0]: x[1] for x in wanted if x[0] in file_columns}
     coltypes['kortnr'] = str
-    coltypes = {colindices[k]: v for k, v in coltypes.items()}
+    
+    
+    colidtypes = {colindices[k]: v for k, v in coltypes.items()}
 
-    return colindices, coltypes
+    return colindices, colidtypes
 
 def blocks(files: IO[bytes]) -> Iterable[bytes]:
     """yield the bytes of the specified file"""
