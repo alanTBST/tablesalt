@@ -74,10 +74,16 @@ def _load_operator_settings(
     config_dict = _load_operator_configuration(config_file)
 
     chosen_lines = {x.lower() for x in lines}
-    chosen_operators = list(
-        set(v for k, v in config_dict.items() if k in chosen_lines)
-    )
 
+    chosen_operators = set()
+    for k, v in config_dict.items():
+        if k in chosen_lines:
+            try:
+                chosen_operators.add(v)
+            except TypeError:
+                for line in v:
+                    chosen_operators.add(config_dict[line])
+                    chosen_lines.add(line.lower())
     operator_ids = {
         k.lower(): v for k, v in  mappers['operator_id'].items()
         }
@@ -151,6 +157,7 @@ def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
     cols = base_cols + line_cols
     pas_stations = pas_stations[cols]
     return pas_stations
+
 
 
 # make a separate lookup class
