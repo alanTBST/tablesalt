@@ -4,6 +4,7 @@ Classes to interact with passenger stations and the operators that serve them
 """
 #standard imports
 import json
+from collections import defaultdict
 from itertools import chain, combinations
 from typing import Any, AnyStr, Dict, List, Optional, Set, Tuple, Union
 
@@ -166,6 +167,7 @@ def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
     alternates = pas_stations.query("stop_id in @ALTERNATE_STATIONS")
 
     alternate_dicts = _alternate_stop_map()
+    # ADD METRO MAPS
 
     new_frames = []
     for i, d in alternate_dicts.items():
@@ -210,24 +212,25 @@ class StationOperators():
         self.lines = lines
         self._settings = _load_operator_settings(*self.lines)
         self._station_dict = self._pas_station_dict()
+        self._lookup_line = self._create_lookups()
+        
         self._station_dict_set = {
             k: tuple(v) for k, v in self._station_dict.items()
             }
         self._stop_zone_map = TakstZones().stop_zone_map()
         
-        self._create_lookups()
+        #self._create_lookups()
 
-    def _make_query(self, intup: Tuple[str, ...]) -> str:
+    @staticmethod
+    def _make_query(lines, intup: Tuple[str, ...]) -> str:
         """
         create the query to select valid values from the dataframe
         """
-        lines = self._settings['lines']
         qry = []
         for oper in lines:
-            if 'bus' not in oper:
-                val = int(oper in intup)
-                string = f"{oper} == {val}"
-                qry.append(string)
+            val = int(oper in intup)
+            string = f"{oper} == {val}"
+            qry.append(string)
 
         full_qry = " & ".join(qry)
 
@@ -241,32 +244,26 @@ class StationOperators():
         """
         lines = self._settings['lines']
         pas_stations = _load_default_passenger_stations(*lines)
+        pas_stations = pas_stations.set_index('stop_id')
         # range(1, ..) - include single operators in the permutations
 
-        all_perms = [
+        all_perms = (
             x for l in range(1, len(lines)) for
             x in combinations(lines, l)
-            ]
+        )
 
         out = {}
+        cache = {}
         for perm_tup in all_perms:
-            out[perm_tup] = pas_stations.query(
-                self._make_query(perm_tup)
-                )['stop_id'].tolist()
-
-        out = {k: v for k, v in out.items() if v}
-
-        x = zip(out.keys(), out.values())
-        x = sorted(x, key=lambda x: x[0])
-        outdict = {}
-        seen = set()
-        for k, v in x:
-            val = tuple(set(k)), tuple(set(v))
-            if val not in seen:
-                outdict[k] = v
-                seen.add(val)
+            for line in perm_tup:
+                if line not in cache:
+                    s = pas_stations[line]
+                    cache[line] = set(s[s > 0].index)
+            v = set.intersection(*(cache[line] for line in perm_tup))
+            if v:
+                out[frozenset(perm_tup)] = v
         
-        return {frozenset(k): v for k, v in outdict.items()}
+        return out
 
     def _station_type(self, stop_number: int) -> Tuple[str, ...]:
         """
@@ -283,14 +280,12 @@ class StationOperators():
         create the dictionaries that are used in the public
         methods
         """
-
-        all_stations = set(chain(*self._station_dict_set.values()))
-        self._lookup_name = {x: self._station_type(x) for x in all_stations}
-        self._lookup = {
-            k: tuple(self._settings['config'][x] for x in v) for
-            k, v in self._lookup_name.items()
-            }
-
+        val = defaultdict(set)
+        for k, v in self._station_dict.items():
+            for stopid in v:
+                val[stopid].update(k)
+        
+        return val
     def _get_operator(self, stop_number: int) -> Tuple[str, ...]:
         """return the operators that survice the station
 
