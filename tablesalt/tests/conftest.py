@@ -5,6 +5,8 @@ from pathlib import Path
 import pytest
 from tablesalt.topology.stopnetwork import StopsList
 
+from tablesalt.topology.stationoperators import StationOperators
+
 
 HERE = Path(__file__).parent
 
@@ -38,3 +40,10 @@ def lib_dir(tmp_path):
     d = tmp_path / 'rejskortstores'
     yield d
     shutil.rmtree(str(d))
+
+@pytest.fixture
+def sj_station_getter():
+
+    return StationOperators(
+    'kystbanen', 'local', 'metro', 'suburban', 'fjernregional'
+    )
