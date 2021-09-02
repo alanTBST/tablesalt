@@ -215,7 +215,7 @@ class StationOperators():
             }
         self._stop_zone_map = TakstZones().stop_zone_map()
         
-        #self._create_lookups()
+        self._create_lookups()
 
     def _make_query(self, intup: Tuple[str, ...]) -> str:
         """
@@ -307,7 +307,7 @@ class StationOperators():
                 return tuple((self._settings['config']['bus'], ))
         raise KeyError("stop_number not found")
 
-    def _get_line(self, stop_number: int) -> Tuple[str, ...]:
+    def _get_lines(self, stop_number: int) -> Tuple[str, ...]:
         """return the line names that the station is on
 
         :param stop_number: the stop uic number
@@ -318,7 +318,7 @@ class StationOperators():
         """
         minidict = {
             v: k for k, v in self._settings['config'].items()
-            if k in self.lines
+            if k in self._settings['lines']
             }
         try:
             return tuple(minidict[x] for x in self._lookup[stop_number])
