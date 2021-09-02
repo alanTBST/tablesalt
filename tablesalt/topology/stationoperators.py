@@ -211,31 +211,9 @@ class StationOperators():
 
         self.lines = lines
         self._settings = _load_operator_settings(*self.lines)
-        self._station_dict = self._pas_station_dict()
-        self._lookup_line = self._create_lookups()
+        self._lookup_line = self._pas_station_dict()
         
-        self._station_dict_set = {
-            k: tuple(v) for k, v in self._station_dict.items()
-            }
         self._stop_zone_map = TakstZones().stop_zone_map()
-        
-        #self._create_lookups()
-
-    @staticmethod
-    def _make_query(lines, intup: Tuple[str, ...]) -> str:
-        """
-        create the query to select valid values from the dataframe
-        """
-        qry = []
-        for oper in lines:
-            val = int(oper in intup)
-            string = f"{oper} == {val}"
-            qry.append(string)
-
-        full_qry = " & ".join(qry)
-
-        return full_qry
-
 
     def _pas_station_dict(self) -> Dict[Tuple[str, ...], List[int]]:
         """
@@ -252,40 +230,20 @@ class StationOperators():
             x in combinations(lines, l)
         )
 
-        out = {}
-        cache = {}
-        for perm_tup in all_perms:
-            for line in perm_tup:
-                if line not in cache:
-                    s = pas_stations[line]
-                    cache[line] = set(s[s > 0].index)
-            v = set.intersection(*(cache[line] for line in perm_tup))
-            if v:
-                out[frozenset(perm_tup)] = v
         
-        return out
-
-    def _station_type(self, stop_number: int) -> Tuple[str, ...]:
-        """
-        return the operator key if the given stop_number
-        is in the values
-        """
-        for k, v in self._station_dict_set.items():
-            if stop_number in v:
-                return k
-        raise ValueError("station number not found")
-
-    def _create_lookups(self) -> None:
-        """
-        create the dictionaries that are used in the public
-        methods
-        """
+        cache = {}
+        for line in lines:
+            s = pas_stations[line]
+            cache[line] = set(s[s > 0].index)
+        
+        out = {}
         val = defaultdict(set)
-        for k, v in self._station_dict.items():
+        for k, v in cache.items():
             for stopid in v:
-                val[stopid].update(k)
+                val[stopid].add(k)
         
         return val
+
     def _get_operator(self, stop_number: int) -> Tuple[str, ...]:
         """return the operators that survice the station
 
@@ -311,12 +269,9 @@ class StationOperators():
         :return: a tuple of line names that the stop is on
         :rtype: Tuple[str, ...]
         """
-        minidict = {
-            v: k for k, v in self._settings['config'].items()
-            if k in self._settings['lines']
-            }
+
         try:
-            return tuple(minidict[x] for x in self._lookup[stop_number])
+            return self._lookup_line[stop_number]
         except KeyError:
              if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
                 return tuple(('bus', ))
