@@ -142,20 +142,9 @@ def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
             )
 
     pas_stations = pd.read_csv(
-        fp, encoding='utf-8'
+        fp, encoding='iso-8859-1'
         )
-
     pas_stations.columns = [x.lower() for x in pas_stations.columns]
-
-    base_cols = [
-        'uic', 'parent_uic', 'stationsnavn',
-        'forkortelse', 'region nr', 'region navn',
-        'kommune nr', 'kommune navn'
-        ]
-    line_cols = [x for x in pas_stations.columns if x in lines]
-
-    cols = base_cols + line_cols
-    pas_stations = pas_stations[cols]
     return pas_stations
 
 
