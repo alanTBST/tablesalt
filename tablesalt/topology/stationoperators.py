@@ -93,7 +93,7 @@ def _load_operator_settings(
         k in chosen_operators
         }
 
-    operators = tuple(set(config_dict[x] for x in chosen_lines))
+    operators = tuple(operator_ids)
 
     return {
         'operator_ids': operator_ids,
@@ -157,6 +157,8 @@ def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
     cols = base_cols + line_cols
     pas_stations = pas_stations[cols]
     return pas_stations
+
+
 
 
 
