@@ -25,9 +25,9 @@ from tablesalt.topology.zonegraph import ZoneGraph
 from tablesalt.topology.tools import determine_takst_region
 
 # put these in lines in a config
-OPGETTER = stationoperators.StationOperators(
-    'kystbanen', 'sjællandlocal', 'metro', 'suburban', 'sjællandfjernregional'
-    )
+#OPGETTER = stationoperators.StationOperators(
+#    'kystbanen', 'sjællandlocal', 'metro', 'suburban', 'sjællandfjernregional'
+#    )
 
 OP_MAP = {v: k.lower() for k, v in mappers['operator_id'].items()}
 REV_OP_MAP = {v: k for k, v in OP_MAP.items()}
