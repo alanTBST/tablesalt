@@ -12,16 +12,16 @@ import pytest
 def test_easy_metro_station_pair(sj_station_getter, station_tuple):
     """[summary]
 
-    :param sj_station_getter: Staion
+    :param sj_station_getter: stationoperators.StationOperators instance
     :type sj_station_getter: [type]
     :param station_tuple: [description]
     :type station_tuple: [type]
     """
 
-    op_id_res = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
+    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
     #op_res = sj_station_getter.station_pair(8603307, 8603308, format='operator')
 
-    assert op_id_res == ('metro', )
+    assert line == ('metro', )
 
 
 @pytest.mark.parametrize('station_tuple',
@@ -30,8 +30,8 @@ def test_easy_metro_station_pair(sj_station_getter, station_tuple):
     (8603302, 8600856)]) 
 def test_harder_metro_station_pair(sj_station_getter, station_tuple):
 
-    op_id_res = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
-    assert op_id_res == ('metro', )
+    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
+    assert line == ('metro', )
 
 
 @pytest.mark.parametrize('station_tuple',
@@ -40,13 +40,91 @@ def test_harder_metro_station_pair(sj_station_getter, station_tuple):
     (8600664, 8600626)]) 
 
 def test_easy_kyst_station_pair(sj_station_getter, station_tuple):
-    op_id_res = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
-    assert op_id_res == ('kystbanen', )
+    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
+    assert line == ('kystbanen', )
+
+
 """
 @pytest.mark.parametrize('station_tuple',
     [(8600626, 8600858),])
 
 def test_harder_kyst_station_pair(sj_station_getter, station_tuple):
-    op_id_res = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
-    assert op_id_res == (8, )
+    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
+    assert line == (8, )
 """
+
+@pytest.mark.parametrize('station_tuple',
+    [(8600626, 6548),
+    (8600626, 6554), 
+    (8600626, 6551), 
+    (8600858, 6551)]) 
+def test_easy_dsb_bus_station_pair(sj_station_getter, station_tuple):
+
+    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
+
+    assert line == ('fjernregional', )
+
+def test_start_dsb_to_metro():
+    return 
+
+def test_start_dsb_to_stog():
+    return 
+
+def test_start_dsb_to_stog():
+    return  
+
+def test_start_metro_to_dsb():
+
+    return 
+
+@pytest.mark.parametrize('station_tuple',
+    [(8600626, 8690798),
+    (8600626, 8690646), 
+    (8600659, 8690798)]       
+    ) 
+def test_stog_dsb_equals_dsb_station_pair(sj_station_getter, station_tuple):
+    
+    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
+
+    assert line == ('fjernregional', )
+
+@pytest.mark.parametrize('station_tuple',
+    [(8690646, 8600798),
+    (8690626, 8600646), 
+    (8690659, 8600669)]       
+    ) 
+def test_stog_dsb_equals_stog(sj_station_getter, station_tuple):
+    
+    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
+
+    assert line == ('suburban', )
+
+
+@pytest.mark.parametrize('station_tuple',
+    [(8690683, 8600669),]
+    ) 
+def test_stog_dsb_equals_local(sj_station_getter, station_tuple):
+    
+    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
+
+    assert line == ('local', )
+
+@pytest.mark.parametrize('station_tuple',
+    [(8690683, 8601411),
+    (8690683, 8601715), 
+    (8690674, 8603003), 
+    (8600674, 8603003)
+]
+    ) 
+def test_stog_to_local_equals_local(sj_station_getter, station_tuple):
+    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
+
+    assert line == ('local', )
+
+
+
+def test_stog_to_localbus_equals_local(sj_station_getter, station_tuple):
+    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
+    assert line == ('local', )
+
+
