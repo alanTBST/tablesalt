@@ -104,6 +104,7 @@ def load_bus_station_connectors() -> Dict[int, int]:
     :rtype: Dict[int, int]
 
     """
+    
     support_store = pkg_resources.resource_filename(
         'tablesalt', 'resources/support_store.h5')
 
@@ -111,6 +112,16 @@ def load_bus_station_connectors() -> Dict[int, int]:
         bus_map = store['datasets/bus_closest_station'][:]
 
     return {x[0]: x[1] for x in bus_map}
+
+
+def _load_bus_station_map() -> Dict[int, int]:
+    filepath = pkg_resources.resource_filename(
+        'tablesalt', 'resources/bus_closest_station.json')
+
+    with open(filepath, 'r') as f:
+        bus_map = json.load(f)
+
+    return {int(bstop): station for bstop, station in bus_map.items()}
 
 def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
 
@@ -145,7 +156,7 @@ def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
 # make a separate lookup class
 class StationOperators():
 
-    BUS_ID_MAP: Dict[int, int] = load_bus_station_connectors()
+    BUS_ID_MAP: Dict[int, int] = _load_bus_station_map()
 
     ID_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
 
