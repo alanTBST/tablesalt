@@ -4,7 +4,7 @@ Classes to interact with passenger stations and the operators that serve them
 """
 #standard imports
 import json
-from itertools import chain, permutations
+from itertools import chain, combinations
 from typing import Any, AnyStr, Dict, List, Optional, Set, Tuple, Union
 
 import h5py  # type: ignore
@@ -12,6 +12,7 @@ import pandas as pd  # type: ignore
 import pkg_resources
 from tablesalt.common.io import mappers
 from tablesalt.topology.tools import determine_takst_region, TakstZones
+from tablesalt.topology.stopnetwork import ALTERNATE_STATIONS
 
 M_RANGE: Set[int] = set(range(8603301, 8603400))
 S_RANGE: Set[int] = set(range(8690000, 8699999))
@@ -99,7 +100,8 @@ def _load_operator_settings(
     return {
         'operator_ids': operator_ids,
         'operators': operators,
-        'config': config_dict
+        'config': config_dict,
+        'lines': chosen_lines
         }
 
 
@@ -130,6 +132,17 @@ def _load_bus_station_map() -> Dict[int, int]:
 
     return {int(bstop): station for bstop, station in bus_map.items()}
 
+
+def _alternate_stop_map():
+
+    max_alternates = max(len(x) for x in ALTERNATE_STATIONS.values())
+    alternate_dicts = {x: {} for x in range(max_alternates)}
+    for k, v in ALTERNATE_STATIONS.items():
+        for i, stopid in enumerate(v):
+            alternate_dicts[i][k] = stopid
+
+    return alternate_dicts
+
 def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
 
     """load the passenger stations data
@@ -146,7 +159,23 @@ def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
         fp, encoding='iso-8859-1'
         )
     pas_stations.columns = [x.lower() for x in pas_stations.columns]
-    return pas_stations
+
+    alternates = pas_stations.query("stop_id in @ALTERNATE_STATIONS")
+
+    alternate_dicts = _alternate_stop_map()
+
+    new_frames = []
+    for i, d in alternate_dicts.items():
+        new_frame = alternates.copy()
+        new_frame = new_frame.query("stop_id in @d")
+        new_frame.loc[:, 'stop_id'] = new_frame.loc[:, 'stop_id'].map(d)
+        new_frames.append(new_frame)
+
+    concat_new_frames = pd.concat(new_frames, ignore_index=True)
+    out = pd.concat([pas_stations, concat_new_frames], ignore_index=True)
+    cols = ['stop_id'] + list(lines)
+    out = out[cols]
+    return out
 
 # make a separate lookup class
 class StationOperators():
@@ -178,20 +207,20 @@ class StationOperators():
         self.lines = lines
         self._settings = _load_operator_settings(*self.lines)
         self._station_dict = self._pas_station_dict()
-        self._station_dict_set = {
-            k: tuple(v) for k, v in self._station_dict.items()
-            }
+        #self._station_dict_set = {
+        #    k: tuple(v) for k, v in self._station_dict.items()
+        #    }
         self._stop_zone_map = TakstZones().stop_zone_map()
         
-        self._create_lookups()
+        #self._create_lookups()
 
     def _make_query(self, intup: Tuple[str, ...]) -> str:
         """
         create the query to select valid values from the dataframe
         """
-
+        lines = self._settings['lines']
         qry = []
-        for oper in self.lines:
+        for oper in lines:
             if 'bus' not in oper:
                 val = int(oper in intup)
                 string = f"{oper} == {val}"
@@ -207,46 +236,22 @@ class StationOperators():
         create the station dictionary from the underlying
         dataset
         """
-
-        pas_stations = _load_default_passenger_stations(*self.lines)
-        s_exceptions = pas_stations.query(
-            "stop_id > 8690000")['parent_uic'].dropna().astype(int).tolist()
-
+        lines = self._settings['lines']
+        pas_stations = _load_default_passenger_stations(*lines)
         # range(1, ..) - include single operators in the permutations
 
         all_perms = [
-            x for l in range(1, len(self.lines)) for
-            x in permutations(self.lines, l)
+            x for l in range(1, len(lines)) for
+            x in combinations(lines, l)
             ]
 
         out = {}
         for perm_tup in all_perms:
             out[perm_tup] = pas_stations.query(
                 self._make_query(perm_tup)
-                )['uic'].tolist()
+                )['stop_id'].tolist()
 
         out = {k: v for k, v in out.items() if v}
-
-        config = self._settings['config']
-        for k, v in out.items():
-            if k[0] == config["metro"]:
-                out[k] = [x for x in v if x in M_RANGE]
-            else:
-                out[k] = [x for x in v if x not in M_RANGE]
-        for k, v in out.items():
-            if k[0] in (
-                    config["fjernregional"],
-                    config["kystbanen"],
-                    config["local"]
-                    ):
-                out[k] = [x for x in v if x not in S_RANGE]
-#            else:
-#                out[k] = [x for x in v if x in S_RANGE]
-        for k, v in out.items():
-            if k[0] == config["suburban"] and len(k) > 1:
-                out[k] = [
-                    x for x in v if x in S_RANGE or x in s_exceptions
-                    ]
 
         x = zip(out.keys(), out.values())
         x = sorted(x, key=lambda x: x[0])
@@ -257,7 +262,8 @@ class StationOperators():
             if val not in seen:
                 outdict[k] = v
                 seen.add(val)
-        return outdict
+        
+        return  {frozenset(k): v for k, v in outdict.items()}
 
     def _station_type(self, stop_number: int) -> Tuple[str, ...]:
         """
