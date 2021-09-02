@@ -207,9 +207,9 @@ class StationOperators():
         self.lines = lines
         self._settings = _load_operator_settings(*self.lines)
         self._station_dict = self._pas_station_dict()
-        #self._station_dict_set = {
-        #    k: tuple(v) for k, v in self._station_dict.items()
-        #    }
+        self._station_dict_set = {
+            k: tuple(v) for k, v in self._station_dict.items()
+            }
         self._stop_zone_map = TakstZones().stop_zone_map()
         
         #self._create_lookups()
@@ -263,7 +263,7 @@ class StationOperators():
                 outdict[k] = v
                 seen.add(val)
         
-        return  {frozenset(k): v for k, v in outdict.items()}
+        return {frozenset(k): v for k, v in outdict.items()}
 
     def _station_type(self, stop_number: int) -> Tuple[str, ...]:
         """
