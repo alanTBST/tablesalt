@@ -82,8 +82,9 @@ def _load_operator_settings(
                 chosen_operators.add(v)
             except TypeError:
                 for line in v:
-                    chosen_operators.add(config_dict[line])
+                    chosen_operators.add(config_dict[line])                  
                     chosen_lines.add(line.lower())
+                chosen_lines.remove(k) # remove the group name...local, suburban etc
     operator_ids = {
         k.lower(): v for k, v in  mappers['operator_id'].items()
         }
@@ -147,10 +148,6 @@ def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
     pas_stations.columns = [x.lower() for x in pas_stations.columns]
     return pas_stations
 
-
-
-
-
 # make a separate lookup class
 class StationOperators():
 
@@ -213,7 +210,7 @@ class StationOperators():
 
         pas_stations = _load_default_passenger_stations(*self.lines)
         s_exceptions = pas_stations.query(
-            "uic > 8690000")['parent_uic'].dropna().astype(int).tolist()
+            "stop_id > 8690000")['parent_uic'].dropna().astype(int).tolist()
 
         # range(1, ..) - include single operators in the permutations
 
