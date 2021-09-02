@@ -76,12 +76,14 @@ def _load_operator_settings(
 
     chosen_lines = {x.lower() for x in lines}
 
+    use_groups = False # if a group of lines is input
     chosen_operators = set()
     for k, v in config_dict.items():
         if k in chosen_lines:
             try:
                 chosen_operators.add(v)
             except TypeError:
+                use_groups = True
                 for line in v:
                     chosen_operators.add(config_dict[line])                  
                     chosen_lines.add(line.lower())
@@ -101,7 +103,8 @@ def _load_operator_settings(
         'operator_ids': operator_ids,
         'operators': operators,
         'config': config_dict,
-        'lines': chosen_lines
+        'lines': chosen_lines,
+        'use_groups': use_groups
         }
 
 
