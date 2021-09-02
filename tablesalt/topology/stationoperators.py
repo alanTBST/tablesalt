@@ -244,22 +244,6 @@ class StationOperators():
         
         return val
 
-    def _get_operator(self, stop_number: int) -> Tuple[str, ...]:
-        """return the operators that survice the station
-
-        :param stop_number: the stop uic number
-        :type stop_number: int
-        :raises KeyError: if the station/stop is not found
-        :return:  a tuple of operators that service the stop
-        :rtype: Tuple[str, ...]
-        """
-        try:
-            return self._lookup[stop_number]
-        except KeyError:
-            if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
-                return tuple((self._settings['config']['bus'], ))
-        raise KeyError("stop_number not found")
-
     def _get_lines(self, stop_number: int) -> Tuple[str, ...]:
         """return the line names that the station is on
 
@@ -273,9 +257,26 @@ class StationOperators():
         try:
             return self._lookup_line[stop_number]
         except KeyError:
-             if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
-                return tuple(('bus', ))
+            pass
         raise KeyError("stop_number not found")
+
+    def _get_operator(self, stop_number: int) -> Tuple[str, ...]:
+        """return the operators that survice the station
+
+        :param stop_number: the stop uic number
+        :type stop_number: int
+        :raises KeyError: if the station/stop is not found
+        :return:  a tuple of operators that service the stop
+        :rtype: Tuple[str, ...]
+        """
+        try:
+            return self._lookup[stop_number]
+        except KeyError:
+            if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
+                self.BUS_ID_MAP[]
+                return tuple((self._settings['config']['bus'], ))
+        raise KeyError("stop_number not found")
+
 
     def _get_operator_id(self, stop_number: int) -> Tuple[int, ...]:
         """[summary]
