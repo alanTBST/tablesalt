@@ -261,8 +261,8 @@ def chunk_shares(
     model_two_shares = {} # solo_zone_price
     model_three_shares = {} # bumped
     model_four_shares = {}
-
     for k, zones, stops, operators, usage in tqdm(gen):
+        # k, zones, stops, operators, usage = next(gen)
         sharer = ZoneSharer(graph, zones, stops, operators, usage)
         trip_shares = sharer.share()
 
