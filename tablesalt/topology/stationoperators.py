@@ -417,8 +417,11 @@ class StationOperators():
             line = {f'{region}_bus'}
             operator = {self._settings['config']['bus'][region]}
             
-            self.OP_CACHE[(start_uic, end_uic)] = operator
-            self.LINE_CACHE[(start_uic, end_uic)] = line
+            self.OP_CACHE[(start_uic, end_uic)] = list(operator)
+            self.LINE_CACHE[(start_uic, end_uic)] = list(line)
+            if format == 'operator':          
+                return self.OP_CACHE[(start_uic, end_uic)]
+            return self.LINE_CACHE[(start_uic, end_uic)]
 
                 
         if not start_bus:
@@ -448,8 +451,8 @@ class StationOperators():
                 self.OP_CACHE[(start_uic, end_uic)]  = possible_operators
                 self.LINE_CACHE[(start_uic, end_uic)] = group_lines
             else: 
-                self.OP_CACHE[(start_uic, end_uic)]  = set()
-                self.LINE_CACHE[(start_uic, end_uic)] = set()
+                self.OP_CACHE[(start_uic, end_uic)]  = []
+                self.LINE_CACHE[(start_uic, end_uic)] = []
         else:                      
             possible_operators, possible_lines = self._has_line_intersection(
                 start_uic, line_intersection
@@ -473,10 +476,16 @@ class StationOperators():
             group_lines = set()
             possible_operators = set()
         
-        return group_lines, possible_operators
+        return list(group_lines), list(possible_operators)
 
     
     def _has_line_intersection(self, start_uic, line_intersection):
+        
+
+        if len(line_intersection) == 1:
+            line = list(line_intersection)
+            possible_operators = [self._settings['config'][line[0]]]
+            return possible_operators, line
         
         suburban_option = any(
             x in self._settings['config']['suburban'] for 
@@ -495,4 +504,4 @@ class StationOperators():
             possible_operators = {
                 self._settings['config'][x] for x in possible_lines
                 }
-        return possible_operators, possible_lines
+        return list(possible_operators), list(possible_lines)
