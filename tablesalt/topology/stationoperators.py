@@ -239,7 +239,8 @@ class StationOperators():
 
     BUS_ID_MAP: Dict[int, int] = _load_bus_station_map()
 
-    ID_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
+    LINE_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
+    OP_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
 
     def __init__(self, *lines: str) -> None:
         """
@@ -436,82 +437,76 @@ class StationOperators():
         >>> opgetter.station_pair(8600626, 8600669, format='operator')
             ('first',)
         """ 
+        if format == 'operator':
+            try:
+                return self.OP_CACHE[(start_uic, end_uic)]
+            except KeyError:
+                pass
+        elif format == 'line':
+            try:
+                return self.LINE_CACHE[(start_uic, end_uic)]
+            except KeyError:
+                pass
+        else:
+            raise ValueError(f"format={format} not available")
         
-        try:
-            return self.OP_CACHE[(start_uic, end_uic)]
-        except KeyError:
-            pass
+        start_bus = start_uic > MAX_RAIL_UIC or start_uic < MIN_RAIL_UIC
+        end_bus = end_uic > MAX_RAIL_UIC or end_uic < MIN_RAIL_UIC
 
-        out = {}
-        
-
-            start_bus = start_uic > MAX_RAIL_UIC or start_uic < MIN_RAIL_UIC
-            end_bus = end_uic > MAX_RAIL_UIC or end_uic < MIN_RAIL_UIC
-
-            if not start_bus:
-                start_lines = self._stop_lookup[start_uic]
-            if not end_bus:
-                end_lines = self._stop_lookup[end_uic]
-            else:
-                bus_loc_check = self._check_bus_location(end_uic)
-                if bus_loc_check:
-                    end_uic = bus_loc_check
-                    end_lines = self._stop_lookup[end_uic]
-                raise ValueError(f"Unknown bus stop id={end_uic}")
-            
-            line_intersection = start_lines.intersection(end_lines)
-            
-            if not line_intersection:
-                # find missing stop point
-                start_groups = {self._group_lines.get(x) for x in start_lines}
-                end_groups = {self._group_lines.get(x) for x in end_lines}  
-                group_intersection = start_groups.intersection(end_groups)
-
-                if group_intersection:
-                    if len(group_intersection) == 1:
-                        group = group_intersection.pop()
-                        group_lines = set(self._settings['config'][group])
-                        possible_operators = {self._settings['config'][x] for x in group_lines}
-                        out[(start_uic, end_uic)] = possible_operators 
-                    else:
-                        out[(start_uic, end_uic)] = set()
-                else: 
-                    out[(start_uic, end_uic)] = set()
-            else:           
-                if start_uic in mappers['s_uic']:
-                    possible_lines = {x for x in line_intersection if x in self._settings['config']['suburban']}
-                    possible_operators = {self._settings['config'][x] for x in possible_lines}
-                else:
-                    possible_lines = {x for x in line_intersection if x not in self._settings['config']['suburban']}
-                    possible_operators = {self._settings['config'][x] for x in possible_lines}
-
-                out[(start_uic, end_uic)] = possible_operators                           
-        
         if start_bus:
             startzone = self._stop_zone_map.get(start_uic)
             if startzone:
                 region = determine_takst_region(startzone)
+                line = {f'{region}_bus'}
+                operator = {self._settings['config']['bus'][region]}
+                
+                self.OP_CACHE[(start_uic, end_uic)] = operator
+                self.LINE_CACHE[(start_uic, end_uic)] = line
+        
             raise ValueError(f"Unknown bus stop id={start_uic}")
         
-        return 
-{(8600624, 8690798): {'dsb', 'stog'},
- (8600798, 8672626): {'dsb', 'stog'},
- (8610803, 8690792): {'dsb', 'stog'},
- (8600626, 8680624): {'dsb', 'stog'},
- (8600624, 8600626): {'dsb', 'stog'},
- (8671626, 8680624): {'dsb', 'stog'},
- (8600624, 8672626): {'dsb', 'stog'},
- (8600626, 8690798): {'dsb', 'stog'},
- (8671626, 8690798): {'dsb', 'stog'},
- (8600624, 8600798): {'dsb', 'stog'},
- (8680624, 8672626): {'dsb', 'stog'},
- (8600798, 8603330): {'dsb', 'stog'},
- (8671626, 8600624): {'dsb', 'stog'},
- (8680624, 8600798): {'dsb', 'stog'},
- (8610803, 8600792): {'dsb', 'stog'},
- (8600792, 8600803): {'dsb', 'stog'},
- (8600626, 8600798): {'dsb', 'stog'},
- (8600624, 8603330): {'dsb', 'stog'},
- (8600624, 8680624): {'dsb', 'stog'},
- (8671626, 8600798): {'dsb', 'stog'},
- (8680624, 8603330): {'dsb', 'stog'}}
+        if not start_bus:
+            start_lines = self._stop_lookup[start_uic]
+        if not end_bus:
+            end_lines = self._stop_lookup[end_uic]
+        else:
+            bus_loc_check = self._check_bus_location(end_uic)
+            if bus_loc_check:
+                end_uic = bus_loc_check
+                end_lines = self._stop_lookup[end_uic]
+            raise ValueError(f"Unknown bus stop id={end_uic}")
+        
+        line_intersection = start_lines.intersection(end_lines)
+        
+        if not line_intersection:
+            # find missing stop point
+            start_groups = {self._group_lines.get(x) for x in start_lines}
+            end_groups = {self._group_lines.get(x) for x in end_lines}  
+            group_intersection = start_groups.intersection(end_groups)
+
+            if group_intersection:
+                if len(group_intersection) == 1:
+                    group = group_intersection.pop()
+                    group_lines = set(self._settings['config'][group])
+                    possible_operators = {self._settings['config'][x] for x in group_lines}
+                    self.OP_CACHE[(start_uic, end_uic)] = possible_operators
+                    self.LINE_CACHE[(start_uic, end_uic)] = possible_operators 
+                else:
+                    self.OP_CACHE[(start_uic, end_uic)]  = set()
+            else: 
+                self.OP_CACHE[(start_uic, end_uic)]  = set()
+        else:           
+            if start_uic in mappers['s_uic']:
+                possible_lines = {x for x in line_intersection if x in self._settings['config']['suburban']}
+                possible_operators = {self._settings['config'][x] for x in possible_lines}
+            else:
+                possible_lines = {x for x in line_intersection if x not in self._settings['config']['suburban']}
+                possible_operators = {self._settings['config'][x] for x in possible_lines}
+
+            self.OP_CACHE[(start_uic, end_uic)] = possible_operators
+            self.LINE_CACHE[(start_uic, end_uic)] = possible_lines                      
+        
+        
+        if format == 'operator':          
+            return self.OP_CACHE[(start_uic, end_uic)] 
+        return self.LINE_CACHE[(start_uic, end_uic)]

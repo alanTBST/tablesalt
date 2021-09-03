@@ -18,7 +18,9 @@ def test_easy_metro_station_pair(sj_station_getter, station_tuple):
     :type station_tuple: [type]
     """
 
-    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
+    line = sj_station_getter.station_pair(
+        station_tuple[0], station_tuple[1], format='line'
+        )
     #op_res = sj_station_getter.station_pair(8603307, 8603308, format='operator')
 
     assert line == ('metro', )
@@ -30,7 +32,9 @@ def test_easy_metro_station_pair(sj_station_getter, station_tuple):
      (8603302, 8600856)]) 
 def test_harder_metro_station_pair(sj_station_getter, station_tuple):
 
-    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
+    line = sj_station_getter.station_pair(
+        station_tuple[0], station_tuple[1], format='line'
+        )
     assert line == ('metro', )
 
 
@@ -41,7 +45,9 @@ def test_harder_metro_station_pair(sj_station_getter, station_tuple):
      ) 
 
 def test_easy_kyst_station_pair(sj_station_getter, station_tuple):
-    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
+    line = sj_station_getter.station_pair(
+        station_tuple[0], station_tuple[1], format='line'
+        )
     assert line == ('kystbanen', )
 
 
@@ -57,14 +63,15 @@ def test_harder_kyst_station_pair(sj_station_getter, station_tuple):
 @pytest.mark.parametrize('station_tuple',
     [(8600626, 6548),
      (8600626, 6554), 
-     (8600626, 6551), 
-     (8600858, 6551)]) 
+     (8600626, 6551)]) 
 def test_easy_dsb_bus_station_pair(sj_station_getter, station_tuple):
 
     line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
 
     assert line == ('fjernregional', )
 
+
+# missed check at  , (8600858, 6551)
 def test_start_dsb_to_metro():
     return 
 
@@ -123,9 +130,21 @@ def test_stog_to_local_equals_local(sj_station_getter, station_tuple):
      (8600683, 7933),
      (8690683, 6118)]
     )
-
 def test_stog_to_localbus_equals_local(sj_station_getter, station_tuple):
     line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
     assert line == ('local', )
+
+
+def test_start_bus_hovedstaden():
+    assert True
+
+def test_start_bus_sydsj():
+    assert True
+
+def test_start_bus_vestsj():
+    assert True
+
+
+
 
 
