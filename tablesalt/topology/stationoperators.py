@@ -477,8 +477,13 @@ class StationOperators():
 
     
     def _has_line_intersection(self, start_uic, line_intersection):
-
-        if start_uic in mappers['s_uic']:
+        
+        suburban_option = any(
+            x in self._settings['config']['suburban'] for 
+            x in line_intersection
+            )
+        
+        if start_uic in mappers['s_uic'] and suburban_option:
             possible_lines = {x for x in line_intersection if 
                               x in self._settings['config']['suburban']}
             possible_operators = {
