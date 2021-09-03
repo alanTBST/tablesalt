@@ -27,7 +27,7 @@ def test_easy_metro_operator(station_tuple):
         )
     #op_res = sj_station_getter.station_pair(8603307, 8603308, format='operator')
 
-    assert line == {'metro'}
+    assert line == ['metro']
 
 
 
@@ -41,7 +41,7 @@ def test_harder_metro_operator(station_tuple):
     line = sj_station_getter.station_pair(
         station_tuple[0], station_tuple[1], format='operator'
         )
-    assert line == {'metro'}
+    assert line == ['metro']
 
 
 
@@ -54,7 +54,7 @@ def test_easy_kyst_line(station_tuple):
     line = sj_station_getter.station_pair(
         station_tuple[0], station_tuple[1], format='line'
         )
-    assert line == {'kystbanen'}
+    assert line == ['kystbanen']
 
 
 
@@ -68,7 +68,7 @@ def test_easy_kyst_operator(station_tuple):
     line = sj_station_getter.station_pair(
         station_tuple[0], station_tuple[1], format='operator'
         )
-    assert line == {'first'}
+    assert line == ['first']
 
 
 @pytest.mark.parametrize('station_tuple',
@@ -81,7 +81,7 @@ def test_easy_dsb_bus_line(station_tuple):
     line = sj_station_getter.station_pair(
         station_tuple[0], station_tuple[1], format='line'
         )
-    assert line == {'vestbanen_sjælland'}
+    assert line == ['vestbanen_sjælland']
 
 
 
@@ -111,7 +111,7 @@ def test_east_coast(station_tuple):
     line = sj_station_getter.station_pair(
         station_tuple[0], station_tuple[1], format='operator'
         )
-    assert line == {'first'}
+    assert line == ['first']
 
 
 
@@ -145,7 +145,7 @@ def test_dsb_to_stog_equals_dsb(station_tuple):
     ) 
 def test_stog_to_dsb_equals_stog(station_tuple):   
     line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='operator')
-    assert line == {'stog'}
+    assert line == ['s-tog']
 
 
 @pytest.mark.parametrize('station_tuple',
@@ -156,7 +156,7 @@ def test_stog_dsb_equals_local(station_tuple):
     line = sj_station_getter.station_pair(
         station_tuple[0], station_tuple[1], format='operator'
         )
-    assert line == {'movia_h'}
+    assert line == ['movia_h']
     
 @pytest.mark.parametrize('station_tuple',
     [(8690683, 8601411),
@@ -169,7 +169,7 @@ def test_stog_to_local_equals_local(station_tuple):
     line = sj_station_getter.station_pair(
         station_tuple[0], station_tuple[1], format='operator'
         )
-    assert line == {'movia_h'}
+    assert line == ['movia_h']
 
 @pytest.mark.parametrize('station_tuple',
     [(8690683, 7933),
