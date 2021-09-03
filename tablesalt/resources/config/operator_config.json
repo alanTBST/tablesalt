@@ -73,5 +73,6 @@
 							  "sydbanen_lolland",
 							  "lillesyd",
 							  "nordvest_banen", 
-							  "ringsted_banen"]
+							  "ringsted_banen"], 
+	"kystkastrup": ["øresunds_banen", "kystbanen"]
 }
