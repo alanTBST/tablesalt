@@ -90,7 +90,9 @@ def test_easy_dsb_bus_line(station_tuple):
      (8600622, 8600669), 
      (8600622, 8600858), 
      (8690622, 8600858), 
-     (8600696, 8600668)]
+     (8600696, 8600668), 
+     (8600611, 8600807), 
+     (8601411, 8603003)]
      )
 def test_missed_check(station_tuple):
     """a missed check between to stations should 
@@ -99,11 +101,6 @@ def test_missed_check(station_tuple):
         station_tuple[0], station_tuple[1], format='operator'
         )
     assert len(line) != 1
-
-
-
-
-
 
 
 def test_start_dsb_to_metro():
@@ -143,8 +140,10 @@ def test_stog_to_dsb_equals_stog(station_tuple):
      (8600683, 8600669)]
     ) 
 def test_stog_dsb_equals_local(station_tuple):   
-    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
-    assert True
+    line = sj_station_getter.station_pair(
+        station_tuple[0], station_tuple[1], format='operator'
+        )
+    assert line == {'movia_h'}
     
 @pytest.mark.parametrize('station_tuple',
     [(8690683, 8601411),
@@ -154,9 +153,10 @@ def test_stog_dsb_equals_local(station_tuple):
     ]
     ) 
 def test_stog_to_local_equals_local(station_tuple):
-    line = sj_station_getter.station_pair(station_tuple[0], station_tuple[1], format='line')
-
-    assert True
+    line = sj_station_getter.station_pair(
+        station_tuple[0], station_tuple[1], format='operator'
+        )
+    assert line == {'movia_h'}
 
 @pytest.mark.parametrize('station_tuple',
     [(8690683, 7933),
