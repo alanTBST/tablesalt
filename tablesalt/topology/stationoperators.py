@@ -145,9 +145,37 @@ def _alternate_stop_map():
         for i, stopid in enumerate(v):
             alternate_dicts[i][k] = stopid
 
-    return alternate_dicts
+    metromap = mappers['metro_map']
+    revmetromap = mappers['metro_map_rev']
+    
+    sstops = mappers['s_uic']
+    mstops = mappers['m_uic']
 
-def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
+    sstopsdict = {}
+    for stopid in sstops:
+        normalid = stopid - 90000
+        ms = revmetromap.get(normalid)
+        alts = [d.get(normalid) for d in alternate_dicts.values()]
+        alts = [x for x in alts if x and x != stopid]
+        if ms:
+            alts = alts + [ms]
+        for x in alts:
+            sstopsdict[x] = stopid
+    
+    mstopsdict = {}
+    for stopid in mstops:
+        ss = metromap.get(stopid)
+        alts = [d.get(ss) for d in alternate_dicts.values()]
+        alts = [x for x in alts if x and x != stopid]
+        for x in alts:
+            mstopsdict[x] = stopid
+
+    alternate_dicts[max_alternates] = metromap
+    alternate_dicts[max_alternates+1] = revmetromap
+
+    return alternate_dicts, sstopsdict, mstopsdict
+
+def _load_default_passenger_stations() -> pd.core.frame.DataFrame:
 
     """load the passenger stations data
 
@@ -164,23 +192,47 @@ def _load_default_passenger_stations(*lines: str) -> pd.core.frame.DataFrame:
         )
     pas_stations.columns = [x.lower() for x in pas_stations.columns]
 
-    alternates = pas_stations.query("stop_id in @ALTERNATE_STATIONS")
+    alternate_dicts, sstopsdict, mstopsdict = _alternate_stop_map()
 
-    alternate_dicts = _alternate_stop_map()
-    # ADD METRO MAPS
-
-    new_frames = []
+    frames = []
     for i, d in alternate_dicts.items():
-        new_frame = alternates.copy()
+
+        new_frame = pas_stations.copy()
         new_frame = new_frame.query("stop_id in @d")
         new_frame.loc[:, 'stop_id'] = new_frame.loc[:, 'stop_id'].map(d)
-        new_frames.append(new_frame)
+        
+        sframe = new_frame.query("stop_id in @sstopsdict").copy()
+        sframe.loc[:, 'stop_id'] = sframe.loc[:, 'stop_id'].map(sstopsdict)
 
-    concat_new_frames = pd.concat(new_frames, ignore_index=True)
-    out = pd.concat([pas_stations, concat_new_frames], ignore_index=True)
-    cols = ['stop_id'] + list(lines)
-    out = out[cols]
-    return out
+        mframe = new_frame.query("stop_id in @mstopsdict").copy()
+        mframe.loc[:, 'stop_id'] = mframe.loc[:, 'stop_id'].map(mstopsdict)        
+        
+        new_frame = new_frame.set_index('stop_id')
+        sframe = sframe.set_index('stop_id')
+        mframe = mframe.set_index('stop_id')
+        
+        frames.append(new_frame)
+        frames.append(sframe)
+        frames.append(mframe)
+
+
+
+    pas_stations = pas_stations.query("stop_id > @MIN_RAIL_UIC ")
+    pas_stations = pas_stations.set_index('stop_id')
+    frames.append(pas_stations)
+
+    return frames
+
+
+def _grouped_lines_dict(config_dict):
+
+    groupdict = {}
+    for line, info in config_dict.items():
+        if isinstance(info, list):
+            for l in info:
+                groupdict[l] = line
+    return groupdict
+
 
 # make a separate lookup class
 class StationOperators():
@@ -211,9 +263,11 @@ class StationOperators():
 
         self.lines = lines
         self._settings = _load_operator_settings(*self.lines)
-        self._lookup_line = self._pas_station_dict()
-        
+        stop_lookup, line_lookup = self._pas_station_dict()   
+        self._stop_lookup = stop_lookup   
+        self._line_lookup = line_lookup   
         self._stop_zone_map = TakstZones().stop_zone_map()
+        self._group_lines = _grouped_lines_dict(self._settings['config'])
 
     def _pas_station_dict(self) -> Dict[Tuple[str, ...], List[int]]:
         """
@@ -221,44 +275,22 @@ class StationOperators():
         dataset
         """
         lines = self._settings['lines']
-        pas_stations = _load_default_passenger_stations(*lines)
-        pas_stations = pas_stations.set_index('stop_id')
-        # range(1, ..) - include single operators in the permutations
-
-        all_perms = (
-            x for l in range(1, len(lines)) for
-            x in combinations(lines, l)
-        )
-
-        
-        cache = {}
+        pas_stations = _load_default_passenger_stations()
+  
+        line_lookup = defaultdict(set)
         for line in lines:
-            s = pas_stations[line]
-            cache[line] = set(s[s > 0].index)
+            for frame in pas_stations:
+                s = frame[line]
+                good = set(s[s > 0].index)
+                line_lookup[line].update(good)
         
-        out = {}
-        val = defaultdict(set)
-        for k, v in cache.items():
+        stop_lookup = defaultdict(set)
+        for k, v in line_lookup.items():
             for stopid in v:
-                val[stopid].add(k)
+                stop_lookup[stopid].add(k)
         
-        return val
+        return stop_lookup, line_lookup
 
-    def _get_lines(self, stop_number: int) -> Tuple[str, ...]:
-        """return the line names that the station is on
-
-        :param stop_number: the stop uic number
-        :type stop_number: int
-        :raises KeyError: the stop uic number
-        :return: a tuple of line names that the stop is on
-        :rtype: Tuple[str, ...]
-        """
-
-        try:
-            return self._lookup_line[stop_number]
-        except KeyError:
-            pass
-        raise KeyError("stop_number not found")
 
     def _get_operator(self, stop_number: int) -> Tuple[str, ...]:
         """return the operators that survice the station
@@ -273,7 +305,7 @@ class StationOperators():
             return self._lookup[stop_number]
         except KeyError:
             if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
-                self.BUS_ID_MAP[]
+
                 return tuple((self._settings['config']['bus'], ))
         raise KeyError("stop_number not found")
 
@@ -370,104 +402,11 @@ class StationOperators():
 
         return self.BUS_ID_MAP.get(bus_stop_id, 0)
 
-    def _pair_operator(
-        self, start_uic: int,
-        start_ops: Tuple[str, ...],
-        end_ops: Tuple[str, ...]
-        ) -> Tuple[str, ...]:
-
-        """return the possible operator strings that can service the
-        a start and end point
-
-        :return: a tuple of operators that serve the station pair
-        :rtype: Tuple[str, ...]
-        """
-
-        intersect = set(start_ops).intersection(set(end_ops))
-        if len(intersect) == 1:
-            return tuple(intersect)
-
-        if intersect:
-            if start_uic in M_RANGE:
-                return tuple((self._settings['config']['metro'], ))
-
-            if start_uic in S_RANGE:
-                return tuple((self._settings['config']['suburban'], ))
-
-        return tuple(intersect)
-
-    def _pair_operator_id(
-        self, start_uic: int,
-        start_ops: Tuple[int, ...],
-        end_ops: Tuple[int, ...]
-        ) -> Tuple[int, ...]:
-        """return the possibe operator ids that can service
-        a start and end point
-
-        :param start_uic: station id of start
-        :type start_uic: int
-        :param start_ops: station operators of start
-        :type start_ops: Tuple[int, ...]
-        :param end_ops: station operators of end
-        :type end_ops: Tuple[int, ...]
-        :return: a tuple of the possible operator ids
-        :rtype: Tuple[int, ...]
-        """
-
-
-        intersect = set(start_ops).intersection(set(end_ops))
-        if len(intersect) == 1:
-            return tuple(intersect)
-
-        if intersect:
-
-            if start_uic in M_RANGE:
-                return tuple(
-                    (self._settings['operator_ids'][self._settings['config']['metro']], )
-                    )
-            if start_uic in S_RANGE:
-                return tuple(
-                    (self._settings['operator_ids'][self._settings['config']['suburban']], )
-                    )
-
-        return tuple(intersect)
-
-
-    def _pair_line(
-        self, start_uic: int,
-        start_ops: Tuple[str, ...],
-        end_ops: Tuple[str, ...]
-        ) -> Tuple[str, ...]:
-        """return the possible lines that can service
-        a start and end point
-
-        :param start_uic: the stop number of
-        :type start_uic: int
-        :param start_ops: the possible operators at the start
-        :type start_ops: Tuple[str, ...]
-        :param end_ops: the possible operators at the end
-        :type end_ops: Tuple[str, ...]
-        :return: the possible lines
-        :rtype: Tuple[str, ...]
-        """
-
-        intersect = set(start_ops).intersection(set(end_ops))
-        if len(intersect) == 1:
-            return tuple(intersect)
-        if intersect:
-            if start_uic in M_RANGE:
-                return tuple(('metro', ))
-            if start_uic in S_RANGE:
-                return tuple(('suburban', ))
-
-        return tuple(intersect)
-
-
     def station_pair(
         self,
         start_uic: int,
         end_uic: int,
-        format: Optional[str] = 'operator_id'
+        format: Optional[str] = 'operator'
         ) -> Union[Tuple[int, ...], Tuple[str, ...]]:
         """
         Returns the possible operators that can perform
@@ -496,42 +435,83 @@ class StationOperators():
             ('kystbanen',)
         >>> opgetter.station_pair(8600626, 8600669, format='operator')
             ('first',)
-        >>> opgetter.station_pair(8600626, 8600669, format='operator_id')
-            (8,)
-        """
-
+        """ 
+        
         try:
-            return self.ID_CACHE[(start_uic, end_uic, format)]
+            return self.OP_CACHE[(start_uic, end_uic)]
         except KeyError:
             pass
 
-        start_bus = start_uic > MAX_RAIL_UIC or start_uic < MIN_RAIL_UIC
-        end_bus = end_uic > MAX_RAIL_UIC or end_uic < MIN_RAIL_UIC
+        out = {}
+        
 
-        if start_bus:
-            return self.get_ops(start_uic, format=format)
+            start_bus = start_uic > MAX_RAIL_UIC or start_uic < MIN_RAIL_UIC
+            end_bus = end_uic > MAX_RAIL_UIC or end_uic < MIN_RAIL_UIC
 
-        if not start_bus and end_bus:
-            bus_loc_check = self._check_bus_location(end_uic)
-            if bus_loc_check:
-                end_uic = bus_loc_check
+            if not start_bus:
+                start_lines = self._stop_lookup[start_uic]
+            if not end_bus:
+                end_lines = self._stop_lookup[end_uic]
             else:
-                raise ValueError(
-            f"Can't find station for end of leg bus stop id {end_uic}"
-            )
-        start_ops = self.get_ops(start_uic, format=format)
-        end_ops = self.get_ops(end_uic, format=format)
+                bus_loc_check = self._check_bus_location(end_uic)
+                if bus_loc_check:
+                    end_uic = bus_loc_check
+                    end_lines = self._stop_lookup[end_uic]
+                raise ValueError(f"Unknown bus stop id={end_uic}")
+            
+            line_intersection = start_lines.intersection(end_lines)
+            
+            if not line_intersection:
+                # find missing stop point
+                start_groups = {self._group_lines.get(x) for x in start_lines}
+                end_groups = {self._group_lines.get(x) for x in end_lines}  
+                group_intersection = start_groups.intersection(end_groups)
 
-        fdict: Dict[str,  Union[Tuple[int, ...], Tuple[str, ...]]]
+                if group_intersection:
+                    if len(group_intersection) == 1:
+                        group = group_intersection.pop()
+                        group_lines = set(self._settings['config'][group])
+                        possible_operators = {self._settings['config'][x] for x in group_lines}
+                        out[(start_uic, end_uic)] = possible_operators 
+                    else:
+                        out[(start_uic, end_uic)] = set()
+                else: 
+                    out[(start_uic, end_uic)] = set()
+            else:           
+                if start_uic in mappers['s_uic']:
+                    possible_lines = {x for x in line_intersection if x in self._settings['config']['suburban']}
+                    possible_operators = {self._settings['config'][x] for x in possible_lines}
+                else:
+                    possible_lines = {x for x in line_intersection if x not in self._settings['config']['suburban']}
+                    possible_operators = {self._settings['config'][x] for x in possible_lines}
 
-        fdict = {
-            'operator_id': self._pair_operator_id(start_uic, start_ops, end_ops),
-            'operator': self._pair_operator(start_uic, start_ops, end_ops),
-            'line': self._pair_line(start_uic, start_ops, end_ops)
-            }
-
-        returnval: Union[Tuple[int, ...], Tuple[str, ...]]
-        returnval = fdict[format]
-        if format == 'operator_id':
-            self.ID_CACHE[(start_uic, end_uic, format)] = returnval
-        return returnval
+                out[(start_uic, end_uic)] = possible_operators                           
+        
+        if start_bus:
+            startzone = self._stop_zone_map.get(start_uic)
+            if startzone:
+                region = determine_takst_region(startzone)
+            raise ValueError(f"Unknown bus stop id={start_uic}")
+        
+        return 
+{(8600624, 8690798): {'dsb', 'stog'},
+ (8600798, 8672626): {'dsb', 'stog'},
+ (8610803, 8690792): {'dsb', 'stog'},
+ (8600626, 8680624): {'dsb', 'stog'},
+ (8600624, 8600626): {'dsb', 'stog'},
+ (8671626, 8680624): {'dsb', 'stog'},
+ (8600624, 8672626): {'dsb', 'stog'},
+ (8600626, 8690798): {'dsb', 'stog'},
+ (8671626, 8690798): {'dsb', 'stog'},
+ (8600624, 8600798): {'dsb', 'stog'},
+ (8680624, 8672626): {'dsb', 'stog'},
+ (8600798, 8603330): {'dsb', 'stog'},
+ (8671626, 8600624): {'dsb', 'stog'},
+ (8680624, 8600798): {'dsb', 'stog'},
+ (8610803, 8600792): {'dsb', 'stog'},
+ (8600792, 8600803): {'dsb', 'stog'},
+ (8600626, 8600798): {'dsb', 'stog'},
+ (8600624, 8603330): {'dsb', 'stog'},
+ (8600624, 8680624): {'dsb', 'stog'},
+ (8671626, 8600798): {'dsb', 'stog'},
+ (8680624, 8603330): {'dsb', 'stog'}}
