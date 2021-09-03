@@ -24,10 +24,12 @@ from tablesalt.topology.stopnetwork import StopsList
 from tablesalt.topology.zonegraph import ZoneGraph
 from tablesalt.topology.tools import determine_takst_region
 
-# put these in lines in a config
-#OPGETTER = stationoperators.StationOperators(
-#    'kystbanen', 'sjællandlocal', 'metro', 'suburban', 'sjællandfjernregional'
-#    )
+
+OPGETTER = stationoperators.StationOperators(
+    'kystbanen', 'sjællandlocal', 'metro', 
+    'suburban', 'sjællandfjernregional',
+    'øresunds_banen'
+    )
 
 OP_MAP = {v: k.lower() for k, v in mappers['operator_id'].items()}
 REV_OP_MAP = {v: k for k, v in OP_MAP.items()}
@@ -519,12 +521,13 @@ class ZoneSharer(ZoneProperties):
     def _station_operators(self):
         """get the operators at the visited stations"""
 
-        oplegs = tuple(
-            OPGETTER.station_pair(*x, format='operator_id')
-            for x in self.stop_legs
-                )
+        opsequence = ()
+        for x in self.stop_legs:
+            ops = OPGETTER.station_pair(*x, format='operator')
+            op = stationoperators.REV_OP_MAP[(list(ops)[0])]
+            opsequence += (op, )
 
-        return oplegs
+        return opsequence
     
     @staticmethod
     def _bump_zone_normal(share_tuple, n_zones):
@@ -701,23 +704,22 @@ class ZoneSharer(ZoneProperties):
         if not all(len(set(x)) == 1 for x in self.operator_legs):
             try:
                 new_op_legs = self._station_operators()
-            except (TypeError, KeyError):
-                
+            except (ValueError, TypeError):            
                 shares = {'standard': 'station_map_error', 
                           'solo_price': 'station_map_error', 
                           'bumped': 'station_map_error', 
                           'bumped_solo': 'station_map_error'}
                 self.SHARE_CACHE[val] = shares
                 return shares
-            try:
-                self.operator_legs = legops(new_op_legs)
             except IndexError:
                 shares = {'standard': 'operator_error', 
                           'solo_price': 'operator_error', 
                           'bumped': 'operator_error', 
                           'bumped_solo': 'operator_error'}
                 self.SHARE_CACHE[val] = shares
-                return shares
+                return shares                
+
+            self.operator_legs = tuple((x, x) for x in new_op_legs)
 
         if not all(len(set(x)) == 1 for x in self.operator_legs):
             shares = {'standard': 'operator_error', 
@@ -727,9 +729,6 @@ class ZoneSharer(ZoneProperties):
             self.SHARE_CACHE[val] = shares        
             return shares
 
-        self.operator_sequence = tuple(
-            [x[0] for x in self.operator_legs] + [self.operator_legs[-1][1]]
-            )
 
         property_dict = self.property_dict()
         property_dict['ops_in_touched'] = operators_in_touched_(
