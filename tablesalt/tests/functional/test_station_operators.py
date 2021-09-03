@@ -103,6 +103,19 @@ def test_missed_check(station_tuple):
     assert len(line) != 1
 
 
+
+@pytest.mark.parametrize('station_tuple',
+    [(8600669, 8600858)]
+     )
+def test_east_coast(station_tuple):
+    line = sj_station_getter.station_pair(
+        station_tuple[0], station_tuple[1], format='operator'
+        )
+    assert line == {'first'}
+
+
+
+
 def test_start_dsb_to_metro():
     return 
 
