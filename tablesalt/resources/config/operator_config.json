@@ -11,9 +11,10 @@
     "nordvest_banen": "dsb", 
     "nærumbanen": "movia_h", 
     "odsherreds_banen": "movia_v", 
+	"ringsted_banen": "dsb",
 	"tølløse_banen": "movia_v",
     "vestbanen_sjælland": "dsb", 
-	"sydbanen_sjælland": "dsd",
+	"sydbanen_sjælland": "dsb",
 	"sydbanen_falster": "dsb",
 	"sydbanen_lolland": "dsb",
     "øresunds_banen": "first", 
@@ -67,5 +68,6 @@
 							  "sydbanen_falster", 
 							  "sydbanen_lolland",
 							  "lillesyd",
-							  "nordvest_banen"]
+							  "nordvest_banen", 
+							  "ringsted_banen"]
 }
