@@ -292,50 +292,6 @@ class StationOperators():
         
         return stop_lookup, line_lookup
 
-
-    def _get_operator(self, stop_number: int) -> Tuple[str, ...]:
-        """return the operators that survice the station
-
-        :param stop_number: the stop uic number
-        :type stop_number: int
-        :raises KeyError: if the station/stop is not found
-        :return:  a tuple of operators that service the stop
-        :rtype: Tuple[str, ...]
-        """
-        try:
-            return self._lookup[stop_number]
-        except KeyError:
-            if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
-
-                return tuple((self._settings['config']['bus'], ))
-        raise KeyError("stop_number not found")
-
-
-    def _get_operator_id(self, stop_number: int) -> Tuple[int, ...]:
-        """[summary]
-
-        :param stop_number: the stop uic number
-        :type stop_number: int
-        :raises KeyError: the stop uic number
-        :return:  a tuple of operator ids that the stop is on
-        :rtype: Tuple[int, ...]
-        """
-        try:
-            # 1 is movia_H, this must be made generic
-            op_name = determine_takst_region(self._stop_zone_map[stop_number])
-            return tuple(
-                self._settings['operator_ids'].get(x, REV_OP_MAP[op_name]) for x in self._lookup[stop_number]
-                )
-        except KeyError:
-            try:
-                if stop_number > MAX_RAIL_UIC or stop_number < MIN_RAIL_UIC:
-                    op_name = determine_takst_region(self._stop_zone_map[stop_number])
-                    return tuple((REV_OP_MAP[op_name], ))
-            except KeyError:
-                raise KeyError(f"stop number = {stop_number} is not a valid stop point")
-        raise KeyError(f"stop_number = {stop_number}  not found")
-
-
     def get_ops(
         self, stop_number: int,
         format: Optional[str] = 'operator_id'
@@ -455,58 +411,83 @@ class StationOperators():
 
         if start_bus:
             startzone = self._stop_zone_map.get(start_uic)
-            if startzone:
-                region = determine_takst_region(startzone)
-                line = {f'{region}_bus'}
-                operator = {self._settings['config']['bus'][region]}
+            if not startzone:
+                raise ValueError(f"Unknown bus stop id={start_uic}")
+            region = determine_takst_region(startzone)
+            line = {f'{region}_bus'}
+            operator = {self._settings['config']['bus'][region]}
+            
+            self.OP_CACHE[(start_uic, end_uic)] = operator
+            self.LINE_CACHE[(start_uic, end_uic)] = line
+
                 
-                self.OP_CACHE[(start_uic, end_uic)] = operator
-                self.LINE_CACHE[(start_uic, end_uic)] = line
-        
-            raise ValueError(f"Unknown bus stop id={start_uic}")
-        
         if not start_bus:
             start_lines = self._stop_lookup[start_uic]
         if not end_bus:
             end_lines = self._stop_lookup[end_uic]
         else:
             bus_loc_check = self._check_bus_location(end_uic)
-            if bus_loc_check:
-                end_uic = bus_loc_check
-                end_lines = self._stop_lookup[end_uic]
-            raise ValueError(f"Unknown bus stop id={end_uic}")
-        
+            if not bus_loc_check:
+                 raise ValueError(f"Unknown bus stop id={end_uic}")
+            end_lines = self._stop_lookup[bus_loc_check]
+                       
         line_intersection = start_lines.intersection(end_lines)
         
         if not line_intersection:
             # find missing stop point
             start_groups = {self._group_lines.get(x) for x in start_lines}
+            start_groups = {x for x in start_groups if x}
             end_groups = {self._group_lines.get(x) for x in end_lines}  
+            end_groups = {x for x in end_groups if x}
             group_intersection = start_groups.intersection(end_groups)
 
             if group_intersection:
-                if len(group_intersection) == 1:
-                    group = group_intersection.pop()
-                    group_lines = set(self._settings['config'][group])
-                    possible_operators = {self._settings['config'][x] for x in group_lines}
-                    self.OP_CACHE[(start_uic, end_uic)] = possible_operators
-                    self.LINE_CACHE[(start_uic, end_uic)] = possible_operators 
-                else:
-                    self.OP_CACHE[(start_uic, end_uic)]  = set()
+                group_lines, possible_operators = self._has_grp_intersection(
+                    group_intersection
+                    )
+                self.OP_CACHE[(start_uic, end_uic)]  = possible_operators
+                self.LINE_CACHE[(start_uic, end_uic)] = group_lines
             else: 
                 self.OP_CACHE[(start_uic, end_uic)]  = set()
-        else:           
-            if start_uic in mappers['s_uic']:
-                possible_lines = {x for x in line_intersection if x in self._settings['config']['suburban']}
-                possible_operators = {self._settings['config'][x] for x in possible_lines}
-            else:
-                possible_lines = {x for x in line_intersection if x not in self._settings['config']['suburban']}
-                possible_operators = {self._settings['config'][x] for x in possible_lines}
+                self.LINE_CACHE[(start_uic, end_uic)] = set()
+        else:                      
+            possible_operators, possible_lines = self._has_line_intersection(
+                start_uic, line_intersection
+                )
 
             self.OP_CACHE[(start_uic, end_uic)] = possible_operators
             self.LINE_CACHE[(start_uic, end_uic)] = possible_lines                      
-        
-        
+              
         if format == 'operator':          
-            return self.OP_CACHE[(start_uic, end_uic)] 
+            return self.OP_CACHE[(start_uic, end_uic)]
         return self.LINE_CACHE[(start_uic, end_uic)]
+
+    def _has_grp_intersection(self, group_intersection):
+        
+        if len(group_intersection) == 1:
+            group = group_intersection.pop()
+            group_lines = set(self._settings['config'][group])
+            possible_operators = {self._settings['config'][x] for x in group_lines}
+                
+        else:
+            group_lines = set()
+            possible_operators = set()
+        
+        return group_lines, possible_operators
+
+    
+    def _has_line_intersection(self, start_uic, line_intersection):
+
+        if start_uic in mappers['s_uic']:
+            possible_lines = {x for x in line_intersection if 
+                              x in self._settings['config']['suburban']}
+            possible_operators = {
+                self._settings['config'][x] for x in possible_lines
+                }
+        else:
+            possible_lines = {x for x in line_intersection if 
+                              x not in self._settings['config']['suburban']}
+            possible_operators = {
+                self._settings['config'][x] for x in possible_lines
+                }
+        return possible_operators, possible_lines
