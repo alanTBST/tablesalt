@@ -491,7 +491,11 @@ class StationOperators():
             x in self._settings['config']['suburban'] for 
             x in line_intersection
             )
-        
+ 
+        metro_option = any(
+            x in self._settings['config']['metro'] for 
+            x in line_intersection
+            )        
         if start_uic in mappers['s_uic'] and suburban_option:
             possible_lines = {x for x in line_intersection if 
                               x in self._settings['config']['suburban']}
