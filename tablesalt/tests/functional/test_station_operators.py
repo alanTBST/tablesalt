@@ -4,11 +4,10 @@ from tablesalt.topology.stationoperators import StationOperators
 
 
 sj_station_getter = StationOperators(
-    'kystbanen',
+    'kystkastrup',
     'suburban',
     'sjællandfjernregional',
     'sjællandlocal',
-    'øresunds_banen',
     'metro'
     )
 
@@ -28,7 +27,7 @@ sj_station_getter = StationOperators(
         (8603302, 8600856),
         (8603333, 8603339), 
         ]
-    )  
+    )
 def test_metro_operator(station_tuple):
 
     operator = sj_station_getter.station_pair(
@@ -152,7 +151,6 @@ def test_kyst_line(station_tuple):
         station_tuple[0], station_tuple[1], format='line'
         )
     assert line == ['kystbanen']
-
 
 
 
