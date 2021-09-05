@@ -26,7 +26,7 @@ from tablesalt.topology.tools import determine_takst_region
 
 
 OPGETTER = stationoperators.StationOperators(
-    'kystkastrup', 'sjællandlocal', 'metro', 
+    'kystkastrup', 'sjællandlocal', 'metro',
     'suburban', 'sjællandfjernregional',
     )
 
@@ -336,7 +336,7 @@ class ZoneProperties():
         self.zone_sequence = tuple(
             [x[0] for x in zone_legs] + [zone_legs[-1][1]]
             )
-        
+
         self.zone_legs = to_legs(self.zone_sequence)
         self.touched_zones = get_touched_zones(self.zone_sequence)
         self.touched_zone_legs = to_legs(self.touched_zones)
@@ -370,7 +370,7 @@ class ZoneProperties():
 
     def _border_startzone(self, zone_leg, stop_leg):
         border_zones = BORDER_STATIONS[stop_leg[0]]
-        border_distances = [len(self.graph.shortest_path(x, zone_leg[1])[0]) 
+        border_distances = [len(self.graph.shortest_path(x, zone_leg[1])[0])
                             for x in border_zones]
         min_pos = int(np.argmin(border_distances))
         start_zone = border_zones[min_pos]
@@ -527,7 +527,7 @@ class ZoneSharer(ZoneProperties):
         self.operator_legs = _remove_idxs(cotr_idxs, self.operator_legs)
         self.zone_legs = _remove_idxs(cotr_idxs, self.zone_legs)
         self.usage_legs = _remove_idxs(cotr_idxs, self.usage_legs)
-    
+
     def _remove_susu(self):
         """remove SuSu legs if they occur at the same station
         """
@@ -543,10 +543,10 @@ class ZoneSharer(ZoneProperties):
                 susu_idxs += (i,)
                 continue
             start = self.stops_dict[j[0]]
-            end =  self.stops_dict[j[1]]              
+            end =  self.stops_dict[j[1]]
             if j[0] in end.alternate_stop_ids or j[1] in start.alternate_stop_ids:
                 susu_idxs += (i,)
-        if susu_idxs:        
+        if susu_idxs:
             self.stop_legs = _remove_idxs(susu_idxs, self.stop_legs)
             self.operator_legs = _remove_idxs(susu_idxs, self.operator_legs)
             self.zone_legs = _remove_idxs(susu_idxs, self.zone_legs)
@@ -562,7 +562,7 @@ class ZoneSharer(ZoneProperties):
             opsequence += (op, )
 
         return opsequence
-    
+
     @staticmethod
     def _bump_zone_normal(share_tuple, n_zones):
 
@@ -575,50 +575,50 @@ class ZoneSharer(ZoneProperties):
 
     def _single_operator_share(self, properties):
         ####### FILL THIS IN
-        
-        return {'standard': (), 
-                'solo_price': (), 
+
+        return {'standard': (),
+                'solo_price': (),
                 'bumped': (),
                 'bumped_solo': ()}
 
     def _single_zone_share(
-        self, 
-        zone, 
-        region, 
-        op_id, 
-        touched_zones, 
-        touched_zone_leg_count, 
+        self,
+        zone,
+        region,
+        op_id,
+        touched_zones,
+        touched_zone_leg_count,
         ops_in_touched_zones
         ):
-        
-        zone_share = 1          
-        if zone in touched_zones:                  
-            if touched_zone_leg_count[zone] == 1:                            
-                res = (zone_share, op_id)                  
+
+        zone_share = 1
+        if zone in touched_zones:
+            if touched_zone_leg_count[zone] == 1:
+                res = (zone_share, op_id)
             else:
-                # need to assign the fraction of the zone for the leg based on it's region for solo    
+                # need to assign the fraction of the zone for the leg based on it's region for solo
                 n_legs_in_zone = touched_zone_leg_count[zone]
                 n_op_id_legs_in_zone = Counter(ops_in_touched_zones[zone])[op_id]
-                try:                  
+                try:
                     zone_share = n_op_id_legs_in_zone / n_legs_in_zone
                     res = (zone_share, op_id)
                 except ZeroDivisionError:
                     res = (zone_share, op_id)
         else:
-            res = (zone_share, op_id)   
+            res = (zone_share, op_id)
 
         return res
-    
+
     @staticmethod
     def _weight_solo(disaggregate_zones, solo_price_legs):
         """weight the shares by the solo zoner pris"""
-        combined = list(zip(chain(*disaggregate_zones), 
+        combined = list(zip(chain(*disaggregate_zones),
                             chain(*solo_price_legs)))
-        
-        
+
+
         total_zones = round(sum(x[0][0] for x in combined))
         total_price = sum(x[0][0]*x[1] for x in combined)
-        
+
         out = []
         for zone_operator, soloprice in combined:
             zone, operator = zone_operator
@@ -632,33 +632,33 @@ class ZoneSharer(ZoneProperties):
 
         out_bumped_solo = [x[0] for x in out_bumped_solo]
         combined = list(zip(out_bumped, out_bumped_solo))
-        
-        
+
+
         total_zones = round(sum(x[0][0] for x in combined))
         total_price = sum(x[0][0]*x[1] for x in combined)
-        
+
         out = []
         for zone_operator, soloprice in combined:
             zone, operator = zone_operator
             val = ((zone * soloprice) / total_price) * total_zones
             out.append((val, operator))
-        return aggregated_zone_operators(tuple(out))       
-    
+        return aggregated_zone_operators(tuple(out))
+
     def share_calculation(
         self,
-        properties: Dict[str, Any], 
+        properties: Dict[str, Any],
         min_zones: Optional[int] = 0
         ) -> Union[Tuple[int, str], Tuple[Tuple[int, str], ...]]:
         """
         Calculate the zone shares for the operators on the trip
 
-        :param val: property_dict from ZoneProperties 
+        :param val: property_dict from ZoneProperties
         :type val: Dict[str, Any]
         :return: the zone shares for the trip
         :rtype: Union[Tuple[int, str], Tuple[Tuple[int, str], ...]]
 
         """
-        
+
         # if self.single:
         #    return self._single_operator_share()
 
@@ -668,72 +668,72 @@ class ZoneSharer(ZoneProperties):
         touched_zones = properties['touched_zones']
         touched_zone_leg_count = properties['nlegs_in_touched']
         ops_in_touched_zones = properties['ops_in_touched']
-        
+
         out_standard = defaultdict(list)
         out_solo = defaultdict(list)
         out_bumped = []
         out_bumped_solo = []
-        
+
         current_op_sum = 0
         previous_op_id = None
 
 
         seen_zone_opid = set()
-        for legnum, imputed_leg in enumerate(imputed_zone_legs):          
-            
+        for legnum, imputed_leg in enumerate(imputed_zone_legs):
+
             leg_region = zone_leg_regions[legnum]
             op_id = self.operator_legs[legnum][0]
             leg_solo_price = self.leg_solo_price(leg_region, op_id)
             if not op_id == previous_op_id and previous_op_id is not None:
                 current_op_sum = 0
-         
+
             for zone in imputed_leg:
                 if (zone, op_id) not in seen_zone_opid:
                     res = self._single_zone_share(
-                        zone, leg_region, op_id, touched_zones, 
-                        touched_zone_leg_count, 
+                        zone, leg_region, op_id, touched_zones,
+                        touched_zone_leg_count,
                         ops_in_touched_zones
                         )
 
                     out_standard[zone].append(res)
                     out_solo[zone].append(leg_solo_price)
-                    
+
                     current_op_sum += res[0]
-                    
+
                     seen_zone_opid.add((zone, op_id))
-                
+
             try:
                 next_op_id = self.operator_legs[legnum+1][0]
                 if op_id != next_op_id:
                     if current_op_sum < min_zones:
-                        current_op_sum = min_zones               
+                        current_op_sum = min_zones
             except IndexError:
                 if current_op_sum < min_zones:
                     current_op_sum = min_zones
-            
+
             out_bumped.append((current_op_sum, res[1]))
             out_bumped_solo.append((leg_solo_price, res[1]))
-            
+
             previous_op_id = op_id
-                
+
         out_standard = {k: tuple(v) for k, v in out_standard.items()}
         standard = aggregated_zone_operators(tuple(out_standard.values()))
         if len(standard) == 1:
             solo_price = standard
         else:
             solo_price = self._weight_solo(out_standard.values(), out_solo.values())
-        
+
         bumped = aggregated_zone_operators(tuple(out_bumped))
         if len(bumped) == 1:
             bumped_solo = bumped
         else:
             bumped_solo = self._weight_solo_bumped(out_bumped, out_bumped_solo)
 
-        return {'standard': standard, 
-                'solo_price': solo_price, 
+        return {'standard': standard,
+                'solo_price': solo_price,
                 'bumped': bumped,
                 'bumped_solo': bumped_solo}
-    
+
     @staticmethod
     def _error_shares(error_name: str) -> Dict[str, str]:
 
@@ -751,11 +751,11 @@ class ZoneSharer(ZoneProperties):
             (self.stop_sequence,
             self.operator_sequence,
             self.usage_sequence)
-            )        
+            )
         if None in chain(*self.stop_legs):
             shares = self._error_shares('station_map_error')
             self.SHARE_CACHE[val] = shares
-            return shares       
+            return shares
 
         try:
             return self.SHARE_CACHE[val]
@@ -768,35 +768,35 @@ class ZoneSharer(ZoneProperties):
         except KeyError:
             shares = self._error_shares('station_map_error')
             self.SHARE_CACHE[val] = shares
-            return shares            
+            return shares
 
         if not all(len(set(x)) == 1 for x in self.operator_legs):
             try:
                 new_op_legs = self._station_operators()
-            except (ValueError, TypeError): 
-                shares = self._error_shares('station_map_error')       
+            except (ValueError, TypeError):
+                shares = self._error_shares('station_map_error')
                 self.SHARE_CACHE[val] = shares
                 return shares
             except IndexError:
                 shares = self._error_shares('operator_error')
                 self.SHARE_CACHE[val] = shares
-                return shares                
+                return shares
 
             self.operator_legs = tuple((x, x) for x in new_op_legs)
 
         if not all(len(set(x)) == 1 for x in self.operator_legs):
             shares = self._error_shares('operator_error')
-            self.SHARE_CACHE[val] = shares        
+            self.SHARE_CACHE[val] = shares
             return shares
 
         try:
             properties = self.property_dict()
         except IndexError:
              # all legs removed
-            shares = self._error_shares('no_available_trip')   
-            self.SHARE_CACHE[val] = shares        
-            return shares     
-        
+            shares = self._error_shares('no_available_trip')
+            self.SHARE_CACHE[val] = shares
+            return shares
+
         properties['ops_in_touched'] = operators_in_touched_(
             properties['touched_zones'],
             properties['zone_legs'],
