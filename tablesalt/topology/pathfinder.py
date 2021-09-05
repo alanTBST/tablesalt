@@ -807,7 +807,7 @@ class ZoneSharer(ZoneProperties):
             shares = self.share_calculation(properties, minimum_operator_zones)
         except KeyError:
             shares = self._error_shares('rk_operator_error')
-            self.SHARE_CACHE[val] = shares     
+            self.SHARE_CACHE[val] = shares
             return shares
 
         self.SHARE_CACHE[val] = shares
