@@ -66,13 +66,12 @@
 					 "tølløse_banen", 
 					 "østbanen_fork_1", 
 					 "østbanen_fork_2"],
-    "sjællandfjernregional": ["vestbanen_sjælland", 
-							  "øresunds_banen", 
-							  "sydbanen_sjælland", 
-							  "sydbanen_falster", 
+    "sjællandfjernregional": ["vestbanen_sjælland",
+							  "sydbanen_sjælland",
+							  "sydbanen_falster",
 							  "sydbanen_lolland",
 							  "lillesyd",
-							  "nordvest_banen", 
+							  "nordvest_banen",
 							  "ringsted_banen"], 
 	"kystkastrup": ["øresunds_banen", "kystbanen"]
 }
