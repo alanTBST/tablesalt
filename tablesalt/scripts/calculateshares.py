@@ -264,11 +264,10 @@ def chunk_shares(
     for k, zones, stops, operators, usage in tqdm(gen):
         # k, zones, stops, operators, usage = next(gen)
         sharer = ZoneSharer(graph, zones, stops, operators, usage)
-        if not all(len(set(x)) == 1 for x in sharer.stop_legs)
         trip_shares = sharer.share()
 
         if sharer.border_trip:
-            initial_zone_sequence = sharer.zone_sequence     
+            initial_zone_sequence = sharer.zone_sequence  
             model_one_shares[k] = trip_shares['standard']
             final_zone_sequence = sharer.zone_sequence
             if initial_zone_sequence != final_zone_sequence:
@@ -352,7 +351,6 @@ if __name__ == "__main__":
     """
 fp = r'C:\Users\B087115\Documents\GitHub\tablesalt\tablesalt\scripts'
 
-
 import gc
 import os
 import pickle
@@ -378,5 +376,41 @@ from tablesalt.topology.tools import TakstZones
 
 THIS_DIR = Path(fp)
 
+year = 2019
+store_loc = find_datastores()
+paths = db_paths(store_loc, year)
+stores = paths['store_paths']
+db_path = paths['calculated_stores']
 
+zones = TakstZones()
+zonemap = zones.stop_zone_map()
+
+# TODO into config
+region_contractors = {
+    'hovedstaden': ['Movia_H', 'DSB', 'First', 'Stog', 'Metro'],
+    'sjælland': ['Movia_H', 'Movia_S', 'Movia_V', 'DSB', 'First', 'Stog', 'Metro']
+    }
+
+region = 'sjælland'
+graph = ZoneGraph(region=region)
+
+
+store = stores[0]
+
+stopsd, zonesd, usaged, operatorsd = _load_store_data(
+    store, region, zonemap, region_contractors
+    )
+
+gen = _get_input(stopsd, zonesd, usaged, operatorsd)
+
+border_changes = {}
+model_one_shares = {}
+model_two_shares = {} # solo_zone_price
+model_three_shares = {} # bumped
+model_four_shares = {}
+for k, zones, stops, operators, usage in tqdm(gen):
+    # k, zones, stops, operators, usage = next(gen)
+    sharer = ZoneSharer(graph, zones, stops, operators, usage)
+    if any(len(set(x)) == 1 for x in sharer.stop_legs):
+        break
     """
