@@ -107,7 +107,7 @@ def test_metro_line_m3(station_tuple):
     assert line == ['metro_m3']
 
 
-"""
+
 @pytest.mark.parametrize('station_tuple',
     [
         (8603346, 8603308),
@@ -121,10 +121,23 @@ def test_metro_line_m4(station_tuple):
         station_tuple[0], station_tuple[1], 
         format='line'
         )
-    assert line == ['metro_m4']
-"""
+    assert line == ['metro_m4_1']
+
+       
 
 
+@pytest.mark.parametrize('station_tuple',
+    [
+        (8603308, 8603333), 
+        (8603333, 8603308)
+    ]
+)
+def test_metro_line_m3_m4(station_tuple):
+    line = sj_station_getter.station_pair(
+        station_tuple[0], station_tuple[1], 
+        format='line'
+        )
+    assert set(line) == {'metro_m3', 'metro_m4_1'}
 
 
 @pytest.mark.parametrize('station_tuple',
@@ -256,6 +269,7 @@ def test_stog_to_dsb_equals_stog(station_tuple):
     [
         (8600626, 8690798),
         (8600626, 8600646), 
+        (8600626, 8690659)
         ]       
     ) 
 def test_dsb_to_stog_equals_dsb(station_tuple):
@@ -296,7 +310,6 @@ def test_stog_dsb_equals_local(station_tuple):
         station_tuple[0], station_tuple[1], format='operator'
         )
     assert line == ['movia_h']
-
 
 
 @pytest.mark.parametrize('station_tuple',
