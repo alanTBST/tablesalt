@@ -534,11 +534,13 @@ class ZoneSharer(ZoneProperties):
 
         return tuple(x if x[0] >= n_zones else (n_zones, x[1]) for x in share_tuple)
 
-        return     
     @staticmethod
     def leg_solo_price(region, op_id):
 
         return SOLO_ZONE_PRIS[region][OP_MAP[op_id]]
+
+    def _single_operator_share(self):
+        return
 
     def _single_zone_share(
         self, 
