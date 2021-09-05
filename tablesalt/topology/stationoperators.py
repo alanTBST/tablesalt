@@ -5,7 +5,7 @@ Classes to interact with passenger stations and the operators that serve them
 #standard imports
 import json
 from collections import defaultdict
-from itertools import chain, combinations
+from itertools import chain
 from typing import Any, AnyStr, Dict, List, Optional, Set, Tuple, Union
 
 import h5py  # type: ignore
@@ -175,7 +175,7 @@ def _alternate_stop_map():
 
     return alternate_dicts, sstopsdict, mstopsdict
 
-def _load_default_passenger_stations() -> pd.core.frame.DataFrame:
+def _load_default_passenger_stations() -> List[pd.core.frame.DataFrame]:
 
     """load the passenger stations data
 
@@ -269,6 +269,8 @@ class StationOperators():
         self._line_lookup = line_lookup   
         self._stop_zone_map = TakstZones().stop_zone_map()
         self._group_lines = _grouped_lines_dict(self._settings['config'])
+
+        self._alternates = set(chain(*ALTERNATE_STATIONS.values())) 
 
     def _pas_station_dict(self) -> Dict[Tuple[str, ...], List[int]]:
         """
@@ -495,22 +497,39 @@ class StationOperators():
         metro_option = any(
             x in self._settings['config']['metro'] for 
             x in line_intersection
-            )        
+            )
+
         if start_uic in mappers['s_uic'] and suburban_option:
             possible_lines = {x for x in line_intersection if 
                               x in self._settings['config']['suburban']}
             possible_operators = {
                 self._settings['config'][x] for x in possible_lines
                 }
+
         elif start_uic in mappers['m_uic'] and metro_option:
-            possible_lines = {x for x in line_intersection if 
-                              x in self._settings['config']['metro']}
+            possible_lines = {
+                x for x in line_intersection if 
+                x in self._settings['config']['metro']
+                }
             possible_operators = {
                 self._settings['config'][x] for x in possible_lines
-                }            
+                }
+
+        elif start_uic in self._alternates:
+            possible_lines = {
+                x for x in line_intersection if 
+                x in self._settings['config']['sjællandlocal']
+                }
+            possible_operators = {
+                self._settings['config'][x] for x in possible_lines
+                }
         else:
-            possible_lines = {x for x in line_intersection if 
-                              x not in self._settings['config']['suburban']}
+            possible_lines = {
+                x for x in line_intersection if 
+                x not in self._settings['config']['suburban'] and 
+                x not in self._settings['config']['metro'] and 
+                x not in self._settings['config']['sjællandlocal']
+                }
             possible_operators = {
                 self._settings['config'][x] for x in possible_lines
                 }
