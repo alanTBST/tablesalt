@@ -267,7 +267,7 @@ def chunk_shares(
         trip_shares = sharer.share()
 
         if sharer.border_trip:
-            initial_zone_sequence = sharer.zone_sequence  
+            initial_zone_sequence = sharer.zone_sequence
             model_one_shares[k] = trip_shares['standard']
             final_zone_sequence = sharer.zone_sequence
             if initial_zone_sequence != final_zone_sequence:
