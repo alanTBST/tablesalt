@@ -37,6 +37,7 @@ rev_model_dict = {v:k for k, v in mappers['model_dict'].items()}
 CO_TR = (rev_model_dict['Co'], rev_model_dict['Tr'])
 SU_SU = (rev_model_dict['Su'], rev_model_dict['Su'])
 
+
 METRO_MAP = mappers['metro_map']
 REV_METRO_MAP = mappers['metro_map_rev']
 
@@ -458,6 +459,10 @@ def aggregated_zone_operators(v):
     return tuple(((sum(x[0] for x in grp), key)) for
                  key, grp in groupby(out_list, key=lambda x: x[1]))
 
+
+
+STOPS = StopsList.default_denmark().stops_dict
+
 class ZoneSharer(ZoneProperties):
 
     SHARE_CACHE = {}
@@ -496,7 +501,7 @@ class ZoneSharer(ZoneProperties):
         self.usage_legs = to_legs(self.usage_sequence)
 
         self.single: bool = self._is_single()
-        self.stops_dict = StopsList.default_denmark().stops_dict
+        self.stops_dict = STOPS
 
         self.region: str = determine_takst_region(self.zone_sequence)
 
@@ -528,26 +533,24 @@ class ZoneSharer(ZoneProperties):
         """
         # NOTE...THIS can be put in TRIPRECORD
 
-        if SU_SU not in self.usage_legs:
-            return
+
         susu_idxs = ()
-        for i, j in enumerate(self.usage_legs):
-            if j == SU_SU:
-                if j[0] == j[1]:
-                    susu_idxs += (i,)
-                    continue
-                if j[0] == METRO_MAP.get(j[1]) or j[1] == METRO_MAP.get(j[0]):
-                    susu_idxs += (i,)
-                    continue
-                start = self.stops_dict[j[0]]
-                end =  self.stops_dict[j[0]]              
-                if j[0] in end.alternate_stop_ids or j[1] in start.alternate_stop_ids:
-                    susu_idxs += (i,)
-        
-        self.stop_legs = _remove_idxs(susu_idxs, self.stop_legs)
-        self.operator_legs = _remove_idxs(susu_idxs, self.operator_legs)
-        self.zone_legs = _remove_idxs(susu_idxs, self.zone_legs)
-        self.usage_legs = _remove_idxs(susu_idxs, self.usage_legs)
+        for i, j in enumerate(self.stop_legs):
+            if j[0] == j[1]:
+                susu_idxs += (i,)
+                continue
+            if j[0] == METRO_MAP.get(j[1]) or j[1] == METRO_MAP.get(j[0]):
+                susu_idxs += (i,)
+                continue
+            start = self.stops_dict[j[0]]
+            end =  self.stops_dict[j[1]]              
+            if j[0] in end.alternate_stop_ids or j[1] in start.alternate_stop_ids:
+                susu_idxs += (i,)
+        if susu_idxs:        
+            self.stop_legs = _remove_idxs(susu_idxs, self.stop_legs)
+            self.operator_legs = _remove_idxs(susu_idxs, self.operator_legs)
+            self.zone_legs = _remove_idxs(susu_idxs, self.zone_legs)
+            self.usage_legs = _remove_idxs(susu_idxs, self.usage_legs)
 
     def _station_operators(self):
         """get the operators at the visited stations"""
@@ -570,7 +573,7 @@ class ZoneSharer(ZoneProperties):
 
         return SOLO_ZONE_PRIS[region][OP_MAP[op_id]]
 
-    def _single_operator_share(self):
+    def _single_operator_share(self, properties):
         ####### FILL THIS IN
         
         return {'standard': (), 
@@ -673,6 +676,9 @@ class ZoneSharer(ZoneProperties):
         
         current_op_sum = 0
         previous_op_id = None
+
+
+        seen_zone_opid = set()
         for legnum, imputed_leg in enumerate(imputed_zone_legs):          
             
             leg_region = zone_leg_regions[legnum]
@@ -680,18 +686,21 @@ class ZoneSharer(ZoneProperties):
             leg_solo_price = self.leg_solo_price(leg_region, op_id)
             if not op_id == previous_op_id and previous_op_id is not None:
                 current_op_sum = 0
-           
+         
             for zone in imputed_leg:
-                res = self._single_zone_share(
-                    zone, leg_region, op_id, touched_zones, 
-                    touched_zone_leg_count, 
-                    ops_in_touched_zones
-                    )
+                if (zone, op_id) not in seen_zone_opid:
+                    res = self._single_zone_share(
+                        zone, leg_region, op_id, touched_zones, 
+                        touched_zone_leg_count, 
+                        ops_in_touched_zones
+                        )
 
-                out_standard[zone].append(res)
-                out_solo[zone].append(leg_solo_price)
-                
-                current_op_sum += res[0]
+                    out_standard[zone].append(res)
+                    out_solo[zone].append(leg_solo_price)
+                    
+                    current_op_sum += res[0]
+                    
+                    seen_zone_opid.add((zone, op_id))
                 
             try:
                 next_op_id = self.operator_legs[legnum+1][0]
@@ -724,67 +733,81 @@ class ZoneSharer(ZoneProperties):
                 'solo_price': solo_price, 
                 'bumped': bumped,
                 'bumped_solo': bumped_solo}
+    
+    @staticmethod
+    def _error_shares(error_name: str) -> Dict[str, str]:
+
+        return {'standard': error_name,
+                'solo_price': error_name,
+                'bumped': error_name,
+                'bumped_solo': error_name}
 
     def share(self, minimum_operator_zones: Optional[int] = 2):
         """
         Share the zone work between the operators on the trip
         """
+
         val = tuple(
             (self.stop_sequence,
             self.operator_sequence,
             self.usage_sequence)
-            )
+            )        
+        if None in chain(*self.stop_legs):
+            shares = self._error_shares('station_map_error')
+            self.SHARE_CACHE[val] = shares
+            return shares       
+
         try:
             return self.SHARE_CACHE[val]
         except KeyError:
             pass
 
         self._remove_cotr()
-        self._remove_susu()
+        try:
+            self._remove_susu()
+        except KeyError:
+            shares = self._error_shares('station_map_error')
+            self.SHARE_CACHE[val] = shares
+            return shares            
 
         if not all(len(set(x)) == 1 for x in self.operator_legs):
             try:
                 new_op_legs = self._station_operators()
-            except (ValueError, TypeError):            
-                shares = {'standard': 'station_map_error', 
-                          'solo_price': 'station_map_error', 
-                          'bumped': 'station_map_error', 
-                          'bumped_solo': 'station_map_error'}
+            except (ValueError, TypeError): 
+                shares = self._error_shares('station_map_error')       
                 self.SHARE_CACHE[val] = shares
                 return shares
             except IndexError:
-                shares = {'standard': 'operator_error', 
-                          'solo_price': 'operator_error', 
-                          'bumped': 'operator_error', 
-                          'bumped_solo': 'operator_error'}
+                shares = self._error_shares('operator_error')
                 self.SHARE_CACHE[val] = shares
                 return shares                
 
             self.operator_legs = tuple((x, x) for x in new_op_legs)
 
         if not all(len(set(x)) == 1 for x in self.operator_legs):
-            shares = {'standard': 'operator_error', 
-                      'solo_price': 'operator_error', 
-                      'bumped': 'operator_error', 
-                      'bumped_solo': 'operator_error'}
+            shares = self._error_shares('operator_error')
             self.SHARE_CACHE[val] = shares        
             return shares
 
-
-        property_dict = self.property_dict()
-        property_dict['ops_in_touched'] = operators_in_touched_(
-            property_dict['touched_zones'],
-            property_dict['zone_legs'],
+        try:
+            properties = self.property_dict()
+        except IndexError:
+             # all legs removed
+            shares = self._error_shares('no_available_trip')   
+            self.SHARE_CACHE[val] = shares        
+            return shares     
+        
+        properties['ops_in_touched'] = operators_in_touched_(
+            properties['touched_zones'],
+            properties['zone_legs'],
             self.operator_legs
             )
+
         try:
-            shares = self.share_calculation(property_dict, minimum_operator_zones)
+            shares = self.share_calculation(properties, minimum_operator_zones)
         except KeyError:
-            shares = {'standard': 'rk_operator_error', 
-                      'solo_price': 'rk_operator_error', 
-                      'bumped': 'rk_operator_error', 
-                      'bumped_solo': 'rk_operator_error'}
-            self.SHARE_CACHE[val] = shares        
+            shares = self._error_shares('rk_operator_error')
+            self.SHARE_CACHE[val] = shares     
             return shares
 
         self.SHARE_CACHE[val] = shares
