@@ -26,16 +26,19 @@ from tablesalt.topology.tools import determine_takst_region
 
 
 OPGETTER = stationoperators.StationOperators(
-    'kystbanen', 'sjællandlocal', 'metro', 
+    'kystkastrup', 'sjællandlocal', 'metro', 
     'suburban', 'sjællandfjernregional',
-    'øresunds_banen'
     )
 
 OP_MAP = {v: k.lower() for k, v in mappers['operator_id'].items()}
 REV_OP_MAP = {v: k for k, v in OP_MAP.items()}
+
 rev_model_dict = {v:k for k, v in mappers['model_dict'].items()}
 CO_TR = (rev_model_dict['Co'], rev_model_dict['Tr'])
+SU_SU = (rev_model_dict['Su'], rev_model_dict['Su'])
 
+METRO_MAP = mappers['metro_map']
+REV_METRO_MAP = mappers['metro_map_rev']
 
 #TODO load from config with year
 SOLO_ZONE_PRIS = {
@@ -493,6 +496,7 @@ class ZoneSharer(ZoneProperties):
         self.usage_legs = to_legs(self.usage_sequence)
 
         self.single: bool = self._is_single()
+        self.stops_dict = StopsList.default_denmark().stops_dict
 
         self.region: str = determine_takst_region(self.zone_sequence)
 
@@ -505,6 +509,7 @@ class ZoneSharer(ZoneProperties):
         """remove all of the legs that are cotr touches
         for each relevant attribute
         """
+        # NOTE...THIS can be put in TRIPRECORD
 
         if CO_TR not in self.usage_legs:
             return
@@ -517,6 +522,32 @@ class ZoneSharer(ZoneProperties):
         self.operator_legs = _remove_idxs(cotr_idxs, self.operator_legs)
         self.zone_legs = _remove_idxs(cotr_idxs, self.zone_legs)
         self.usage_legs = _remove_idxs(cotr_idxs, self.usage_legs)
+    
+    def _remove_susu(self):
+        """remove SuSu legs if they occur at the same station
+        """
+        # NOTE...THIS can be put in TRIPRECORD
+
+        if SU_SU not in self.usage_legs:
+            return
+        susu_idxs = ()
+        for i, j in enumerate(self.usage_legs):
+            if j == SU_SU:
+                if j[0] == j[1]:
+                    susu_idxs += (i,)
+                    continue
+                if j[0] == METRO_MAP.get(j[1]) or j[1] == METRO_MAP.get(j[0]):
+                    susu_idxs += (i,)
+                    continue
+                start = self.stops_dict[j[0]]
+                end =  self.stops_dict[j[0]]              
+                if j[0] in end.alternate_stop_ids or j[1] in start.alternate_stop_ids:
+                    susu_idxs += (i,)
+        
+        self.stop_legs = _remove_idxs(susu_idxs, self.stop_legs)
+        self.operator_legs = _remove_idxs(susu_idxs, self.operator_legs)
+        self.zone_legs = _remove_idxs(susu_idxs, self.zone_legs)
+        self.usage_legs = _remove_idxs(susu_idxs, self.usage_legs)
 
     def _station_operators(self):
         """get the operators at the visited stations"""
@@ -540,7 +571,12 @@ class ZoneSharer(ZoneProperties):
         return SOLO_ZONE_PRIS[region][OP_MAP[op_id]]
 
     def _single_operator_share(self):
-        return
+        ####### FILL THIS IN
+        
+        return {'standard': (), 
+                'solo_price': (), 
+                'bumped': (),
+                'bumped_solo': ()}
 
     def _single_zone_share(
         self, 
@@ -620,6 +656,8 @@ class ZoneSharer(ZoneProperties):
 
         """
         
+        # if self.single:
+        #    return self._single_operator_share()
 
         imputed_zone_legs = properties['imputed_zone_legs']
         zone_leg_regions = properties['zone_legs_regions']
@@ -702,6 +740,7 @@ class ZoneSharer(ZoneProperties):
             pass
 
         self._remove_cotr()
+        self._remove_susu()
 
         if not all(len(set(x)) == 1 for x in self.operator_legs):
             try:
