@@ -502,6 +502,12 @@ class StationOperators():
             possible_operators = {
                 self._settings['config'][x] for x in possible_lines
                 }
+        elif start_uic in mappers['m_uic'] and metro_option:
+            possible_lines = {x for x in line_intersection if 
+                              x in self._settings['config']['metro']}
+            possible_operators = {
+                self._settings['config'][x] for x in possible_lines
+                }            
         else:
             possible_lines = {x for x in line_intersection if 
                               x not in self._settings['config']['suburban']}
