@@ -261,9 +261,10 @@ def chunk_shares(
     model_two_shares = {} # solo_zone_price
     model_three_shares = {} # bumped
     model_four_shares = {}
-
     for k, zones, stops, operators, usage in tqdm(gen):
+        # k, zones, stops, operators, usage = next(gen)
         sharer = ZoneSharer(graph, zones, stops, operators, usage)
+        if not all(len(set(x)) == 1 for x in sharer.stop_legs)
         trip_shares = sharer.share()
 
         if sharer.border_trip:
@@ -346,3 +347,36 @@ if __name__ == "__main__":
         INHIBITOR.uninhibit()
     else:
         main()
+
+
+    """
+fp = r'C:\Users\B087115\Documents\GitHub\tablesalt\tablesalt\scripts'
+
+
+import gc
+import os
+import pickle
+from functools import partial
+from itertools import chain, groupby
+from multiprocessing import Pool
+from operator import itemgetter
+from pathlib import Path
+from typing import Dict, List, Tuple, TypedDict, Iterator
+
+import numpy as np
+from tqdm import tqdm
+
+from tablesalt import StoreReader
+from tablesalt.common import make_store
+from tablesalt.common.io import mappers
+from tablesalt.preprocessing.parsing import TableArgParser
+from tablesalt.preprocessing.tools import db_paths, find_datastores
+from tablesalt.running import WindowsInhibitor
+from tablesalt.topology import ZoneGraph, ZoneSharer
+from tablesalt.topology.tools import TakstZones
+
+
+THIS_DIR = Path(fp)
+
+
+    """
