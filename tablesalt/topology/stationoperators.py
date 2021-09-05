@@ -389,11 +389,15 @@ class StationOperators():
         to return the possbible operators servicing a leg from copenhagen central
         station to helsingør station
 
-        >>> op_getter = StationOperators('kystbanen', 'suburban', 'fjernregional', 'local', 'metro')
+        >>> op_getter = StationOperators(
+                'kystkastrup', 'suburban', 
+                'sjællandfjernregional', 
+                'sjællandlocal', 'metro'
+                )
         >>> op_getter.station_pair(8600626, 8600669, format='line')
-            ('kystbanen',)
+            ['kystbanen']
         >>> opgetter.station_pair(8600626, 8600669, format='operator')
-            ('first',)
+            ['first']
         """ 
         if format == 'operator':
             try:
