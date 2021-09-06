@@ -798,6 +798,9 @@ def main() -> None:
     for model in [1, 2, 3, 4]:
         if model > 1:
             results_path = db_path + f'_model_{model}'
+        else:
+            results_path = db_path
+
         for rabat_level in [0, 1, 2]:
             _rabat_results(
                 year,
