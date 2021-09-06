@@ -265,7 +265,7 @@ def get_zone_combination_shares(tofetch, db_path: str, model: int):
 
     final = {}
     errors = {'operator_error', 'station_map_error', 'rk_operator_error'}
-    with lmdb.open(db_path) as env:     
+    with lmdb.open(db_path) as env:
         with env.begin() as txn:
             for combo, trips in tqdm(tofetch.items(),'fetching combo results',
                                      total=len(tofetch)):
@@ -513,7 +513,7 @@ def _zonerelations(year: int, model: int):
 def main():
 
     parser = TableArgParser(
-        'year', 'products', 'zones', 'model'
+        'year', 'products', 'zones',
         )
 
     args = parser.parse()
@@ -526,41 +526,45 @@ def main():
 
     db_path = paths['calculated_stores']
 
-    model = args['model']
-
-    if model > 1:
-        db_path = db_path + f'_model_{model}'
 
     zone_path = args['zones']
     product_path = args['products']
 
     userdict = PendlerKombiUsers(
-        year, 
+        year,
         products_path=product_path,
         product_zones_path=zone_path,
         min_valid_days=14
         )
 
-    _chosen_zones(
-        userdict,
-        db_path,
-        paths['kombi_valid_trips'],
-        paths['kombi_dates_db'],
-        zero_travel_price,
-        year,
-        model
-        )
+    for model in [1, 2, 3, 4]:
+        if model > 1:
+            result_path = db_path + f'_model_{model}'
+        else:
+            result_path = db_path
 
-    _npaid_zones(
-        userdict,
-        paths['kombi_valid_trips'],
-        zero_travel_price,
-        db_path,
-        year,
-        model
-        )
 
-    _zonerelations(year, model)
+        _chosen_zones(
+            userdict,
+            result_path,
+            paths['kombi_valid_trips'],
+            paths['kombi_dates_db'],
+            zero_travel_price,
+            year,
+            model
+            )
+
+        _npaid_zones(
+            userdict,
+            paths['kombi_valid_trips'],
+            zero_travel_price,
+            result_path,
+            year,
+            model
+            )
+
+        _zonerelations(year, model)
+
 
 
 if __name__ == "__main__":
