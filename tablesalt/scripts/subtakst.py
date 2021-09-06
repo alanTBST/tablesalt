@@ -301,21 +301,26 @@ def main():
                 else:
                     pass
             """
+    for model in [1, 2, 3, 4]:
+        if model > 1:
+            result_path = db_path + f'_model_{model}'
+        else:
+            result_path = db_path
 
-    out = {}
-    for k1, v1 in trips.items():
-        sub = {}
-        for k2, v2 in v1.items():
-            sub[k2] = _get_trips(db_path, v2)
-        out[k1] = sub
+        out = {}
+        for k1, v1 in trips.items():
+            sub = {}
+            for k2, v2 in v1.items():
+                sub[k2] = _get_trips(result_path, v2)
+            out[k1] = sub
 
 
-    test = {
+        test = {
         k1: {
             k2: get_user_shares(v2.values()) for k2, v2 in v1.items()
             } for k1, v1 in out.items()
         }
-    fp = os.path.join(
+        fp = os.path.join(
         THIS_DIR,
         '__result_cache__',
         f'{year}',
@@ -323,8 +328,8 @@ def main():
         f'subtakst_model_{model}.pickle'
         )
 
-    with open(fp, 'wb') as f:
-        pickle.dump(test, f)
+        with open(fp, 'wb') as f:
+            pickle.dump(test, f)
 
 if __name__ == "__main__":
     st = datetime.now()
