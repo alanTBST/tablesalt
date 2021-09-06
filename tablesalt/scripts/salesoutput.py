@@ -1236,15 +1236,15 @@ def main(year: int, model: int) -> None:
 
     stats_columns = ['n_trips', 'n_users', 'n_period_cards', 'note']
     operator_columns = [
-        x for x in output.columns if x not in initial_columns 
+        x for x in output.columns if x not in initial_columns
         and x not in stats_columns
         ]
 
     andel_columns = []
     for col in operator_columns:
-        new_col = f'{col}_Andel'
+        new_col = f'{col}_andel'
         andel_columns.append(new_col)
-        output.loc[:, f'{col}_Andel'] = \
+        output.loc[:, f'{col}_andel'] = \
             output.loc[:, 'omsætning'] * output.loc[:, col]
 
     col_order = initial_columns + operator_columns + andel_columns + stats_columns
@@ -1261,5 +1261,5 @@ if __name__ == "__main__":
     parser = TableArgParser('year', 'model')
     args = parser.parse()
     year = args['year']
-    model = args['model'] 
+    model = args['model']
     main(year, model)
