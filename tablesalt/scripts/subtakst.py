@@ -191,10 +191,10 @@ def _get_trips(calculated_stores, tripkeys):
 
 def main():
 
-    parser = TableArgParser('year', 'rabattrin', 'model')
+    parser = TableArgParser('year', 'rabattrin')
     args = parser.parse()
     rabat_level = args['rabattrin']
-    model = args['model']
+
 
     year = args['year']
 
@@ -202,9 +202,6 @@ def main():
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
-
-    if model > 1:
-        db_path = db_path + f'_model_{model}'
 
     ringzones = ZoneGraph.ring_dict('sjælland')
 
@@ -313,7 +310,6 @@ def main():
             for k2, v2 in v1.items():
                 sub[k2] = _get_trips(result_path, v2)
             out[k1] = sub
-
 
         test = {
         k1: {
