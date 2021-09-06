@@ -584,7 +584,6 @@ class ZoneSharer(ZoneProperties):
     def _single_zone_share(
         self,
         zone,
-        region,
         op_id,
         touched_zones,
         touched_zone_leg_count,
@@ -627,12 +626,23 @@ class ZoneSharer(ZoneProperties):
         return aggregated_zone_operators(tuple(out))
 
     @staticmethod
+    def _weight_bumped_zones(out_standard, out_bumped):
+
+        outstandard = list(chain(*out_standard.values()))
+        sum_standard = sum(x[0] for x in outstandard)
+        sum_bumped = sum(x[0] for x in out_bumped)
+
+        final_bump = [(x[0] / sum_bumped * sum_standard, x[1])
+                      for x in out_bumped]
+
+        return final_bump
+
+    @staticmethod
     def _weight_solo_bumped(out_bumped, out_bumped_solo):
         """weight the shares by the solo zoner pris"""
 
         out_bumped_solo = [x[0] for x in out_bumped_solo]
         combined = list(zip(out_bumped, out_bumped_solo))
-
 
         total_zones = round(sum(x[0][0] for x in combined))
         total_price = sum(x[0][0]*x[1] for x in combined)
@@ -677,7 +687,6 @@ class ZoneSharer(ZoneProperties):
         current_op_sum = 0
         previous_op_id = None
 
-
         seen_zone_opid = set()
         for legnum, imputed_leg in enumerate(imputed_zone_legs):
 
@@ -690,18 +699,14 @@ class ZoneSharer(ZoneProperties):
             for zone in imputed_leg:
                 if (zone, op_id) not in seen_zone_opid:
                     res = self._single_zone_share(
-                        zone, leg_region, op_id, touched_zones,
+                        zone, op_id, touched_zones,
                         touched_zone_leg_count,
                         ops_in_touched_zones
                         )
-
                     out_standard[zone].append(res)
                     out_solo[zone].append(leg_solo_price)
-
                     current_op_sum += res[0]
-
                     seen_zone_opid.add((zone, op_id))
-
             try:
                 next_op_id = self.operator_legs[legnum+1][0]
                 if op_id != next_op_id:
@@ -717,21 +722,30 @@ class ZoneSharer(ZoneProperties):
             previous_op_id = op_id
 
         out_standard = {k: tuple(v) for k, v in out_standard.items()}
+
         standard = aggregated_zone_operators(tuple(out_standard.values()))
+
         if len(standard) == 1:
             solo_price = standard
         else:
             solo_price = self._weight_solo(out_standard.values(), out_solo.values())
 
-        bumped = aggregated_zone_operators(tuple(out_bumped))
-        if len(bumped) == 1:
-            bumped_solo = bumped
+        if len(out_bumped) == 1:
+            bumped = out_bumped
+            bumped_solo = out_bumped
         else:
-            bumped_solo = self._weight_solo_bumped(out_bumped, out_bumped_solo)
+            bumped = self._weight_bumped_zones(out_standard, out_bumped)
+            bumped_solo = self._weight_solo_bumped(bumped, out_bumped_solo)
+
+        bumped_out = aggregated_zone_operators(tuple(bumped))
+        try:
+            bumped_solo = aggregated_zone_operators(tuple(bumped_solo))
+        except KeyError:
+            pass
 
         return {'standard': standard,
                 'solo_price': solo_price,
-                'bumped': bumped,
+                'bumped': bumped_out,
                 'bumped_solo': bumped_solo}
 
     @staticmethod
