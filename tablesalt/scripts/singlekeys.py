@@ -777,19 +777,16 @@ def _rabat_results(
 
 def main() -> None:
 
-    parser = TableArgParser('year', 'model')
+    parser = TableArgParser('year')
     args = parser.parse()
 
     year = args['year']
-    model = args['model']
 
     store_loc = find_datastores()
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
 
-    if model > 1:
-        db_path = db_path + f'_model_{model}'
 
 
     ringzones = ZoneGraph.ring_dict('sjælland')
@@ -798,18 +795,20 @@ def main() -> None:
     wanted_operators = [
         'Metro', 'D**', 'Movia_S', 'Movia_V', 'Movia_H'
         ]
-
-    for rabat_level in [0, 1, 2]:
-        _rabat_results(
-        year,
-        model,
-        rabat_level,
-        db_path, 
-        stores,
-        stopzone_map,
-        ringzones,
-        wanted_operators
-        )
+    for model in [1, 2, 3, 4]:
+        if model > 1:
+            results_path = db_path + f'_model_{model}'
+        for rabat_level in [0, 1, 2]:
+            _rabat_results(
+                year,
+                model,
+                rabat_level,
+                results_path,
+                stores,
+                stopzone_map,
+                ringzones,
+                wanted_operators
+                )
     # _write_results(rabat_level, year) # csv results
 
 if __name__ == "__main__":
