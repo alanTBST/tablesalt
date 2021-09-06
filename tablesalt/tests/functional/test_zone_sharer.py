@@ -17,22 +17,12 @@ from tablesalt.topology import ZoneGraph, ZoneSharer
 graph = ZoneGraph(region='sjælland')
 
 #ZoneSharer(graph, zones, stops, operators, usage)
+# operators: 1=movia_h, 2=movia_s, 3=movia_v, 4=stog, 5=dsb, 6=metro, 8=first
+# usage:  1=Fi, 2=Co, 2=Su, 4=Tr
 
-
-#single tests
-#@pytest.mark.parametrize('input_tuple',
-#    [
-#        ((1001, 1001, 1260, 1260), (4790, 8600626, 52098, 41777), (1, 5, 3, 3), (1, 3, 3, 2))
-#    ])
-#def test_sharer_results(input_tuple):
-#
-#    sharer = ZoneSharer(graph, *input_tuple)
-#    standard = sharer.share()['standard']
-#    standard = set(standard)
-#
-#
-#    assert standard == {(0.5, 'movia_h'), (14, 'dsb'), (0.5, 'movias_s')}
-
+#-----------------------------
+# individual tests
+#-----------------------------
 def test_faxe_koge_sydhavn():
 
     sharer = ZoneSharer(
@@ -45,6 +35,8 @@ def test_faxe_koge_sydhavn():
     standard = sharer.share()['standard']
 
     assert standard == ((4.5, 'movia_s'), (8.5, 's-tog'))
+
+
 
 def test_sydhavn_koge_faxe():
 
@@ -59,9 +51,8 @@ def test_sydhavn_koge_faxe():
 
     assert standard == ((4.5, 'movia_s'), (8.5, 's-tog'))
 
-
 def test_sydhavn_koge_faxe_2():
-
+    # added extra susu check - should be equal
     sharer = ZoneSharer(
         graph,
         (1002, 1020, 1020, 1270),
@@ -86,7 +77,20 @@ def test_vestamager_nport_dybbro():
 
     return standard == ((1.5, 'metro'), (0.5, 's-tog'))
 
+def test_stenl_dybbro():
 
+    sharer = ZoneSharer(
+        graph,
+        (1074, 1001),
+        (8600711, 8600634),
+        (4, 4),
+        (1, 2)
+        )
+
+    standard = sharer.share()['standard']
+    return standard == ((7, 's-tog'),) or standard == ((7.0, 's-tog'),)
+
+## more border tests
 
 #test one zone one operator
 
