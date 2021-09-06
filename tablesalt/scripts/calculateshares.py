@@ -196,7 +196,7 @@ def _get_store_num(store: str) -> str:
     :return: the number in the file name
     :rtype: str
     """
-    st = store.split('.')[0]
+    st = str(store).split('.')[0]
     st = st.split('rkfile')[1]
 
     return st
