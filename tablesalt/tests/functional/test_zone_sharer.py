@@ -92,8 +92,64 @@ def test_stenl_dybbro():
 
 ## more border tests
 
+#--------------------------
 #test one zone one operator
+#--------------------------
 
+def test_stog_zone_1043():
+
+    sharer = ZoneSharer(
+        graph,
+        (1043, 1054),
+        (8600622, 8600621),
+        (4, 4),
+        (1, 2)
+    )
+    standard = set(sharer.share()['standard'])
+
+    assert standard == {(1, 's-tog')}
+
+
+def test_stog_zone_1043_2():
+    # double check at albertslund
+    sharer = ZoneSharer(
+        graph,
+        (1043, 1054, 1054),
+        (8600622, 8600621, 8600621),
+        (4, 4, 4),
+        (1, 3, 2)
+    )
+    standard = set(sharer.share()['standard'])
+
+    assert standard == {(1, 's-tog')}
+
+def test_stog_zone_1043_3():
+    # double check in at glostrup
+    sharer = ZoneSharer(
+        graph,
+        (1043, 1043, 1043),
+        (8600622, 8600622, 8600621),
+        (4, 4, 4),
+        (1, 3, 2)
+    )
+    standard = set(sharer.share()['standard'])
+
+    assert standard == {(1, 's-tog')}
+
+
+def test_multi_city_ring_metro():
+
+    sharer = ZoneSharer(
+        graph,
+        (1001, 1001, 1001, 1001),
+        (8603305, 8603344, 8603344, 8603302),
+        (6, 6, 6, 6),
+        (1, 2, 4, 2)
+    )
+
+    standard = set(sharer.share()['standard'])
+
+    assert standard == {(1, 'metro')}
 
 #----------------------------
 # test one operator two zones
@@ -137,12 +193,13 @@ def test_albertslund_glostrup_Åskellet_Østbrovej_2():
     )
     standard = sharer.share()['standard']
     assert set(standard) == {(0.5, 'movia_h'), (0.5, 's-tog')}
-#----------------------------
+
+
+#------------------------------
 # test one zone three operators
-#----------------------------
-
-def _test_drbyen_nport_strandboulevarden_norhavn_dybbro():
-
+#------------------------------
+def test_drbyen_nport_strandboulevarden_norhavn_dybbro():
+    #also has a CoTr to be removed and a border stations
     sharer = ZoneSharer(
         graph,
         (1003, 1001, 1001, 1001, 1001),
