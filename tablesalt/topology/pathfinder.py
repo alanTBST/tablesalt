@@ -511,7 +511,7 @@ class ZoneSharer(ZoneProperties):
         return len(set(chain(*self.operator_legs))) == 1
 
     def _remove_cotr(self) -> None:
-        """remove all of the legs that are cotr touches
+        """Remove all of the legs that are cotr touches
         for each relevant attribute
         """
         # NOTE...THIS can be put in TRIPRECORD
@@ -528,8 +528,8 @@ class ZoneSharer(ZoneProperties):
         self.zone_legs = _remove_idxs(cotr_idxs, self.zone_legs)
         self.usage_legs = _remove_idxs(cotr_idxs, self.usage_legs)
 
-    def _remove_susu(self):
-        """remove SuSu legs if they occur at the same station
+    def _remove_susu(self) -> None:
+        """Remove SuSu legs if they occur at the same station
         """
         # NOTE...THIS can be put in TRIPRECORD
 
@@ -552,8 +552,8 @@ class ZoneSharer(ZoneProperties):
             self.zone_legs = _remove_idxs(susu_idxs, self.zone_legs)
             self.usage_legs = _remove_idxs(susu_idxs, self.usage_legs)
 
-    def _station_operators(self):
-        """get the operators at the visited stations"""
+    def _station_operators(self) -> Tuple[int, ...]:
+        """Get the operators at the visited stations"""
 
         opsequence = ()
         for x in self.stop_legs:
@@ -564,27 +564,23 @@ class ZoneSharer(ZoneProperties):
         return opsequence
 
     @staticmethod
-    def _bump_zone_normal(share_tuple, n_zones):
+    def leg_solo_price(region: str, op_id: int) -> float:
+        """Find the solo price of the leg for the specified
+        operator id
 
-        return tuple(x if x[0] >= n_zones else (n_zones, x[1]) for x in share_tuple)
-
-    @staticmethod
-    def leg_solo_price(region, op_id):
-
+        :param region: the region the leg is in
+        :type region: str
+        :param op_id: the operator id of the leg
+        :type op_id: int
+        :return: a solo zone price
+        :rtype: float
+        """
         return SOLO_ZONE_PRIS[region][OP_MAP[op_id]]
-
-    def _single_operator_share(self, properties):
-        ####### FILL THIS IN
-
-        return {'standard': (),
-                'solo_price': (),
-                'bumped': (),
-                'bumped_solo': ()}
 
     def _single_zone_share(
         self,
-        zone,
-        op_id,
+        zone: int,
+        op_id: int,
         touched_zones,
         touched_zone_leg_count,
         ops_in_touched_zones
@@ -750,16 +746,33 @@ class ZoneSharer(ZoneProperties):
 
     @staticmethod
     def _error_shares(error_name: str) -> Dict[str, str]:
+        """if there is an error, create an output dictionary
+        for it
+
+        :param error_name: the name of the error
+        :type error_name: str
+        :return: a dicionary with an error for each model
+        :rtype: Dict[str, str]
+        """
 
         return {'standard': error_name,
                 'solo_price': error_name,
                 'bumped': error_name,
                 'bumped_solo': error_name}
 
-    def share(self, minimum_operator_zones: Optional[int] = 2):
+    def share(
+        self,
+        minimum_operator_zones: Optional[int] = 2
+        ) -> Dict[str, Tuple[Tuple[Union[int, float], str], ...]]:
+        """[summary]
+
+        :param minimum_operator_zones: The number of zones in the
+            minimum principle model, defaults to 2
+        :type minimum_operator_zones: Optional[int], optional
+        :return: [description]
+        :rtype: Dict[str, Tuple[Tuple[Union[int, float], str], ...]]
         """
-        Share the zone work between the operators on the trip
-        """
+
 
         val = tuple(
             (self.stop_sequence,
