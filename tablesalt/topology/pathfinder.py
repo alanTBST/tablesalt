@@ -586,6 +586,7 @@ class ZoneSharer(ZoneProperties):
         ops_in_touched_zones
         ):
 
+
         zone_share = 1
         if zone in touched_zones:
             if touched_zone_leg_count[zone] == 1:
