@@ -69,13 +69,13 @@ def test_vestamager_nport_dybbro():
     sharer = ZoneSharer(
         graph,
         (1003, 1001, 1001),
-        (8603319, 8600646, 8600634),
+        (8603317, 8600646, 8600634),
         (6, 4, 4),
         (1, 3, 2)
         )
     standard = sharer.share()['standard']
 
-    return standard == ((1.5, 'metro'), (0.5, 's-tog'))
+    assert standard == ((1.5, 'metro'), (0.5, 's-tog'))
 
 def test_stenl_dybbro():
 
@@ -88,17 +88,72 @@ def test_stenl_dybbro():
         )
 
     standard = sharer.share()['standard']
-    return standard == ((7, 's-tog'),) or standard == ((7.0, 's-tog'),)
+    assert standard == ((7, 's-tog'),) or standard == ((7.0, 's-tog'),)
 
 ## more border tests
 
 #test one zone one operator
 
 
+#----------------------------
+# test one operator two zones
+#----------------------------
+
+def test_landlystvej_pbangsvej_rodovrecentrum():
+
+    sharer = ZoneSharer(
+        graph,
+        (1002, 1002, 1032),
+        (7155, 2088, 435),
+        (1, 1, 1),
+        (1, 3, 2)
+    )
+    standard = sharer.share()['standard']
+    assert standard == ((2, 'movia_h'),) or standard == ((2.0, 'movia_h'),)
+
+#----------------------------
 # test one zone two operators
+#----------------------------
+def test_albertslund_glostrup_Åskellet_Østbrovej():
 
+    sharer = ZoneSharer(
+        graph,
+        (1043, 1043, 1043),
+        (8600621, 2261, 10532),
+        (4, 1, 1),
+        (1, 3, 2)
+    )
+    standard = sharer.share()['standard']
+    assert standard == ((0.5, 'movia_h'), (0.5, 's-tog'))
+    # albertslund is also a border station
+def test_albertslund_glostrup_Åskellet_Østbrovej_2():
 
+    sharer = ZoneSharer(
+        graph,
+        (1054, 1043, 1043),
+        (8600621, 2261, 10532),
+        (4, 1, 1),
+        (1, 3, 2)
+    )
+    standard = sharer.share()['standard']
+    assert standard == ((0.5, 'movia_h'), (0.5, 's-tog'))
+#----------------------------
 # test one zone three operators
+#----------------------------
 
 
 #test
+
+
+def test_krekilstrup_nport_ncampus():
+
+    sharer = ZoneSharer(
+        graph,
+        (1115, 1115, 1001, 1001),
+        (8602505, 8600717, 52615,7030),
+        (3, 5, 1, 1),
+        (1, 3, 3, 2)
+    )
+    standard = sharer.share()['standard']
+    set_standard = set(standard)
+    assert set_standard == {(0.5, 'movia_s'), (10, 'dsb'),  (0.5, 'movia_h')}
