@@ -164,8 +164,8 @@ def test_landlystvej_pbangsvej_rodovrecentrum():
         (1, 1, 1),
         (1, 3, 2)
     )
-    standard = sharer.share()['standard']
-    assert set(standard) == {(2, 'movia_h'),} or set(standard) == {(2.0, 'movia_h'),}
+    standard = set(sharer.share()['standard'])
+    assert standard == {(2, 'movia_h')}
 
 #----------------------------
 # test one zone two operators
@@ -179,8 +179,8 @@ def test_albertslund_glostrup_Åskellet_Østbrovej():
         (4, 1, 1),
         (1, 3, 2)
     )
-    standard = sharer.share()['standard']
-    assert set(standard) == {(0.5, 'movia_h'), (0.5, 's-tog')}
+    standard = set(sharer.share()['standard'])
+    assert standard == {(0.5, 'movia_h'), (0.5, 's-tog')}
     # albertslund is also a border station
 def test_albertslund_glostrup_Åskellet_Østbrovej_2():
 
@@ -191,8 +191,8 @@ def test_albertslund_glostrup_Åskellet_Østbrovej_2():
         (4, 1, 1),
         (1, 3, 2)
     )
-    standard = sharer.share()['standard']
-    assert set(standard) == {(0.5, 'movia_h'), (0.5, 's-tog')}
+    standard = set(sharer.share()['standard'])
+    assert standard == {(0.5, 'movia_h'), (0.5, 's-tog')}
 
 
 #------------------------------
@@ -208,8 +208,10 @@ def test_drbyen_nport_strandboulevarden_norhavn_dybbro():
         (1, 3, 2, 4, 2)
     )
 
-    standard = sharer.share()['standard']
-    assert set(standard) == {(0.3333333333333333, 'metro'), (0.3333333333333333, 'movia_h'),(0.3333333333333333, 's-tog')}
+    standard = set(sharer.share()['standard'])
+    assert standard == {(0.3333333333333333, 'metro'),
+                        (0.3333333333333333, 'movia_h'),
+                        (0.3333333333333333, 's-tog')}
 
 
 """
