@@ -202,7 +202,7 @@ def test_drbyen_nport_strandboulevarden_norhavn_dybbro():
     #also has a CoTr to be removed and a border stations
     sharer = ZoneSharer(
         graph,
-        (1003, 1001, 1001, 1001, 1001),
+        (1003, 1001, 1001, 1001, 1001),S
         (8603311, 28329, 1132, 8600653, 8600634),
         (6, 1, 1, 4, 4),
         (1, 3, 2, 4, 2)
