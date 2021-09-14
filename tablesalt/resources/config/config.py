@@ -4,14 +4,15 @@ from pathlib import Path
 
 
 
-def load_config():
+def load_config() -> configparser.ConfigParser:
 
-
-    location = Path(r'resources/config/config.ini')
     config = configparser.ConfigParser()
     ini_file = pkg_resources.resource_filename(
-        'tablesalt', location
+        'tablesalt', r'resources/config/config.ini'
     )
     config.read(ini_file)
 
     return config
+
+
+
