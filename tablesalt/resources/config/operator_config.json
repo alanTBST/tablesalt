@@ -55,6 +55,7 @@
 				 "frederikssund_linjen", 
 				 "farum_linjen", 
 				 "klampenborg_linjen"],
+	"suburban_operator": "DSB S-tog",
     "sjællandlocal":["frederiksværk_banen", 
 				     "gribskovbanen_fork_1", 
 					 "gribskovbanen_fork_2", 
