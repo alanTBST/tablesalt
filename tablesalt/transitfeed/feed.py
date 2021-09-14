@@ -19,7 +19,7 @@ ARCHIVE_DIR = Path(THIS_DIR, 'gtfs_archive')
 
 CONFIG = load_config()
 
-def _download_and_unzip_gtfs(
+def _download_new_gtfs(
     write_text_files: Optional[bool] = False
     ) -> Dict[str, pd.core.frame.DataFrame]:
     """download the latest gtfs data from rejseplan,
@@ -88,6 +88,8 @@ class _FeedObject:
 class Agency(_FeedObject):
 
     def __init__(self, filepath: Optional[str] = None) -> None:
+
+        # self, usedata='' (archive, new)
         self.filepath = filepath if filepath is not None else ARCHIVE_DIR / 'agency.json'
 
     def to_dict(self) -> None:
