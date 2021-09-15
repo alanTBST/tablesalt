@@ -105,6 +105,7 @@ def _(zone_sequence: list) -> str:
     if all(1200 < x < 1300 for x in zone_sequence):
         return "movia_s"
     return "dsb"
+
 @determine_takst_region.register
 def _(zone_sequence: set) -> str:
 
@@ -115,7 +116,7 @@ def _(zone_sequence: set) -> str:
     if all(1200 < x < 1300 for x in zone_sequence):
         return "movia_s"
     return "dsb"
-    
+
 class _StopLoader:
 
     DEFAULT_STOPS_LOC = pkg_resources.resource_filename(
@@ -611,7 +612,7 @@ class TakstZones:
                 stops_df.iloc[:, 5], stops_df.iloc[:, 4]
                 )
             )
-        stops_gdf.crs = 4326  #set projection WGS84 
+        stops_gdf.crs = 4326  #set projection WGS84
 
         return stops_gdf
 
@@ -704,7 +705,7 @@ class RejseplanLoader(_GTFSloader):
             self._content[k] = zipfile.ZipFile(
                 BytesIO(v.content)
                 ).namelist()
-                
+
     @property
     def contents(self):
         if not self._content:
