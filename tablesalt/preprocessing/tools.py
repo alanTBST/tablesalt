@@ -28,7 +28,7 @@ def find_datastores(start_dir: Optional[str] = None) -> str:
     """Find the location of the rejsekort datastores
 
     :param start_dir: [description], defaults to None
-    :type start_dir: Optional[str], 
+    :type start_dir: Optional[str],
         The path to the root directory to start the seard
     :raises FileNotFoundError: If no rejsekort datastores can be found
     :return: The path to the directory containing the stores
@@ -49,7 +49,7 @@ def find_datastores(start_dir: Optional[str] = None) -> str:
         "cannot find a rejsekort datastores location"
         )
 
-def _hdfstores(store_loc: str, year: int) -> List[str]:
+def _hdfstores(store_loc: str, year: int) -> List[Path]:
     """Return a list of the hdf5 data sets to analyse
 
     :param store_loc: The location of the rejsekort datastores
@@ -61,11 +61,14 @@ def _hdfstores(store_loc: str, year: int) -> List[str]:
     """
 
     path = Path(store_loc) / 'rejsekortstores' / f'{year}Datastores' / 'hdfstores'
-    
+
     return list(path.glob('*.h5'))
 
 
-def setup_directories(year: int, dstores: Optional[Union[str, Path]] = None) -> Dict[str, str]:
+def setup_directories(
+    year: int,
+    dstores: Optional[Union[str, Path]] = None
+    ) -> Dict[str, Path]:
     """Setup the directories needed for the chosen year
 
     :param year: the year of analysis
@@ -83,13 +86,13 @@ def setup_directories(year: int, dstores: Optional[Union[str, Path]] = None) -> 
         dstores = THIS_DIR.parent / 'datastores' / 'rejsekortstores' / f'{year}DataStores'
     else:
         dstores = dstores / 'rejsekortstores' / f'{year}DataStores'
-            
+
     substores = ('hdfstores', 'dbs', 'packs')
     paths = [dstores / x for x in substores]
 
     result_subpaths = ('other', 'pendler', 'single', 'preprocessed')
-    
-    result_cache =  THIS_DIR.parent / 'scripts' / '__result_cache__'/ f'{year}' 
+
+    result_cache =  THIS_DIR.parent / 'scripts' / '__result_cache__'/ f'{year}'
     result_paths = [result_cache / x for x in result_subpaths]
     paths.extend(result_paths)
 
@@ -98,7 +101,10 @@ def setup_directories(year: int, dstores: Optional[Union[str, Path]] = None) -> 
 
     return {x.stem: x for x in paths}
 
-def db_paths(store_location: str, year: int) -> Dict[str, Union[str, List[str]]]:
+def db_paths(
+    store_location: str,
+    year: int
+    ) -> Dict[str, Union[str, List[str]]]:
     """
     Return a dictionary of the paths to the databases
 
@@ -204,6 +210,7 @@ def check_all_file_headers(
 def col_index_dict(
         file_columns: Sequence[str]
         ) -> Tuple[Dict[str, int], Dict[int, Union[str, int, float]]]:
+
     """get the index values of the input file_columns"""
 
     try:
@@ -235,11 +242,11 @@ def col_index_dict(
         except ValueError:
             pass
     coltypes: Dict[str, Union[str, int, float]]
-    
+
     coltypes = {x[0]: x[1] for x in wanted if x[0] in file_columns}
     coltypes['kortnr'] = str
-    
-    
+
+
     colidtypes = {colindices[k]: v for k, v in coltypes.items()}
 
     return colindices, colidtypes
