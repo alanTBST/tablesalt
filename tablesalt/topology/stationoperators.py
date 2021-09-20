@@ -86,7 +86,7 @@ def _load_operator_settings(
             except TypeError:
                 use_groups = True
                 for line in v:
-                    chosen_operators.add(config_dict[line])                  
+                    chosen_operators.add(config_dict[line])
                     chosen_lines.add(line.lower())
                 chosen_lines.remove(k) # remove the group name...local, suburban etc
     operator_ids = {
@@ -117,7 +117,7 @@ def load_bus_station_connectors() -> Dict[int, int]:
     :rtype: Dict[int, int]
 
     """
-    
+
     support_store = pkg_resources.resource_filename(
         'tablesalt', 'resources/support_store.h5')
 
@@ -147,7 +147,7 @@ def _alternate_stop_map():
 
     metromap = mappers['metro_map']
     revmetromap = mappers['metro_map_rev']
-    
+
     sstops = mappers['s_uic']
     mstops = mappers['m_uic']
 
@@ -161,7 +161,7 @@ def _alternate_stop_map():
             alts = alts + [ms]
         for x in alts:
             sstopsdict[x] = stopid
-    
+
     mstopsdict = {}
     for stopid in mstops:
         ss = metromap.get(stopid)
@@ -200,17 +200,17 @@ def _load_default_passenger_stations() -> List[pd.core.frame.DataFrame]:
         new_frame = pas_stations.copy()
         new_frame = new_frame.query("stop_id in @d")
         new_frame.loc[:, 'stop_id'] = new_frame.loc[:, 'stop_id'].map(d)
-        
+
         sframe = new_frame.query("stop_id in @sstopsdict").copy()
         sframe.loc[:, 'stop_id'] = sframe.loc[:, 'stop_id'].map(sstopsdict)
 
         mframe = new_frame.query("stop_id in @mstopsdict").copy()
-        mframe.loc[:, 'stop_id'] = mframe.loc[:, 'stop_id'].map(mstopsdict)        
-        
+        mframe.loc[:, 'stop_id'] = mframe.loc[:, 'stop_id'].map(mstopsdict)
+
         new_frame = new_frame.set_index('stop_id')
         sframe = sframe.set_index('stop_id')
         mframe = mframe.set_index('stop_id')
-        
+
         frames.append(new_frame)
         frames.append(sframe)
         frames.append(mframe)
@@ -264,13 +264,13 @@ class StationOperators():
 
         self.lines = lines
         self._settings = _load_operator_settings(*self.lines)
-        stop_lookup, line_lookup = self._pas_station_dict()   
-        self._stop_lookup = stop_lookup   
-        self._line_lookup = line_lookup   
+        stop_lookup, line_lookup = self._pas_station_dict()
+        self._stop_lookup = stop_lookup
+        self._line_lookup = line_lookup
         self._stop_zone_map = TakstZones().stop_zone_map()
         self._group_lines = _grouped_lines_dict(self._settings['config'])
 
-        self._alternates = set(chain(*ALTERNATE_STATIONS.values())) 
+        self._alternates = set(chain(*ALTERNATE_STATIONS.values()))
 
     def _pas_station_dict(self) -> Dict[Tuple[str, ...], List[int]]:
         """
@@ -279,19 +279,19 @@ class StationOperators():
         """
         lines = self._settings['lines']
         pas_stations = _load_default_passenger_stations()
-  
+
         line_lookup = defaultdict(set)
         for line in lines:
             for frame in pas_stations:
                 s = frame[line]
                 good = set(s[s > 0].index)
                 line_lookup[line].update(good)
-        
+
         stop_lookup = defaultdict(set)
         for k, v in line_lookup.items():
             for stopid in v:
                 stop_lookup[stopid].add(k)
-        
+
         return stop_lookup, line_lookup
 
     def get_ops(
@@ -390,15 +390,15 @@ class StationOperators():
         station to helsingør station
 
         >>> op_getter = StationOperators(
-                'kystkastrup', 'suburban', 
-                'sjællandfjernregional', 
+                'kystkastrup', 'suburban',
+                'sjællandfjernregional',
                 'sjællandlocal', 'metro'
                 )
         >>> op_getter.station_pair(8600626, 8600669, format='line')
             ['kystbanen']
         >>> opgetter.station_pair(8600626, 8600669, format='operator')
             ['first']
-        """ 
+        """
         if format == 'operator':
             try:
                 return self.OP_CACHE[(start_uic, end_uic)]
@@ -411,7 +411,7 @@ class StationOperators():
                 pass
         else:
             raise ValueError(f"format={format} not available")
-        
+
         start_bus = start_uic > MAX_RAIL_UIC or start_uic < MIN_RAIL_UIC
         end_bus = end_uic > MAX_RAIL_UIC or end_uic < MIN_RAIL_UIC
 
@@ -422,14 +422,14 @@ class StationOperators():
             region = determine_takst_region(startzone)
             line = {f'{region}_bus'}
             operator = {self._settings['config']['bus'][region]}
-            
+
             self.OP_CACHE[(start_uic, end_uic)] = list(operator)
             self.LINE_CACHE[(start_uic, end_uic)] = list(line)
-            if format == 'operator':          
+            if format == 'operator':
                 return self.OP_CACHE[(start_uic, end_uic)]
             return self.LINE_CACHE[(start_uic, end_uic)]
 
-                
+
         if not start_bus:
             start_lines = self._stop_lookup[start_uic]
         if not end_bus:
@@ -439,14 +439,14 @@ class StationOperators():
             if not bus_loc_check:
                  raise ValueError(f"Unknown bus stop id={end_uic}")
             end_lines = self._stop_lookup[bus_loc_check]
-                       
+
         line_intersection = start_lines.intersection(end_lines)
-        
+
         if not line_intersection:
             # find missing stop point
             start_groups = {self._group_lines.get(x) for x in start_lines}
             start_groups = {x for x in start_groups if x}
-            end_groups = {self._group_lines.get(x) for x in end_lines}  
+            end_groups = {self._group_lines.get(x) for x in end_lines}
             end_groups = {x for x in end_groups if x}
             group_intersection = start_groups.intersection(end_groups)
 
@@ -456,55 +456,55 @@ class StationOperators():
                     )
                 self.OP_CACHE[(start_uic, end_uic)]  = possible_operators
                 self.LINE_CACHE[(start_uic, end_uic)] = group_lines
-            else: 
+            else:
                 self.OP_CACHE[(start_uic, end_uic)]  = []
                 self.LINE_CACHE[(start_uic, end_uic)] = []
-        else:                      
+        else:
             possible_operators, possible_lines = self._has_line_intersection(
                 start_uic, line_intersection
                 )
 
             self.OP_CACHE[(start_uic, end_uic)] = possible_operators
-            self.LINE_CACHE[(start_uic, end_uic)] = possible_lines                      
-              
-        if format == 'operator':          
+            self.LINE_CACHE[(start_uic, end_uic)] = possible_lines
+
+        if format == 'operator':
             return self.OP_CACHE[(start_uic, end_uic)]
         return self.LINE_CACHE[(start_uic, end_uic)]
 
     def _has_grp_intersection(self, group_intersection):
-        
+
         if len(group_intersection) == 1:
             group = group_intersection.pop()
             group_lines = set(self._settings['config'][group])
             possible_operators = {self._settings['config'][x] for x in group_lines}
-                
+
         else:
             group_lines = set()
             possible_operators = set()
-        
+
         return list(group_lines), list(possible_operators)
 
-    
+
     def _has_line_intersection(self, start_uic, line_intersection):
-        
+
 
         if len(line_intersection) == 1:
             line = list(line_intersection)
             possible_operators = [self._settings['config'][line[0]]]
             return possible_operators, line
-        
+
         suburban_option = any(
-            x in self._settings['config']['suburban'] for 
+            x in self._settings['config']['suburban'] for
             x in line_intersection
             )
- 
+
         metro_option = any(
-            x in self._settings['config']['metro'] for 
+            x in self._settings['config']['metro'] for
             x in line_intersection
             )
 
         if start_uic in mappers['s_uic'] and suburban_option:
-            possible_lines = {x for x in line_intersection if 
+            possible_lines = {x for x in line_intersection if
                               x in self._settings['config']['suburban']}
             possible_operators = {
                 self._settings['config'][x] for x in possible_lines
@@ -512,7 +512,7 @@ class StationOperators():
 
         elif start_uic in mappers['m_uic'] and metro_option:
             possible_lines = {
-                x for x in line_intersection if 
+                x for x in line_intersection if
                 x in self._settings['config']['metro']
                 }
             possible_operators = {
@@ -521,7 +521,7 @@ class StationOperators():
 
         elif start_uic in self._alternates:
             possible_lines = {
-                x for x in line_intersection if 
+                x for x in line_intersection if
                 x in self._settings['config']['sjællandlocal']
                 }
             possible_operators = {
@@ -529,9 +529,9 @@ class StationOperators():
                 }
         else:
             possible_lines = {
-                x for x in line_intersection if 
-                x not in self._settings['config']['suburban'] and 
-                x not in self._settings['config']['metro'] and 
+                x for x in line_intersection if
+                x not in self._settings['config']['suburban'] and
+                x not in self._settings['config']['metro'] and
                 x not in self._settings['config']['sjællandlocal']
                 }
             possible_operators = {
