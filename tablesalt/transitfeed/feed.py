@@ -9,6 +9,8 @@ More specifically it is the static GTFS data.
 import ast
 import json
 import logging
+import os
+import shutil
 import zipfile
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -29,9 +31,8 @@ from tablesalt.resources.config import load_config
 
 log = logging.getLogger(__name__)
 
-THIS_DIR = Path('C:\\Users\\B087115\\Documents\\GitHub\\tablesalt\\tablesalt\\transitfeed').parent
-TEMP_DIR = Path(THIS_DIR, 'temp_gtfs_data')
-ARCHIVE_DIR = Path(THIS_DIR, 'gtfs_archive')
+THIS_DIR = Path('C:\\Users\\B087115\\Documents\\GitHub\\tablesalt\\tablesalt\\transitfeed') #(__file__).parent
+ARCHIVE_DIR = Path(THIS_DIR, '__gtfs_archive__')
 
 CONFIG = load_config()
 
@@ -447,7 +448,6 @@ class Shapes(_TransitFeedObject):
 
         shapes = latest_data.itertuples(name=None, index=False)
 
-
         shape_lines = {
             key: cls._group_to_linestring(grp) for
             key, grp in groupby(shapes, key=itemgetter(0))
@@ -491,23 +491,30 @@ class TransitFeed:
         routes: Routes,
         trips: Trips,
         stop_times: StopTimes,
+        calendar: Calendar,
+        calendar_dates: CalendarDates,
         transfers: Optional[Transfers] = None,
-        calendar: Optional[Calendar] = None,
-        calendar_dates: Optional[CalendarDates] = None,
         shapes: Optional[Shapes] = None
         ) -> None:
+
 
         self.agency = agency
         self.routes = routes
         self.stops = stops
         self.trips = trips
         self.stop_times = stop_times
-        self.transfers = transfers
         self.calendar = calendar
         self.calendar_dates = calendar_dates
+
+        self.transfers = transfers
         self.shapes = shapes
 
     def rail_routes(self) ->  Dict[str, Dict[str, Any]]:
+        """Return only the rail routes of the feed
+
+        :return: a dictionary of routes
+        :rtype: Dict[str, Dict[str, Any]]
+        """
 
         rail_routes = {}
         for route_id, info in self.routes.rail_routes.items():
@@ -539,59 +546,81 @@ class TransitFeed:
 
         return self.calendar.period()
 
-def update_archive(dataset: str) -> None:
+    def to_archive(self) -> None:
 
-    return
+        period = self.feed_period()
+        period_string = '_'.join(datetime.strftime(x, '%Y%m%d') for x in period)
+        path = ARCHIVE_DIR / period_string
+        path.mkdir(parents=True, exist_ok=True)
 
+        for dset, klass in self.__dict__.items():
+            filepath = path / dset
+            with open(filepath, 'wb') as f:
+                try:
+                    msgpack.pack(klass._data, f)
+                except TypeError:
+                    klass.to_geojson(filepath)
 
-def latest_transitfeed(add_to_archive: bool = False) -> TransitFeed:
+        shutil.make_archive(str(path), 'zip', path)
+        shutil.rmtree(path)
+
+def latest_transitfeed(
+    add_transfers: bool = True,
+    add_shapes: bool = True,
+    add_to_archive: bool = False
+    ) -> TransitFeed:
     """Factory function that returns the latest available
     transfeet data as a TransitFeed object
 
     :param update_archive: [description], defaults to True
     :type update_archive: bool, optional
     """
+    # order matches TransitFeed
+    required = [
+        ('agency.txt', Agency.latest),
+        ('stops.txt', Stops.latest),
+        ('routes.txt', Routes.latest),
+        ('trips.txt', Trips.latest),
+        ('stop_times.txt', StopTimes.latest),
+        ('calendar.txt', Calendar.latest),
+        ('calendar_dates.txt', CalendarDates.latest)
+    ]
+
     latest_gtfs_data = _download_latest_feed()
-    agency_df = latest_gtfs_data['agency.txt']
-    agency = Agency.latest(agency_df)
 
-    routes_df = latest_gtfs_data['routes.txt']
-    routes = Routes.latest(routes_df)
+    req_classes = tuple(v(latest_gtfs_data[k]) for k, v in required)
 
-    stops_df = latest_gtfs_data['stops.txt']
-    stops = Stops.latest(stops_df)
+    if add_transfers:
+        transfers_df = latest_gtfs_data['transfers.txt']
+        transfers: Optional[Transfers]
+        transfers = Transfers.latest(transfers_df)
+    else:
+        transfers = None
 
-    trips_df = latest_gtfs_data['trips.txt']
-    trips = Trips.latest(trips_df)
+    if add_shapes:
+        shapes_df = latest_gtfs_data['shapes.txt']
+        shapes: Optional[Shapes]
+        shapes = Shapes.latest(shapes_df)
+    else:
+        shapes = None
 
-    stop_times_df = latest_gtfs_data['stop_times.txt']
-    stoptimes = StopTimes.latest(stop_times_df)
+    feed = TransitFeed(*req_classes, transfers=transfers, shapes=shapes)
+    if add_to_archive:
+        feed.to_archive()
 
-    transfers_df = latest_gtfs_data['transfers.txt']
-    transfers = Transfers.latest(transfers_df)
-
-    calendar_df = latest_gtfs_data['calendar.txt']
-    calendar = Calendar.latest(calendar_df)
-
-    calendar_dates_df = latest_gtfs_data['calendar_dates.txt']
-    calendar_dates = CalendarDates.latest(calendar_dates_df)
-
-    shapes_df = latest_gtfs_data['shapes.txt']
-    shapes = Shapes.latest(shapes_df)
-
-    feed = TransitFeed(
-        agency,
-        stops,
-        routes,
-        trips,
-        stoptimes,
-        transfers=transfers,
-        calendar=calendar,
-        calendar_dates=calendar_dates,
-        shapes=shapes
-        )
     return feed
 
-def archived_transitfeed() -> None:
+def available_archives() -> List[str]:
+    """List the available transitfeed archives
+
+    :return: a list of period_strings
+    :rtype: List[str]
+    """
+
+    available = ARCHIVE_DIR.glob('*.zip')
+
+    return [x.stem for x in available]
+
+def archived_transitfeed(period_string: str) -> None:
 
     return
