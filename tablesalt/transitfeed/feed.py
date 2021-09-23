@@ -11,19 +11,25 @@ import json
 import logging
 import zipfile
 from abc import ABC, abstractmethod
+from datetime import datetime
 from io import BytesIO
+from itertools import combinations_with_replacement, groupby
+from operator import attrgetter, itemgetter
 from pathlib import Path
-from typing import AbstractSet, ClassVar, Dict, Optional, Tuple, Set, TypeVar, Any
-from urllib.request import urlopen
+from typing import Any, ClassVar, Dict, Iterable, List, Optional, Set, Tuple, TypeVar, Iterable
 from urllib.error import URLError
+from urllib.request import urlopen
 
+import msgpack
 import pandas as pd
 from pandas.core.frame import DataFrame
+from shapely import geometry, wkt
+from shapely.geometry import LineString
 from tablesalt.resources.config import load_config
 
 log = logging.getLogger(__name__)
 
-THIS_DIR = Path(__file__).parent
+THIS_DIR = Path('C:\\Users\\B087115\\Documents\\GitHub\\tablesalt\\tablesalt\\transitfeed').parent
 TEMP_DIR = Path(THIS_DIR, 'temp_gtfs_data')
 ARCHIVE_DIR = Path(THIS_DIR, 'gtfs_archive')
 
@@ -97,57 +103,20 @@ def _load_route_types() -> Tuple[Dict[int, int], Set[int], Set[int]]:
         bus_route_types
         )
 
-
-def _load_process_trips(
-    gtfs_dir: Path,
-    rail_route_ids: Set[str],
-    route_agency: Dict[str, str]
-    ) -> Tuple[Set[int], Dict[int, str]]:
-
-    trips_fp = list(gtfs_dir.glob('trips*'))[0]
-    trips = pd.read_csv(trips_fp, usecols=['trip_id', 'route_id'])
-
-    rail_trips = trips.query("route_id in @rail_route_ids").copy()
-    rail_trips['agency_name'] = rail_trips.loc[:, 'route_id'].replace(route_agency)
-
-    trip_agency = dict(zip(rail_trips['trip_id'], rail_trips.loc[:, 'agency_name']))
-    rail_trip_ids = set(rail_trips.trip_id)
-
-    return rail_trip_ids, trip_agency
-
-def _load_process_stop_times(
-    gtfs_dir: Path,
-    rail_trip_ids: Set[int],
-    trip_agency: Dict[int, str]
-    ) -> DataFrame:
-
-    stoptimes_fp = list(gtfs_dir.glob('stop_times*'))[0]
-    stop_times = pd.read_csv(stoptimes_fp, usecols=['trip_id', 'stop_id'])
-
-    rail_stop_times = stop_times.query("trip_id in @rail_trip_ids").copy()
-
-    trip_stops = rail_stop_times.groupby('trip_id')['stop_id'].apply(tuple)
-    trip_stops = trip_stops.reset_index()
-    trip_stops = trip_stops.drop_duplicates('stop_id')
-    trip_stops.loc[:, 'agency_name'] = \
-        trip_stops.loc[:, 'trip_id'].replace(trip_agency)
-
-    return trip_stops
-
-class TransitFeedObject(ABC):
+class _TransitFeedObject(ABC):
 
     @classmethod
     @abstractmethod
-    def from_archive(self) -> 'TransitFeedObject':
+    def from_archive(self) -> '_TransitFeedObject':
         pass
 
     @classmethod
     @abstractmethod
-    def latest(self, latest_data: DataFrame) -> 'TransitFeedObject':
+    def latest(self, latest_data: DataFrame) -> '_TransitFeedObject':
         pass
 
 
-class Agency(TransitFeedObject):
+class Agency(_TransitFeedObject):
 
     def __init__(
         self,
@@ -184,7 +153,7 @@ class Agency(TransitFeedObject):
         return cls(agency_data)
 
 
-class Stops(TransitFeedObject):
+class Stops(_TransitFeedObject):
     def __init__(
         self,
         stops_data: Dict[int, Dict[str, Any]]
@@ -212,7 +181,7 @@ class Stops(TransitFeedObject):
         return
 
 
-class Routes(TransitFeedObject):
+class Routes(_TransitFeedObject):
 
     OLD_ROUTE_MAP: ClassVar[Dict[int, int]]
     BUS_ROUTE_TYPES: ClassVar[Set[int]]
@@ -273,9 +242,34 @@ class Routes(TransitFeedObject):
 
         return
 
-class Trips(TransitFeedObject):
-    def __init__(self, trips_data) -> None:
+class Trips(_TransitFeedObject):
+
+    def __init__(
+        self,
+        trips_data: Dict[int, Dict[str, Any]]
+        ) -> None:
+
         self._data = trips_data
+        self._trip_route_map: Optional[Dict[int, str]] = None
+        self._route_trip_map: Optional[Dict[str, Tuple[int, ...]]] = None
+
+    @property
+    def trip_route_map(self) -> Optional[Dict[int, str]]:
+
+        return self._trip_route_map
+
+    @trip_route_map.setter
+    def trip_route_map(self, value: Dict[int, str]) -> None:
+        self._trip_route_map = value
+
+    @property
+    def route_trip_map(self) -> Optional[Dict[str, Tuple[int, ...]]]:
+        return self._route_trip_map
+
+    @route_trip_map.setter
+    def route_trip_map(self, value: Dict[str, Tuple[int, ...]]) -> None:
+        self._route_trip_map = value
+
 
     @classmethod
     def from_archive(cls) -> 'Trips':
@@ -288,29 +282,204 @@ class Trips(TransitFeedObject):
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Trips':
 
-        latest_data.set_index('trip_id').T.to_dict()
+        triproute = dict(zip(latest_data.loc[:, 'trip_id'], latest_data.loc[:, 'route_id']))
+
+        route_trips = zip(latest_data.loc[:, 'route_id'], latest_data.loc[:, 'trip_id'])
+        route_tripsmap = {key:tuple(x[1] for x in grp) for
+                          key, grp in groupby(route_trips, key=itemgetter(0))}
 
         trips_data = latest_data.set_index('trip_id').T.to_dict()
-        return cls(trips_data)
+
+        trip = cls(trips_data)
+        trip.trip_route_map = triproute
+        trip.route_trip_map = route_tripsmap
+
+        return trip
 
 
-class StopTimes(TransitFeedObject):
+class StopTimes(_TransitFeedObject):
 
-    def __init__(self, stoptimes_data) -> None:
+    def __init__(self, stoptimes_data: Dict[int, Tuple[Dict[str, Any], ...]]) -> None:
         self._data = stoptimes_data
 
     @classmethod
     def from_archive(cls) -> 'StopTimes':
         with open(ARCHIVE_DIR / 'stop_times.json', 'r') as f:
+            stoptimes_data = json.load(f)
+        return cls(stoptimes_data)
+
+
+    @classmethod
+    def latest(cls, latest_data: DataFrame) -> 'StopTimes':
+        df = latest_data.fillna('0')
+
+        # this deals with older format gtfs from Rejseplan
+        if not 'int' in df.loc[:, 'stop_id'].dtype.name:
+            df.loc[:, 'stop_id'] = \
+                df.loc[:, 'stop_id'].astype(str).str.strip('G').astype(int)
+
+        df = df.sort_values(['trip_id', 'stop_sequence']) # assure trip order
+
+        vals = df.itertuples(name='StopTimes', index=False)
+
+        stoptimes_data = {key: tuple(x._asdict() for x in grp) for
+             key, grp in groupby(vals, key=attrgetter('trip_id'))}
+
+        return cls(stoptimes_data)
+
+class Transfers(_TransitFeedObject):
+
+    def __init__(self, transfers_data: List[Dict[str, Any]]) -> None:
+        self._data = transfers_data
+
+    @classmethod
+    def from_archive(cls) -> 'Transfers':
+        with open(ARCHIVE_DIR / 'transfers.json', 'r') as f:
             trips_data = json.load(f)
         return cls(trips_data)
 
     @classmethod
-    def latest(cls, latest_data: DataFrame) -> 'StopTimes':
+    def latest(cls, latest_data: DataFrame) -> 'Transfers':
+
+        null_columns = []
+        for col in latest_data.columns:
+            if latest_data.loc[:, col].isnull().all():
+                null_columns.append(col)
+        new_cols = [x for x in latest_data.columns if x not in null_columns]
+        df = latest_data.loc[:, new_cols]
+        for col in df.columns:
+                if col in ('transfer_type', 'min_transfer_time'):
+                    df.loc[:, col] = df.loc[:, col].fillna(0).astype(int)
+                else:
+                    df.loc[:, col] = df.loc[:, col].fillna('')
+
+        transfers_data = df.itertuples(name='Transfer', index=False)
+        transfers_data = [x._asdict() for x in transfers_data]
+
+        return cls(transfers_data)
+
+class Calendar(_TransitFeedObject):
+
+    def __init__(self, calender_data: Dict[int, Dict[str, int]]) -> None:
+        self._data = calender_data
+
+    def __getitem__(self, service_id: int) -> Dict[str, int]:
+        return self._data.__getitem__(service_id)
+
+    @classmethod
+    def from_archive(cls) -> 'Calendar':
+        with open(ARCHIVE_DIR / 'calendar.json', 'r') as f:
+            calender_data = json.load(f)
+        return cls(calender_data)
+
+    @classmethod
+    def latest(cls, latest_data: DataFrame) -> 'Calendar':
+        calendar_data = latest_data.set_index('service_id').T.to_dict()
+        return cls(calendar_data)
+
+    def period(self) -> Tuple[datetime, datetime]:
+
+        values = self._data.values()
+        values_it = iter(values)
+        first = next(values_it)
+
+        start = first['start_date']
+        end = first['end_date']
+
+        start_time = datetime.strptime(str(start), '%Y%m%d')
+        end_time = datetime.strptime(str(end), '%Y%m%d')
+
+        return (start_time, end_time)
 
 
-        routes_data = latest_data.set_index('').T.to_dict()
-        return cls(routes_data)
+class CalendarDates(_TransitFeedObject):
+
+    def __init__(
+        self,
+        calendar_dates_data: Dict[int, Tuple[Tuple[int, int], ...]]
+        ) -> None:
+        self._data = calendar_dates_data
+
+    @classmethod
+    def from_archive(cls) -> 'CalendarDates':
+        with open(ARCHIVE_DIR / 'calendar_dates.json', 'r') as f:
+            calender_date_data = json.load(f)
+        return cls(calender_date_data)
+
+    @classmethod
+    def latest(cls, latest_data: DataFrame) -> 'CalendarDates':
+
+        latest_data = latest_data.sort_values('service_id')
+
+        calendar_tuples = zip(latest_data['service_id'],
+                              latest_data['date'],
+                              latest_data['exception_type'])
+
+        calendar_dates_data = {
+            key: tuple((x[1], x[2]) for x in grp) for key, grp in
+            groupby(calendar_tuples, key=itemgetter(0))
+        }
+        return cls(calendar_dates_data)
+
+
+
+class Shapes(_TransitFeedObject):
+
+    def __init__(self, shapes_data: Dict[int, LineString]) -> None:
+        self._data = shapes_data
+
+    @classmethod
+    def from_archive(cls) -> 'Shapes':
+
+        return cls()
+
+    @staticmethod
+    def _group_to_linestring(grp: Iterable[Tuple[TNum, ...]]) -> LineString:
+
+        string = str(tuple(str(x[2]) + ' ' + str(x[1]) for x in grp)).replace("'", "")
+
+        return wkt.loads('LINESTRING ' + string)
+
+    @classmethod
+    def latest(cls, latest_data: DataFrame) -> 'Shapes':
+
+        latest_data = latest_data.sort_values(['shape_id', 'shape_pt_sequence'])
+
+        shapes = latest_data.itertuples(name=None, index=False)
+
+
+        shape_lines = {
+            key: cls._group_to_linestring(grp) for
+            key, grp in groupby(shapes, key=itemgetter(0))
+        }
+        return cls(shape_lines)
+
+    def to_geojson(self, filepath: str) -> None:
+        """Write the shapes data to a geojson file
+
+        :param filepath: the path of the file to write to
+        :type filepath: str
+        """
+
+        features: List[Any] = []
+        for k, v in self._data.items():
+            geom = geometry.mapping(v)
+
+            feature = {
+                "type": "Feature",
+                "geometry": geom,
+                "properties": {
+                    "shape_id": k
+                    }
+                }
+            features.append(feature)
+
+        for_geojson = {
+            "type": "FeatureCollection",
+            "features": features
+            }
+        with open(filepath, 'w') as fp:
+            json.dump(for_geojson, fp)
 
 
 class TransitFeed:
@@ -318,30 +487,64 @@ class TransitFeed:
     def __init__(
         self,
         agency: Agency,
+        stops: Stops,
         routes: Routes,
-        stops: Stops
+        trips: Trips,
+        stop_times: StopTimes,
+        transfers: Optional[Transfers] = None,
+        calendar: Optional[Calendar] = None,
+        calendar_dates: Optional[CalendarDates] = None,
+        shapes: Optional[Shapes] = None
         ) -> None:
 
         self.agency = agency
         self.routes = routes
         self.stops = stops
+        self.trips = trips
+        self.stop_times = stop_times
+        self.transfers = transfers
+        self.calendar = calendar
+        self.calendar_dates = calendar_dates
+        self.shapes = shapes
 
     def rail_routes(self) ->  Dict[str, Dict[str, Any]]:
-        routes = self.routes.rail_routes
 
         rail_routes = {}
-        for route_id, info in routes.items():
+        for route_id, info in self.routes.rail_routes.items():
             info['agency_name'] = self.agency.get(info['agency_id'], '')
             rail_routes[route_id] = info
 
-        return routes
+        return rail_routes
+
+    def bus_routes(self) -> Dict[str, Dict[str, Any]]:
+        """Return only the bus routes of the feed
+
+        :return: a dictionary of routes
+        :rtype: Dict[str, Dict[str, Any]]
+        """
+
+        bus_routes = {}
+        for route_id, info in self.routes.bus_routes.items():
+            info['agency_name'] = self.agency.get(info['agency_id'], '')
+            bus_routes[route_id] = info
+
+        return bus_routes
+
+    def feed_period(self) -> Tuple[datetime, datetime]:
+        """Return the time period that the feed is valid for
+
+        :return: a tuple of start_time, end_time
+        :rtype: Tuple[datetime, datetime]
+        """
+
+        return self.calendar.period()
 
 def update_archive(dataset: str) -> None:
 
     return
 
 
-def latest_transitfeed(update_archive: bool = False) -> TransitFeed:
+def latest_transitfeed(add_to_archive: bool = False) -> TransitFeed:
     """Factory function that returns the latest available
     transfeet data as a TransitFeed object
 
@@ -358,19 +561,37 @@ def latest_transitfeed(update_archive: bool = False) -> TransitFeed:
     stops_df = latest_gtfs_data['stops.txt']
     stops = Stops.latest(stops_df)
 
-    stop_times_df = latest_gtfs_data['stop_times.txt']
-
     trips_df = latest_gtfs_data['trips.txt']
+    trips = Trips.latest(trips_df)
+
+    stop_times_df = latest_gtfs_data['stop_times.txt']
+    stoptimes = StopTimes.latest(stop_times_df)
 
     transfers_df = latest_gtfs_data['transfers.txt']
+    transfers = Transfers.latest(transfers_df)
 
-    calendar = latest_gtfs_data['calendar.txt']
+    calendar_df = latest_gtfs_data['calendar.txt']
+    calendar = Calendar.latest(calendar_df)
 
-    calendar_dates = latest_gtfs_data['calendar_dates.txt']
+    calendar_dates_df = latest_gtfs_data['calendar_dates.txt']
+    calendar_dates = CalendarDates.latest(calendar_dates_df)
 
+    shapes_df = latest_gtfs_data['shapes.txt']
+    shapes = Shapes.latest(shapes_df)
 
-    return TransitFeed(agency, routes, stops)
+    feed = TransitFeed(
+        agency,
+        stops,
+        routes,
+        trips,
+        stoptimes,
+        transfers=transfers,
+        calendar=calendar,
+        calendar_dates=calendar_dates,
+        shapes=shapes
+        )
+    return feed
 
-def archived_transitfed() -> None:
+def archived_transitfeed() -> None:
 
     return
