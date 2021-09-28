@@ -13,17 +13,19 @@ import os
 import shutil
 import zipfile
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from datetime import datetime
-from io import BytesIO
-from itertools import combinations_with_replacement, groupby
+from io import BytesIO, TextIOWrapper
+from itertools import groupby
 from operator import attrgetter, itemgetter
 from pathlib import Path
-from typing import Any, ClassVar, Dict, Iterable, List, Optional, Set, Tuple, TypeVar, Iterable
+from typing import Any, ClassVar, DefaultDict, Dict, Iterable, List, Optional, Set, Tuple, TypeVar, Iterable
 from urllib.error import URLError
 from urllib.request import urlopen
 
 import msgpack
 import pandas as pd
+from msgpack.exceptions import ExtraData
 from pandas.core.frame import DataFrame
 from shapely import geometry, wkt
 from shapely.geometry import LineString
@@ -38,20 +40,27 @@ CONFIG = load_config()
 
 TNum = TypeVar('TNum', int, float)
 
-def _download_latest_feed(
-    write_text_files: Optional[bool] = False
-    ) -> Dict[str, pd.core.frame.DataFrame]:
 
+class TransitFeedError(Exception):
+    pass
+
+def download_latest_feed() -> Dict[str, pd.core.frame.DataFrame]:
     """download the latest gtfs data from rejseplan,
     write the text files to a folder named temp_gtfs_data
 
-    :param write_text_files: write the .txt files to disk, defaults to False
-    :type write_text_files: Optional[bool], optional
     :raises Exception: If we cannot download the data for any reason
     :return: a dictionary of dataframes for the gtfs txt files
     :rtype: Dict[str, pd.core.frame.DataFrame]
     """
-
+    required = {
+        'agency.txt',
+        'stops.txt',
+        'routes.txt',
+        'trips.txt',
+        'stop_times.txt',
+        'calendar.txt',
+        'calendar_dates.txt',
+    }
 
     gtfs_url = CONFIG['rejseplanen']['gtfs_url']
     resp = urlopen(gtfs_url)
@@ -65,14 +74,15 @@ def _download_latest_feed(
     gtfs_data: Dict[str, pd.core.frame.DataFrame] = {}
 
     with zipfile.ZipFile(BytesIO(resp.read())) as zfile:
-        for x in zfile.namelist():
+        names = zfile.namelist()
+        missing = {x for x in required if x not in names}
+        if missing:
+            raise TransitFeedError(
+                f"Mandatory dataset/s [{', '.join(missing)}] are missing from the feed."
+                )
+        for x in names:
             df = pd.read_csv(zfile.open(x), low_memory=False)
             gtfs_data[x] = df
-
-    if write_text_files:
-        for filename, df in gtfs_data.items():
-            fp = TEMP_DIR / filename
-            df.to_csv(fp, encoding='iso-8859-1')
 
     return gtfs_data
 
@@ -162,6 +172,20 @@ class Stops(_TransitFeedObject):
 
         self._data = stops_data
 
+    def __getitem__(self, item: int) -> Dict[str, Any]:
+
+        return self._data.__getitem__(item)
+
+    def get(
+        self,
+        item: int,
+        default: Optional[Any] = None
+        ) -> Optional[Any]:
+
+        return self._data.get(item, default)
+
+    @classmethod
+
 
     @classmethod
     def from_archive(cls) -> 'Stops':
@@ -199,6 +223,18 @@ class Routes(_TransitFeedObject):
 
         self._rail_routes: Optional[Dict[str, Dict[str, Any]]] = None
         self._bus_routes: Optional[Dict[str, Dict[str, Any]]] = None
+
+    def __getitem__(self, item: str) -> Dict[str, Any]:
+
+        return self._data.__getitem__(item)
+
+    def get(
+        self,
+        item: str,
+        default: Optional[str] = None
+        ) -> Any:
+
+        return self._data.get(item, default)
 
     @property
     def rail_routes(self) -> Dict[str, Dict[str, Any]]:
@@ -254,6 +290,17 @@ class Trips(_TransitFeedObject):
         self._trip_route_map: Optional[Dict[int, str]] = None
         self._route_trip_map: Optional[Dict[str, Tuple[int, ...]]] = None
 
+    def __getitem__(self, item: int) -> Dict[str, Any]:
+
+        return self._data.__getitem__(item)
+
+    def get(
+        self,
+        item: int,
+        default: Optional[Dict[str, Any]] = None
+        ) -> Optional[Dict[str, Any]]:
+        return self._data.get(item, default)
+
     @property
     def trip_route_map(self) -> Optional[Dict[int, str]]:
 
@@ -300,7 +347,10 @@ class Trips(_TransitFeedObject):
 
 class StopTimes(_TransitFeedObject):
 
-    def __init__(self, stoptimes_data: Dict[int, Tuple[Dict[str, Any], ...]]) -> None:
+    def __init__(
+        self,
+        stoptimes_data: Dict[int, Tuple[Dict[str, Any], ...]]
+        ) -> None:
         self._data = stoptimes_data
 
     @classmethod
@@ -429,6 +479,18 @@ class Shapes(_TransitFeedObject):
     def __init__(self, shapes_data: Dict[int, LineString]) -> None:
         self._data = shapes_data
 
+
+    def __getitem__(self, item: int) -> LineString:
+
+        return self._data.__getitem__(item)
+
+    def get(
+        self,
+        item: int,
+        default: Optional[LineString] = None
+        ) -> Optional[LineString]:
+        return self._data.get(item, default)
+
     @classmethod
     def from_archive(cls) -> 'Shapes':
 
@@ -547,6 +609,8 @@ class TransitFeed:
         return self.calendar.period()
 
     def to_archive(self) -> None:
+        """Add the transitfeed to the package archive
+        """
 
         period = self.feed_period()
         period_string = '_'.join(datetime.strftime(x, '%Y%m%d') for x in period)
@@ -560,6 +624,8 @@ class TransitFeed:
                     msgpack.pack(klass._data, f)
                 except TypeError:
                     klass.to_geojson(filepath)
+                else:
+                    pass
 
         shutil.make_archive(str(path), 'zip', path)
         shutil.rmtree(path)
@@ -569,13 +635,21 @@ def latest_transitfeed(
     add_shapes: bool = True,
     add_to_archive: bool = False
     ) -> TransitFeed:
-    """Factory function that returns the latest available
-    transfeet data as a TransitFeed object
+    """Factory function that returns the latest available transit
+    feed data fro Rejseplan as a TransitFeed object
 
-    :param update_archive: [description], defaults to True
-    :type update_archive: bool, optional
+    :param add_transfers: [description], defaults to True
+    :type add_transfers: bool, optional
+    :param add_shapes: [description], defaults to True
+    :type add_shapes: bool, optional
+    :param add_to_archive: [description], defaults to False
+    :type add_to_archive: bool, optional
+    :return: [description]
+    :rtype: TransitFeed
     """
-    # order matches TransitFeed
+
+
+    # order matches TransitFeed args
     required = [
         ('agency.txt', Agency.latest),
         ('stops.txt', Stops.latest),
@@ -586,20 +660,20 @@ def latest_transitfeed(
         ('calendar_dates.txt', CalendarDates.latest)
     ]
 
-    latest_gtfs_data = _download_latest_feed()
-
+    latest_gtfs_data = download_latest_feed()
     req_classes = tuple(v(latest_gtfs_data[k]) for k, v in required)
+
+    transfers: Optional[Transfers]
+    shapes: Optional[Shapes]
 
     if add_transfers:
         transfers_df = latest_gtfs_data['transfers.txt']
-        transfers: Optional[Transfers]
         transfers = Transfers.latest(transfers_df)
     else:
         transfers = None
 
     if add_shapes:
         shapes_df = latest_gtfs_data['shapes.txt']
-        shapes: Optional[Shapes]
         shapes = Shapes.latest(shapes_df)
     else:
         shapes = None
@@ -609,6 +683,7 @@ def latest_transitfeed(
         feed.to_archive()
 
     return feed
+
 
 def available_archives() -> List[str]:
     """List the available transitfeed archives
@@ -621,6 +696,51 @@ def available_archives() -> List[str]:
 
     return [x.stem for x in available]
 
-def archived_transitfeed(period_string: str) -> None:
+def archived_transitfeed(period_string: str) -> TransitFeed:
 
-    return
+    archives = available_archives()
+    if period_string not in archives:
+        raise FileNotFoundError(
+            f"{period_string} is not in the archive. Available periods are {archives}"
+            )
+
+    fp = ARCHIVE_DIR / (period_string + '.zip')
+
+    data: DefaultDict[str, Any]
+    data = defaultdict()
+
+    with zipfile.ZipFile(fp, 'r') as zfile:
+        names = zfile.namelist()
+        for name in names:
+            with zfile.open(name) as f:
+                try:
+                    d = msgpack.unpack(f, strict_map_key=False)
+                except ExtraData: # we know this is the shapes geojson
+                    jsonbytes = zfile.read(name)
+                    d = json.loads(jsonbytes.decode('utf-8'))
+                data[name] = d
+
+    agency = Agency(data['agency'])
+    stops = Stops(data['stops'])
+    routes = Routes(data['routes'])
+    trips = Trips(data['trips'])
+    stop_times = StopTimes(data['stop_times'])
+    calendar = Calendar(data['calendar'])
+    calendar_dates = CalendarDates(data['calendar_dates'])
+
+    transfers = Transfers(data['transfers'])
+    shapes = Shapes(data['shapes'])
+
+    feed = TransitFeed(
+        agency,
+        stops,
+        routes,
+        trips,
+        stop_times,
+        calendar,
+        calendar_dates,
+        transfers=transfers,
+        shapes=shapes
+        )
+
+    return feed
