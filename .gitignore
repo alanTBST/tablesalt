@@ -5,6 +5,7 @@
 /.pylint.d/
 /__result_cache__/
 /gtfs/
+/__gtfs_archive__/
 /*.egg-info
 *.pyc
 __pycache__
@@ -29,4 +30,4 @@ mtype*
 tablesalt/transitfeed/temp_gtfs_data/
 tablesalt/transitfeed/gtfs_archive
 *.msgpack
-/__gtfs_archive__/
+
