@@ -12,7 +12,7 @@ import logging
 import os
 import shutil
 import zipfile
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from collections import defaultdict
 from datetime import datetime
 from io import BytesIO, TextIOWrapper
@@ -114,12 +114,7 @@ def _load_route_types() -> Tuple[Dict[int, int], Set[int], Set[int]]:
         bus_route_types
         )
 
-class _TransitFeedObject(ABC):
-
-    @classmethod
-    @abstractmethod
-    def from_archive(self) -> '_TransitFeedObject':
-        pass
+class _TransitFeedObject(metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
@@ -134,6 +129,15 @@ class Agency(_TransitFeedObject):
         agency_data: Dict[int, str]
         ) -> None:
         self._data = agency_data
+        self._is_composite: bool = False
+
+    def __add__(self, other: 'Agency') -> 'Agency':
+
+        updated_data = {**self._data, **other._data}
+        new_agency = Agency(updated_data)
+        new_agency._is_composite = True
+
+        return new_agency
 
     def __getitem__(self, item: int) -> str:
 
@@ -147,12 +151,6 @@ class Agency(_TransitFeedObject):
         return self._data.get(item, default)
 
     @classmethod
-    def from_archive(cls) -> 'Agency':
-        with open(ARCHIVE_DIR / 'agency.json', 'r') as f:
-            agency_data = json.load(f)
-        return cls(agency_data)
-
-    @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Agency':
 
         agency_data = dict(
@@ -162,6 +160,7 @@ class Agency(_TransitFeedObject):
             )
         )
         return cls(agency_data)
+    from_dataframe = latest
 
 
 class Stops(_TransitFeedObject):
@@ -171,6 +170,12 @@ class Stops(_TransitFeedObject):
         ) -> None:
 
         self._data = stops_data
+
+    def __add__(self, other: 'Stops') -> 'Stops':
+
+        updated_data = {**self._data, **other._data}
+
+        return Stops(updated_data)
 
     def __getitem__(self, item: int) -> Dict[str, Any]:
 
@@ -185,26 +190,13 @@ class Stops(_TransitFeedObject):
         return self._data.get(item, default)
 
     @classmethod
-
-
-    @classmethod
-    def from_archive(cls) -> 'Stops':
-        with open(ARCHIVE_DIR / 'stops.json', 'r') as f:
-            stop_data = json.load(f)
-        return cls(stop_data)
-
-    @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Stops':
 
         latest_data = latest_data.fillna('')
         stops_data = latest_data.set_index('stop_id').T.to_dict()
 
         return cls(stops_data)
-
-    def _update_archive(self) -> None:
-
-        return
-
+    from_dataframe = latest
 
 class Routes(_TransitFeedObject):
 
@@ -223,6 +215,12 @@ class Routes(_TransitFeedObject):
 
         self._rail_routes: Optional[Dict[str, Dict[str, Any]]] = None
         self._bus_routes: Optional[Dict[str, Dict[str, Any]]] = None
+
+    def __add__(self, other: 'Routes') -> 'Routes':
+
+        updated_data = {**self._data, **other._data}
+
+        return Routes(updated_data)
 
     def __getitem__(self, item: str) -> Dict[str, Any]:
 
@@ -260,13 +258,6 @@ class Routes(_TransitFeedObject):
         }
         return self._bus_routes
 
-
-    @classmethod
-    def from_archive(cls) -> 'Routes':
-        with open(ARCHIVE_DIR / 'routes.json', 'r') as f:
-            routes_data = json.load(f)
-        return cls(routes_data)
-
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Routes':
 
@@ -275,9 +266,9 @@ class Routes(_TransitFeedObject):
 
         routes_data = latest_data.set_index('route_id').T.to_dict()
         return cls(routes_data)
-    def _update_archive(self) -> None:
 
-        return
+
+    from_dataframe = latest
 
 class Trips(_TransitFeedObject):
 
@@ -289,6 +280,14 @@ class Trips(_TransitFeedObject):
         self._data = trips_data
         self._trip_route_map: Optional[Dict[int, str]] = None
         self._route_trip_map: Optional[Dict[str, Tuple[int, ...]]] = None
+
+
+    def __add__(self, other: 'Trips') -> 'Trips':
+
+        updated_data = {**self._data, **other._data}
+
+        return Trips(updated_data)
+
 
     def __getitem__(self, item: int) -> Dict[str, Any]:
 
@@ -318,15 +317,6 @@ class Trips(_TransitFeedObject):
     def route_trip_map(self, value: Dict[str, Tuple[int, ...]]) -> None:
         self._route_trip_map = value
 
-
-    @classmethod
-    def from_archive(cls) -> 'Trips':
-
-        with open(ARCHIVE_DIR / 'trips.json', 'r') as f:
-            trips_data = json.load(f)
-
-        return cls(trips_data)
-
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Trips':
 
@@ -344,6 +334,8 @@ class Trips(_TransitFeedObject):
 
         return trip
 
+    from_dataframe = latest
+
 
 class StopTimes(_TransitFeedObject):
 
@@ -352,13 +344,6 @@ class StopTimes(_TransitFeedObject):
         stoptimes_data: Dict[int, Tuple[Dict[str, Any], ...]]
         ) -> None:
         self._data = stoptimes_data
-
-    @classmethod
-    def from_archive(cls) -> 'StopTimes':
-        with open(ARCHIVE_DIR / 'stop_times.json', 'r') as f:
-            stoptimes_data = json.load(f)
-        return cls(stoptimes_data)
-
 
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'StopTimes':
@@ -377,17 +362,12 @@ class StopTimes(_TransitFeedObject):
              key, grp in groupby(vals, key=attrgetter('trip_id'))}
 
         return cls(stoptimes_data)
+    from_dataframe = latest
 
 class Transfers(_TransitFeedObject):
 
     def __init__(self, transfers_data: List[Dict[str, Any]]) -> None:
         self._data = transfers_data
-
-    @classmethod
-    def from_archive(cls) -> 'Transfers':
-        with open(ARCHIVE_DIR / 'transfers.json', 'r') as f:
-            trips_data = json.load(f)
-        return cls(trips_data)
 
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Transfers':
@@ -451,6 +431,9 @@ class CalendarDates(_TransitFeedObject):
         ) -> None:
         self._data = calendar_dates_data
 
+    def __getitem__(self, service_id: int) -> Tuple[Tuple[int, int], ...]:
+        return self._data.__getitem__(service_id)
+
     @classmethod
     def from_archive(cls) -> 'CalendarDates':
         with open(ARCHIVE_DIR / 'calendar_dates.json', 'r') as f:
@@ -471,7 +454,6 @@ class CalendarDates(_TransitFeedObject):
             groupby(calendar_tuples, key=itemgetter(0))
         }
         return cls(calendar_dates_data)
-
 
 
 class Shapes(_TransitFeedObject):
