@@ -715,7 +715,8 @@ def archived_transitfeed(period_string: str) -> TransitFeed:
             with zfile.open(name) as f:
                 try:
                     d = msgpack.unpack(f, strict_map_key=False)
-                except ExtraData: # we know this is the shapes geojson
+                except ExtraData:
+                    # we know this is the shapes geojson
                     jsonbytes = zfile.read(name)
                     d = json.loads(jsonbytes.decode('utf-8'))
                 data[name] = d
