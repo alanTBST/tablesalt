@@ -31,3 +31,6 @@ tablesalt/transitfeed/temp_gtfs_data/
 tablesalt/transitfeed/gtfs_archive
 *.msgpack
 
+tablesalt/transitfeed/__gtfs_archive__/20210913_20211208.zip
+20210913_20211208.zip.zip
+20210913_20211208.zip.zip
