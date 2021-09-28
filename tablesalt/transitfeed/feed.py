@@ -1,25 +1,26 @@
 
 """
 This module deals with transit feed data provided by Rejseplanen.
-More specifically it is the static GTFS data.
-
+More specifically, it is the static GTFS data. Rejseplanen does
+not publish real-time GTFS. Instead, they provide a separate RESTful API
+created by Hafas.
 
 """
 
 import ast
 import json
 import logging
-import os
 import shutil
 import zipfile
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from datetime import datetime
 from io import BytesIO, TextIOWrapper
 from itertools import groupby
 from operator import attrgetter, itemgetter
 from pathlib import Path
-from typing import Any, ClassVar, DefaultDict, Dict, Iterable, List, Optional, Set, Tuple, TypeVar, Iterable
+from typing import (Any, ClassVar, DefaultDict, Dict, Iterable, List, Optional,
+                    Set, Tuple, TypeVar)
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -33,9 +34,8 @@ from tablesalt.resources.config import load_config
 
 log = logging.getLogger(__name__)
 
-THIS_DIR = Path('C:\\Users\\B087115\\Documents\\GitHub\\tablesalt\\tablesalt\\transitfeed') #(__file__).parent
+THIS_DIR = Path(__file__).parent
 ARCHIVE_DIR = Path(THIS_DIR, '__gtfs_archive__')
-
 CONFIG = load_config()
 
 TNum = TypeVar('TNum', int, float)
@@ -44,13 +44,13 @@ TNum = TypeVar('TNum', int, float)
 class TransitFeedError(Exception):
     pass
 
-def download_latest_feed() -> Dict[str, pd.core.frame.DataFrame]:
+def download_latest_feed() -> Dict[str, DataFrame]:
     """download the latest gtfs data from rejseplan,
     write the text files to a folder named temp_gtfs_data
 
     :raises Exception: If we cannot download the data for any reason
     :return: a dictionary of dataframes for the gtfs txt files
-    :rtype: Dict[str, pd.core.frame.DataFrame]
+    :rtype: Dict[str, DataFrame]
     """
     required = {
         'agency.txt',
@@ -71,6 +71,12 @@ def download_latest_feed() -> Dict[str, pd.core.frame.DataFrame]:
         log.critical(f"GTFS download failed - error {resp.code}")
         raise URLError("Could not download GTFS data")
 
+    gtfs_data = _load_gtfs_zip(required, resp)
+
+    return gtfs_data
+
+def _load_gtfs_zip(required, resp) -> Dict[str, DataFrame]:
+
     gtfs_data: Dict[str, pd.core.frame.DataFrame] = {}
 
     with zipfile.ZipFile(BytesIO(resp.read())) as zfile:
@@ -83,7 +89,6 @@ def download_latest_feed() -> Dict[str, pd.core.frame.DataFrame]:
         for x in names:
             df = pd.read_csv(zfile.open(x), low_memory=False)
             gtfs_data[x] = df
-
     return gtfs_data
 
 def _load_route_types() -> Tuple[Dict[int, int], Set[int], Set[int]]:
@@ -121,6 +126,13 @@ class _TransitFeedObject(metaclass=ABCMeta):
     def latest(self, latest_data: DataFrame) -> '_TransitFeedObject':
         pass
 
+class TransitFeedBase(_TransitFeedObject):
+    def __init__(self, data: Any) -> None:
+        self._data = data
+
+    def latest(self, latest_data):
+        return NotImplemented
+
 
 class Agency(_TransitFeedObject):
 
@@ -128,8 +140,14 @@ class Agency(_TransitFeedObject):
         self,
         agency_data: Dict[int, str]
         ) -> None:
+        """Class for data from agency.txt
+
+        :param agency_data: a dictionary of Dict[agency_id, agency_name]
+        :type agency_data: Dict[int, str]
+        """
         self._data = agency_data
         self._is_composite: bool = False
+
 
     def __add__(self, other: 'Agency') -> 'Agency':
 
@@ -152,6 +170,13 @@ class Agency(_TransitFeedObject):
 
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Agency':
+        """Create and instance of an Agency from the latest data
+
+        :param latest_data: a pandas dataframe loaded using download_latest_feed
+        :type latest_data: DataFrame
+        :return: an isntance of Agency
+        :rtype: Agency
+        """
 
         agency_data = dict(
             zip(
@@ -164,10 +189,16 @@ class Agency(_TransitFeedObject):
 
 
 class Stops(_TransitFeedObject):
+
     def __init__(
         self,
         stops_data: Dict[int, Dict[str, Any]]
         ) -> None:
+        """Class for stops.txt
+
+        :param stops_data: a nested dictionary Dict[stop_id, Dict[stop.txt col, val]]
+        :type stops_data: Dict[int, Dict[str, Any]]
+        """
 
         self._data = stops_data
 
@@ -191,6 +222,13 @@ class Stops(_TransitFeedObject):
 
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Stops':
+        """Create and instance of Stops from the latest data
+
+        :param latest_data: a pandas dataframe loaded using download_latest_feed
+        :type latest_data: DataFrame
+        :return: an instance of Stops
+        :rtype: Stops
+        """
 
         latest_data = latest_data.fillna('')
         stops_data = latest_data.set_index('stop_id').T.to_dict()
@@ -210,7 +248,11 @@ class Routes(_TransitFeedObject):
         self,
         routes_data: Dict[str, Dict[str, Any]]
         ) -> None:
+        """Class for routes.txt
 
+        :param routes_data: a nested dictionary Dict[route_id, Dict[routes.txt col, val]]
+        :type routes_data: Dict[str, Dict[str, Any]]
+        """
         self._data: Dict[str, Dict[str, Any]] = routes_data
 
         self._rail_routes: Optional[Dict[str, Dict[str, Any]]] = None
@@ -236,6 +278,11 @@ class Routes(_TransitFeedObject):
 
     @property
     def rail_routes(self) -> Dict[str, Dict[str, Any]]:
+        """Return only routes that are rail/train routes
+
+        :return: a nested dictionary of routes Dict[route_id, Dict[routes.txt col, val]]
+        :rtype: Dict[str, Dict[str, Any]]
+        """
         if self._rail_routes is not None:
             return self._rail_routes
         self._rail_routes = {
@@ -250,6 +297,11 @@ class Routes(_TransitFeedObject):
 
     @property
     def bus_routes(self) -> Dict[str, Dict[str, Any]]:
+        """Return only the routes that are bus routes
+
+        :return: a nested dictionary of Dict[route_id, Dict[routes.txt col, val]]
+        :rtype: Dict[str, Dict[str, Any]]
+        """
         if self._bus_routes is not None:
             return self._bus_routes
         self._bus_routes = {
@@ -260,7 +312,13 @@ class Routes(_TransitFeedObject):
 
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Routes':
+        """Create and instance of Routes from the latest data
 
+        :param latest_data: a pandas dataframe loaded using download_latest_feed
+        :type latest_data: DataFrame
+        :return: an instance of Routes
+        :rtype: Routes
+        """
         latest_data.loc[:, 'route_type'] = \
             latest_data.loc[:, 'route_type'].replace(cls.OLD_ROUTE_MAP)
 
@@ -276,7 +334,11 @@ class Trips(_TransitFeedObject):
         self,
         trips_data: Dict[int, Dict[str, Any]]
         ) -> None:
+        """Class for trips.txt
 
+        :param trips_data: a nested dictionary Dict[route_id, Dict[routes.txt col, val]]
+        :type trips_data: Dict[str, Dict[str, Any]]
+        """
         self._data = trips_data
         self._trip_route_map: Optional[Dict[int, str]] = None
         self._route_trip_map: Optional[Dict[str, Tuple[int, ...]]] = None
@@ -319,6 +381,13 @@ class Trips(_TransitFeedObject):
 
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Trips':
+        """Create and instance of Trips from the latest data
+
+        :param latest_data: a pandas dataframe loaded using download_latest_feed
+        :type latest_data: DataFrame
+        :return: an instance of Trips
+        :rtype: Trips
+        """
 
         triproute = dict(zip(latest_data.loc[:, 'trip_id'], latest_data.loc[:, 'route_id']))
 
@@ -349,7 +418,7 @@ class StopTimes(_TransitFeedObject):
     def latest(cls, latest_data: DataFrame) -> 'StopTimes':
         df = latest_data.fillna('0')
 
-        # this deals with older format gtfs from Rejseplan
+        # this deals with older format gtfs from Rejseplanen
         if not 'int' in df.loc[:, 'stop_id'].dtype.name:
             df.loc[:, 'stop_id'] = \
                 df.loc[:, 'stop_id'].astype(str).str.strip('G').astype(int)
@@ -679,7 +748,16 @@ def available_archives() -> List[str]:
     return [x.stem for x in available]
 
 def archived_transitfeed(period_string: str) -> TransitFeed:
+    """Factory function that returns a TransitFeed instance of a given
+    period string ('YYYYMMDD_YYYYMMDD')
 
+    :param period_string: a string in format 'YYYYMMDD_YYYYMMDD'
+        The dates are the from and to dates in calendar.txt
+    :type period_string: str
+    :raises FileNotFoundError: if there is no data for the given period_string
+    :return: an instance of a TransitFeed
+    :rtype: TransitFeed
+    """
     archives = available_archives()
     if period_string not in archives:
         raise FileNotFoundError(
