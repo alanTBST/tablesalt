@@ -29,3 +29,4 @@ mtype*
 tablesalt/transitfeed/temp_gtfs_data/
 tablesalt/transitfeed/gtfs_archive
 *.msgpack
+/__gtfs_archive__/
