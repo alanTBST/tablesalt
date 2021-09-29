@@ -21,7 +21,7 @@ from itertools import groupby
 from operator import attrgetter, itemgetter
 from pathlib import Path
 from typing import (Any, ClassVar, DefaultDict, Dict, Iterable, List, Optional,
-                    Set, Tuple, TypeVar)
+                    Set, Tuple, TypeVar, Union)
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -827,20 +827,7 @@ def archived_transitfeed(period_string: str) -> TransitFeed:
 
     fp = ARCHIVE_DIR / (period_string + '.zip')
 
-    data: DefaultDict[str, Any]
-    data = defaultdict()
-
-    with zipfile.ZipFile(fp, 'r') as zfile:
-        names = zfile.namelist()
-        for name in names:
-            with zfile.open(name) as f:
-                try:
-                    d = msgpack.unpack(f, strict_map_key=False)
-                except ExtraData:
-                    # we know this is the shapes geojson
-                    jsonbytes = zfile.read(name)
-                    d = json.loads(jsonbytes.decode('utf-8'))
-                data[name] = d
+    data = _load_compressed_archive(fp)
 
     agency = Agency(data['agency'])
     stops = Stops(data['stops'])
@@ -866,3 +853,21 @@ def archived_transitfeed(period_string: str) -> TransitFeed:
         )
 
     return feed
+
+def _load_compressed_archive(fp: Union[str, Path]) -> DefaultDict[str, Any]:
+
+    data: DefaultDict[str, Any]
+    data = defaultdict()
+
+    with zipfile.ZipFile(fp, 'r') as zfile:
+        names = zfile.namelist()
+        for name in names:
+            with zfile.open(name) as f:
+                try:
+                    d = msgpack.unpack(f, strict_map_key=False)
+                except ExtraData:
+                    # we know this is the shapes geojson
+                    jsonbytes = zfile.read(name)
+                    d = json.loads(jsonbytes.decode('utf-8'))
+                data[name] = d
+    return data
