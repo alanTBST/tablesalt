@@ -3,7 +3,7 @@
 This module deals with transit feed data provided by Rejseplanen.
 More specifically, it is the static GTFS data. Rejseplanen does
 not publish real-time GTFS. Instead, they provide a separate RESTful API
-created by Hafas.
+created by Hacon.
 
 """
 
@@ -128,10 +128,19 @@ class _TransitFeedObject(metaclass=ABCMeta):
         pass
 
 class TransitFeedBase(_TransitFeedObject):
-    def __init__(self, data: Any) -> None:
+
+    def __init__(self, data: Dict[Any, Any]) -> None:
         self._data = data
 
-    def latest(self, latest_data):
+    @property
+    def data(self):
+        return self._data
+
+    @data.setter
+    def data(self, val: Dict[Any, Any]) -> None:
+        self._data = val
+
+    def latest(self, latest_data: Dict[Any, Any]):
         return NotImplemented
 
 
@@ -202,12 +211,15 @@ class Stops(_TransitFeedObject):
         """
 
         self._data = stops_data
+        self._is_composite: bool = False
 
     def __add__(self, other: 'Stops') -> 'Stops':
 
         updated_data = {**self._data, **other._data}
+        new_stops = Stops(updated_data)
+        new_stops._is_composite = True
 
-        return Stops(updated_data)
+        return new_stops
 
     def __getitem__(self, item: int) -> Dict[str, Any]:
 
@@ -625,6 +637,24 @@ class Shapes(_TransitFeedObject):
         with open(filepath, 'w') as fp:
             json.dump(for_geojson, fp)
 
+    @classmethod
+    def from_geojson(cls, geojson_data: Dict[str, Any]) -> 'Shapes':
+        """Return an instance of Shapes from a geojson dictionary
+
+        :return: an instance of Shapes
+        :rtype: 'Shapes'
+        """
+
+        shapes_data: Dict[int, LineString] = {}
+        features = geojson_data['features']
+        for feature in features:
+            coords = feature['geometry']['coordinates']
+            shape_id = feature['properties']['shape_id']
+            line = LineString([tuple(l) for l in coords])
+            shapes_data[shape_id] = line
+
+        return cls(shapes_data)
+
 
 class TransitFeed:
 
@@ -821,7 +851,7 @@ def archived_transitfeed(period_string: str) -> TransitFeed:
     calendar_dates = CalendarDates(data['calendar_dates'])
 
     transfers = Transfers(data['transfers'])
-    shapes = Shapes(data['shapes'])
+    shapes = Shapes.from_geojson(data['shapes'])
 
     feed = TransitFeed(
         agency,
