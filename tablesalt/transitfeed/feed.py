@@ -21,7 +21,7 @@ from itertools import groupby
 from operator import attrgetter, itemgetter
 from pathlib import Path
 from typing import (Any, ClassVar, DefaultDict, Dict, Iterable, List, Optional,
-                    Set, Tuple, TypeVar, Union)
+                    Set, Tuple, Type, TypeVar, Union)
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -131,9 +131,20 @@ class TransitFeedBase(_TransitFeedObject):
 
     def __init__(self, data: Dict[Any, Any]) -> None:
         self._data = data
+        self._is_composite: bool = False
+
+    def __add__(self, other: 'TransitFeedBase'):
+        if self.__class__ != other.__class__:
+            raise TypeError("Cannot combain different GTFS datasets")
+
+        updated_data = {**self._data, **other._data}
+        new_instance = TransitFeedBase(updated_data)
+        new_instance._is_composite = True
+
+        return new_instance
 
     @property
-    def data(self):
+    def data(self) -> Dict[Any, Any]:
         return self._data
 
     @data.setter
@@ -538,6 +549,11 @@ class CalendarDates(_TransitFeedObject):
         self,
         calendar_dates_data: Dict[int, Tuple[Tuple[int, int], ...]]
         ) -> None:
+        """Class for calendar_dates.txt
+
+        :param calendar_dates_data: [description]
+        :type calendar_dates_data: Dict[int, Tuple[Tuple[int, int], ...]]
+        """
         self._data = calendar_dates_data
 
     def __getitem__(self, service_id: int) -> Tuple[Tuple[int, int], ...]:
