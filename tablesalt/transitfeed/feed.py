@@ -15,6 +15,7 @@ import zipfile
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from datetime import datetime
+from http.client import HTTPResponse
 from io import BytesIO, TextIOWrapper
 from itertools import groupby
 from operator import attrgetter, itemgetter
@@ -75,7 +76,7 @@ def download_latest_feed() -> Dict[str, DataFrame]:
 
     return gtfs_data
 
-def _load_gtfs_zip(required, resp) -> Dict[str, DataFrame]:
+def _load_gtfs_zip(required: Set[str], resp: HTTPResponse) -> Dict[str, DataFrame]:
 
     gtfs_data: Dict[str, pd.core.frame.DataFrame] = {}
 
@@ -364,6 +365,11 @@ class Trips(_TransitFeedObject):
 
     @property
     def trip_route_map(self) -> Optional[Dict[int, str]]:
+        """Return a mapping of trip_id to route_id
+
+        :return: a dictionary of trip_id as key and route_id as value
+        :rtype: Optional[Dict[int, str]]
+        """
 
         return self._trip_route_map
 
@@ -373,6 +379,11 @@ class Trips(_TransitFeedObject):
 
     @property
     def route_trip_map(self) -> Optional[Dict[str, Tuple[int, ...]]]:
+        """Return a mapping of route_id to trip_ids
+
+        :return: a dictionary of route_id as key and tuple of trip_ids as value
+        :rtype: Optional[Dict[str, Tuple[int, ...]]]
+        """
         return self._route_trip_map
 
     @route_trip_map.setter
@@ -381,7 +392,7 @@ class Trips(_TransitFeedObject):
 
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Trips':
-        """Create and instance of Trips from the latest data
+        """Create an instance of Trips from the latest data
 
         :param latest_data: a pandas dataframe loaded using download_latest_feed
         :type latest_data: DataFrame
@@ -416,6 +427,14 @@ class StopTimes(_TransitFeedObject):
 
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'StopTimes':
+        """Create an instance of StopTimes from the latest data
+
+        :param latest_data: a pandas dataframe loaded using download_latest_feed
+        :type latest_data: DataFrame
+        :return: an instance of StopTimes
+        :rtype: StopTimes
+        """
+
         df = latest_data.fillna('0')
 
         # this deals with older format gtfs from Rejseplanen
@@ -440,6 +459,13 @@ class Transfers(_TransitFeedObject):
 
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Transfers':
+        """Create an instance of Transfers from the latest data
+
+        :param latest_data: a pandas dataframe loaded using download_latest_feed
+        :type latest_data: DataFrame
+        :return: an instance of Transfers
+        :rtype: Transfers
+        """
 
         null_columns = []
         for col in latest_data.columns:
@@ -467,13 +493,15 @@ class Calendar(_TransitFeedObject):
         return self._data.__getitem__(service_id)
 
     @classmethod
-    def from_archive(cls) -> 'Calendar':
-        with open(ARCHIVE_DIR / 'calendar.json', 'r') as f:
-            calender_data = json.load(f)
-        return cls(calender_data)
-
-    @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Calendar':
+        """Create an instance of Calendar from the latest data
+
+        :param latest_data: a pandas dataframe loaded using download_latest_feed
+        :type latest_data: DataFrame
+        :return: an instance of Calendar
+        :rtype: Calendar
+        """
+
         calendar_data = latest_data.set_index('service_id').T.to_dict()
         return cls(calendar_data)
 
@@ -504,13 +532,14 @@ class CalendarDates(_TransitFeedObject):
         return self._data.__getitem__(service_id)
 
     @classmethod
-    def from_archive(cls) -> 'CalendarDates':
-        with open(ARCHIVE_DIR / 'calendar_dates.json', 'r') as f:
-            calender_date_data = json.load(f)
-        return cls(calender_date_data)
-
-    @classmethod
     def latest(cls, latest_data: DataFrame) -> 'CalendarDates':
+        """Create an instance of CalendarDates from the latest data
+
+        :param latest_data: a pandas dataframe loaded using download_latest_feed
+        :type latest_data: DataFrame
+        :return: an instance of CalendarDates
+        :rtype: CalendarDates
+        """
 
         latest_data = latest_data.sort_values('service_id')
 
@@ -542,11 +571,6 @@ class Shapes(_TransitFeedObject):
         ) -> Optional[LineString]:
         return self._data.get(item, default)
 
-    @classmethod
-    def from_archive(cls) -> 'Shapes':
-
-        return cls()
-
     @staticmethod
     def _group_to_linestring(grp: Iterable[Tuple[TNum, ...]]) -> LineString:
 
@@ -556,6 +580,13 @@ class Shapes(_TransitFeedObject):
 
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Shapes':
+        """Create an instance of Shapes from the latest data
+
+        :param latest_data: a pandas dataframe loaded using download_latest_feed
+        :type latest_data: DataFrame
+        :return: an instance of Shapes
+        :rtype: Shapes
+        """
 
         latest_data = latest_data.sort_values(['shape_id', 'shape_pt_sequence'])
 
@@ -689,13 +720,13 @@ def latest_transitfeed(
     """Factory function that returns the latest available transit
     feed data fro Rejseplan as a TransitFeed object
 
-    :param add_transfers: [description], defaults to True
+    :param add_transfers:  add the Transfers object to the TransitFeed, defaults to True
     :type add_transfers: bool, optional
-    :param add_shapes: [description], defaults to True
+    :param add_shapes: add the Shapes object to the TransitFeed, defaults to True
     :type add_shapes: bool, optional
-    :param add_to_archive: [description], defaults to False
+    :param add_to_archive: True to write to the package feed archive, defaults to False
     :type add_to_archive: bool, optional
-    :return: [description]
+    :return: the latest GTFS feed as an instance of TransfitFeed
     :rtype: TransitFeed
     """
 
