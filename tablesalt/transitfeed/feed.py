@@ -282,11 +282,15 @@ class Routes(_TransitFeedObject):
         self._rail_routes: Optional[Dict[str, Dict[str, Any]]] = None
         self._bus_routes: Optional[Dict[str, Dict[str, Any]]] = None
 
+        self._is_composite: bool = False
+
     def __add__(self, other: 'Routes') -> 'Routes':
 
         updated_data = {**self._data, **other._data}
+        new_routes = Routes(updated_data)
+        new_routes._is_composite = True
 
-        return Routes(updated_data)
+        return new_routes
 
     def __getitem__(self, item: str) -> Dict[str, Any]:
 
@@ -367,12 +371,16 @@ class Trips(_TransitFeedObject):
         self._trip_route_map: Optional[Dict[int, str]] = None
         self._route_trip_map: Optional[Dict[str, Tuple[int, ...]]] = None
 
+        self._is_composite: bool = False
+
 
     def __add__(self, other: 'Trips') -> 'Trips':
 
         updated_data = {**self._data, **other._data}
+        new_trips = Trips(updated_data)
+        new_trips._is_composite = True
 
-        return Trips(updated_data)
+        return new_trips
 
 
     def __getitem__(self, item: int) -> Dict[str, Any]:
@@ -448,6 +456,17 @@ class StopTimes(_TransitFeedObject):
         ) -> None:
         self._data = stoptimes_data
 
+        self._is_composite: bool = False
+
+    def __add__(self, other: 'StopTimes') -> 'StopTimes':
+
+        updated_data = {**self._data, **other._data}
+        new_stop_times = StopTimes(updated_data)
+        new_stop_times._is_composite = True
+
+        return new_stop_times
+
+
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'StopTimes':
         """Create an instance of StopTimes from the latest data
@@ -509,8 +528,12 @@ class Transfers(_TransitFeedObject):
 
 class Calendar(_TransitFeedObject):
 
+    ALL_CALENDARS: ClassVar[List['Calendar']]
+    ALL_CALENDARS = []
+
     def __init__(self, calender_data: Dict[int, Dict[str, int]]) -> None:
         self._data = calender_data
+        Calendar.ALL_CALENDARS.append(self)
 
     def __getitem__(self, service_id: int) -> Dict[str, int]:
         return self._data.__getitem__(service_id)
@@ -542,8 +565,21 @@ class Calendar(_TransitFeedObject):
 
         return (start_time, end_time)
 
+class MultiCalendar:
+
+    pass
+
+class MultiCalendarDates:
+
+    pass
+
+class MultiShapes:
+    pass
 
 class CalendarDates(_TransitFeedObject):
+
+    ALL_CALENDAR_DATES: ClassVar[List['CalendarDates']]
+    ALL_CALENDAR_DATES = []
 
     def __init__(
         self,
@@ -555,6 +591,7 @@ class CalendarDates(_TransitFeedObject):
         :type calendar_dates_data: Dict[int, Tuple[Tuple[int, int], ...]]
         """
         self._data = calendar_dates_data
+        CalendarDates.ALL_CALENDAR_DATES.append(self)
 
     def __getitem__(self, service_id: int) -> Tuple[Tuple[int, int], ...]:
         return self._data.__getitem__(service_id)
@@ -584,8 +621,13 @@ class CalendarDates(_TransitFeedObject):
 
 class Shapes(_TransitFeedObject):
 
+    ALL_SHAPES: ClassVar[List['Shapes']]
+    ALL_SHAPES = []
+
+
     def __init__(self, shapes_data: Dict[int, LineString]) -> None:
         self._data = shapes_data
+        Shapes.ALL_SHAPES.append(self)
 
 
     def __getitem__(self, item: int) -> LineString:
@@ -698,6 +740,35 @@ class TransitFeed:
 
         self.transfers = transfers
         self.shapes = shapes
+
+        self._is_composite: bool = False
+
+    def __add__(self, other: 'TransitFeed') -> 'TransitFeed':
+
+        new_agency = self.agency + other.agency
+        new_stops = self.stops + other.stops
+        new_routes = self.routes + other.routes
+        new_trips = self.trips = other.trips
+        new_stop_times = self.stop_times + other.stop_times
+        new_calendar = None
+        new_calendar_dates = None
+        new_transfers = None
+        new_shapes = None
+
+        new_feed = TransitFeed(
+            new_agency,
+            new_stops,
+            new_routes,
+            new_trips,
+            new_stop_times,
+            new_calendar,
+            new_calendar_dates,
+            transfers=new_transfers,
+            shapes=new_shapes
+        )
+        new_feed._is_composite = True
+
+        return new_feed
 
     def rail_routes(self) ->  Dict[str, Dict[str, Any]]:
         """Return only the rail routes of the feed
