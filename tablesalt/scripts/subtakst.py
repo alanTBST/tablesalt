@@ -185,7 +185,7 @@ def _get_trips(calculated_stores, tripkeys):
                 if not res:
                     continue
                 res = res.decode('utf-8')
-                if res not in ('operator_error', 'station_map_error'):
+                if res not in ('operator_error', 'station_map_error', 'no_available_trip', 'rk_operator_error'):
                     out[trip] = ast.literal_eval(res)
     return out
 
