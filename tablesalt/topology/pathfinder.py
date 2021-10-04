@@ -654,7 +654,7 @@ class ZoneSharer(ZoneProperties):
     def share_calculation(
         self,
         properties: Dict[str, Any],
-        min_zones: Optional[int] = 0
+        min_zones: Optional[int] = 2
         ) -> Union[Tuple[int, str], Tuple[Tuple[int, str], ...]]:
         """
         Calculate the zone shares for the operators on the trip
