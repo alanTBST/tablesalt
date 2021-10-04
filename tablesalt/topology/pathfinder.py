@@ -678,11 +678,14 @@ class ZoneSharer(ZoneProperties):
 
         out_standard = defaultdict(list)
         out_solo = defaultdict(list)
+
         out_bumped = []
         out_bumped_solo = []
 
         current_op_sum = 0
         previous_op_id = None
+
+        flag = False
 
         seen_zone_opid = set()
         for legnum, imputed_leg in enumerate(imputed_zone_legs):
@@ -690,6 +693,7 @@ class ZoneSharer(ZoneProperties):
             leg_region = zone_leg_regions[legnum]
             op_id = self.operator_legs[legnum][0]
             leg_solo_price = self.leg_solo_price(leg_region, op_id)
+
             if not op_id == previous_op_id and previous_op_id is not None:
                 current_op_sum = 0
 
@@ -704,17 +708,21 @@ class ZoneSharer(ZoneProperties):
                     out_solo[zone].append(leg_solo_price)
                     current_op_sum += res[0]
                     seen_zone_opid.add((zone, op_id))
+
             try:
                 next_op_id = self.operator_legs[legnum+1][0]
                 if op_id != next_op_id:
                     if current_op_sum < min_zones:
                         current_op_sum = min_zones
+                    flag = True
             except IndexError:
                 if current_op_sum < min_zones:
                     current_op_sum = min_zones
+                flag = True
 
-            out_bumped.append((current_op_sum, res[1]))
-            out_bumped_solo.append((leg_solo_price, res[1]))
+            if flag:
+                out_bumped.append((current_op_sum, op_id)) # replace current
+                out_bumped_solo.append((leg_solo_price, op_id))
 
             previous_op_id = op_id
 
@@ -722,12 +730,12 @@ class ZoneSharer(ZoneProperties):
 
         standard = aggregated_zone_operators(tuple(out_standard.values()))
 
-        if len(standard) == 1:
+        if self.single:
             solo_price = standard
         else:
             solo_price = self._weight_solo(out_standard.values(), out_solo.values())
 
-        if len(out_bumped) == 1:
+        if self.single:
             bumped = out_bumped
             bumped_solo = out_bumped
         else:
