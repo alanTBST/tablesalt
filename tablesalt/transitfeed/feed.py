@@ -10,14 +10,16 @@ created by Hacon.
 import ast
 import json
 import logging
+import os
 import shutil
+import ssl
 import zipfile
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from datetime import datetime
 from http.client import HTTPResponse
-from io import BytesIO, TextIOWrapper
-from itertools import groupby
+from io import BytesIO
+from itertools import groupby, chain
 from operator import attrgetter, itemgetter
 from pathlib import Path
 from typing import (Any, ClassVar, DefaultDict, Dict, Iterable, List, Optional,
@@ -39,29 +41,29 @@ THIS_DIR = Path(__file__).parent
 ARCHIVE_DIR = Path(THIS_DIR, '__gtfs_archive__')
 CONFIG = load_config()
 
+ALL_FILES = ast.literal_eval(CONFIG['rejseplanen']['all_files'])
+REQD_FILES = ast.literal_eval(CONFIG['rejseplanen']['required_files'])
+
 TNum = TypeVar('TNum', int, float)
 
+
+
+
+# using unverified ssl certificate - maybe a bit dodgy
+if (not os.environ.get('PYTHONHTTPSVERIFY', '') and getattr(ssl, '_create_unverified_context', None)):
+    ssl._create_default_https_context = ssl._create_unverified_context
 
 class TransitFeedError(Exception):
     pass
 
 def download_latest_feed() -> Dict[str, DataFrame]:
-    """download the latest gtfs data from rejseplan,
-    write the text files to a folder named temp_gtfs_data
+    """download the latest gtfs data from rejseplan
+
 
     :raises Exception: If we cannot download the data for any reason
     :return: a dictionary of dataframes for the gtfs txt files
     :rtype: Dict[str, DataFrame]
     """
-    required = {
-        'agency.txt',
-        'stops.txt',
-        'routes.txt',
-        'trips.txt',
-        'stop_times.txt',
-        'calendar.txt',
-        'calendar_dates.txt',
-    }
 
     gtfs_url = CONFIG['rejseplanen']['gtfs_url']
     resp = urlopen(gtfs_url)
@@ -72,7 +74,7 @@ def download_latest_feed() -> Dict[str, DataFrame]:
         log.critical(f"GTFS download failed - error {resp.code}")
         raise URLError("Could not download GTFS data")
 
-    gtfs_data = _load_gtfs_zip(required, resp)
+    gtfs_data = _load_gtfs_zip(REQD_FILES, resp)
 
     return gtfs_data
 
@@ -567,14 +569,26 @@ class Calendar(_TransitFeedObject):
 
 class MultiCalendar:
 
-    pass
+    def __init__(self, *calendars: Calendar) -> None:
+        self.calendars = list(calendars)
 
-class MultiCalendarDates:
+    def _merged_calendar_data(self) -> Dict[str, Dict[int, Dict[str, int]]]:
 
-    pass
+        calendar_data = {}
+        for cal in self.calendars:
+            period = cal.period()
+            data = cal._data
+            calendar_data[period] = data
+        return calendar_data
 
-class MultiShapes:
-    pass
+    def period(self) -> Tuple[datetime, datetime]:
+
+        all_periods: List[datetime]
+        all_periods = list(chain(*[x.period() for x in self.calendars]))
+
+        return (min(all_periods), max(all_periods))
+
+
 
 class CalendarDates(_TransitFeedObject):
 
@@ -619,11 +633,15 @@ class CalendarDates(_TransitFeedObject):
         return cls(calendar_dates_data)
 
 
+class MultiCalendarDates:
+    def __init__(self, *calendar_dates: CalendarDates) -> None:
+        self.calendar_dates = list(calendar_dates)
+
+
 class Shapes(_TransitFeedObject):
 
     ALL_SHAPES: ClassVar[List['Shapes']]
     ALL_SHAPES = []
-
 
     def __init__(self, shapes_data: Dict[int, LineString]) -> None:
         self._data = shapes_data
@@ -714,6 +732,16 @@ class Shapes(_TransitFeedObject):
         return cls(shapes_data)
 
 
+class MultiShapes:
+    def __init__(self, *shapes: Shapes) -> None:
+        self.shapes = list(shapes)
+
+
+
+C = TypeVar('C', bound=Union[Calendar, MultiCalendar])
+CD = TypeVar('CD', bound=Union[CalendarDates, MultiCalendarDates])
+
+
 class TransitFeed:
 
     def __init__(
@@ -723,12 +751,32 @@ class TransitFeed:
         routes: Routes,
         trips: Trips,
         stop_times: StopTimes,
-        calendar: Calendar,
-        calendar_dates: CalendarDates,
+        calendar: C,
+        calendar_dates: CD,
         transfers: Optional[Transfers] = None,
-        shapes: Optional[Shapes] = None
+        shapes: Optional[Union[Shapes, MultiShapes]] = None
         ) -> None:
+        """A class that represents an entire GTFS feed from Rejseplanen
 
+        :param agency: an instance of Agency from the feed
+        :type agency: Agency
+        :param stops: an instance of Agency from the feed
+        :type stops: Stops
+        :param routes: an instance of Agency from the feed
+        :type routes: Routes
+        :param trips: an instance of Agency from the feed
+        :type trips: Trips
+        :param stop_times: an instance of Agency from the feed
+        :type stop_times: StopTimes
+        :param calendar: an instance of Agency from the feed
+        :type calendar: C
+        :param calendar_dates: an instance of Agency from the feed
+        :type calendar_dates: CD
+        :param transfers: an instance of Agency from the feed, defaults to None
+        :type transfers: Optional[Transfers], optional
+        :param shapes: an instance of Agency from the feed, defaults to None
+        :type shapes: Optional[Union[Shapes, MultiShapes]], optional
+        """
 
         self.agency = agency
         self.routes = routes
@@ -750,8 +798,9 @@ class TransitFeed:
         new_routes = self.routes + other.routes
         new_trips = self.trips = other.trips
         new_stop_times = self.stop_times + other.stop_times
-        new_calendar = None
-        new_calendar_dates = None
+
+        new_calendars = MultiCalendar(self.calendar, other.calendar)
+        new_calendar_dates = MultiCalendarDates(self.calendar_dates, other.calendar_dates)
         new_transfers = None
         new_shapes = None
 
@@ -761,7 +810,7 @@ class TransitFeed:
             new_routes,
             new_trips,
             new_stop_times,
-            new_calendar,
+            new_calendars,
             new_calendar_dates,
             transfers=new_transfers,
             shapes=new_shapes
@@ -816,15 +865,18 @@ class TransitFeed:
         path = ARCHIVE_DIR / period_string
         path.mkdir(parents=True, exist_ok=True)
 
+        all_filenames = {Path(x).stem for x in ALL_FILES} # rm .txt
+
         for dset, klass in self.__dict__.items():
-            filepath = path / dset
-            with open(filepath, 'wb') as f:
-                try:
-                    msgpack.pack(klass._data, f)
-                except TypeError:
-                    klass.to_geojson(filepath)
-                else:
-                    pass
+            if dset in all_filenames:
+                filepath = path / dset
+                with open(filepath, 'wb') as f:
+                    try:
+                        msgpack.pack(klass._data, f)
+                    except TypeError:
+                        klass.to_geojson(filepath)
+                    else:
+                        pass
 
         shutil.make_archive(str(path), 'zip', path)
         shutil.rmtree(path)
