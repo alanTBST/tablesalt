@@ -264,7 +264,7 @@ def pendler_reshare(share_tuple):
 def get_zone_combination_shares(tofetch, db_path: str, model: int):
 
     final = {}
-    errors = {'operator_error', 'station_map_error', 'rk_operator_error'}
+    errors = {'operator_error', 'station_map_error', 'rk_operator_error', 'no_available_trip'}
     with lmdb.open(db_path) as env:
         with env.begin() as txn:
             for combo, trips in tqdm(tofetch.items(),'fetching combo results',
@@ -314,7 +314,7 @@ def _kombi_by_seasonpass(pendler_kombi, userdict):
 def _get_trips(db_path, tripkeys, model):
 
     tripkeys_ = (bytes(str(x), 'utf-8') for x in tripkeys)
-    errors = {'operator_error', 'station_map_error', 'rk_operator_error'}
+    errors = {'operator_error', 'station_map_error', 'rk_operator_error', 'no_available_trip'}
 
     out = {}
     with lmdb.open(db_path) as env:
