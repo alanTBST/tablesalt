@@ -627,7 +627,7 @@ class ZoneSharer(ZoneProperties):
 
         outstandard = list(chain(*out_standard.values()))
         sum_standard = sum(x[0] for x in outstandard)
-        # bumping must be minimum two zones on total (this a)
+        # bumping must be minimum min_zones in total (this affects kombi trips)
         sum_standard = sum_standard if sum_standard >= min_zones else min_zones
         sum_bumped = sum(x[0] for x in out_bumped)
 
