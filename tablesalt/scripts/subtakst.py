@@ -165,15 +165,20 @@ def _aggregate_zones(shares):
 def get_user_shares(all_trips):
     # TODO: import this from package
     n_trips = len(all_trips)
-    single = [x for x in all_trips if isinstance(x[0], int)]
-    multi =  list(chain(*[x for x in all_trips if isinstance(x[0], tuple)]))
-    all_trips = single + multi
-    user_shares = _aggregate_zones(all_trips)
+    chained =  list(chain(*all_trips))
+    user_shares = _aggregate_zones(chained)
     user_shares['n_trips'] = n_trips
 
     return user_shares
 
 def _get_trips(calculated_stores, tripkeys):
+
+    errs = {
+        'operator_error',
+        'station_map_error',
+        'no_available_trip',
+        'rk_operator_error'
+        }
 
     with lmdb.open(calculated_stores, readahead=False) as env:
         out = {}
@@ -185,7 +190,7 @@ def _get_trips(calculated_stores, tripkeys):
                 if not res:
                     continue
                 res = res.decode('utf-8')
-                if res not in ('operator_error', 'station_map_error', 'no_available_trip', 'rk_operator_error'):
+                if res not in errs:
                     out[trip] = ast.literal_eval(res)
     return out
 
