@@ -623,10 +623,12 @@ class ZoneSharer(ZoneProperties):
         return aggregated_zone_operators(tuple(out))
 
     @staticmethod
-    def _weight_bumped_zones(out_standard, out_bumped):
+    def _weight_bumped_zones(out_standard, out_bumped, min_zones):
 
         outstandard = list(chain(*out_standard.values()))
         sum_standard = sum(x[0] for x in outstandard)
+        # bumping must be minimum two zones on total (this a)
+        sum_standard = sum_standard if sum_standard >= min_zones else min_zones
         sum_bumped = sum(x[0] for x in out_bumped)
 
         final_bump = [(x[0] / sum_bumped * sum_standard, x[1])
@@ -665,10 +667,6 @@ class ZoneSharer(ZoneProperties):
         :rtype: Union[Tuple[int, str], Tuple[Tuple[int, str], ...]]
 
         """
-
-        # if self.single:
-        #    return self._single_operator_share()
-
         imputed_zone_legs = properties['imputed_zone_legs']
         zone_leg_regions = properties['zone_legs_regions']
 
@@ -685,7 +683,7 @@ class ZoneSharer(ZoneProperties):
         current_op_sum = 0
         previous_op_id = None
 
-        flag = False
+        operatorshift_flag = False
 
         seen_zone_opid = set()
         for legnum, imputed_leg in enumerate(imputed_zone_legs):
@@ -714,14 +712,14 @@ class ZoneSharer(ZoneProperties):
                 if op_id != next_op_id:
                     if current_op_sum < min_zones:
                         current_op_sum = min_zones
-                    flag = True
+                    operatorshift_flag = True
             except IndexError:
                 if current_op_sum < min_zones:
                     current_op_sum = min_zones
-                flag = True
+                operatorshift_flag = True
 
-            if flag:
-                out_bumped.append((current_op_sum, op_id)) # replace current
+            if operatorshift_flag:
+                out_bumped.append((current_op_sum, op_id))
                 out_bumped_solo.append((leg_solo_price, op_id))
 
             previous_op_id = op_id
@@ -739,7 +737,7 @@ class ZoneSharer(ZoneProperties):
             bumped = out_bumped
             bumped_solo = out_bumped
         else:
-            bumped = self._weight_bumped_zones(out_standard, out_bumped)
+            bumped = self._weight_bumped_zones(out_standard, out_bumped, min_zones)
             bumped_solo = self._weight_solo_bumped(bumped, out_bumped_solo)
 
         bumped_out = aggregated_zone_operators(tuple(bumped))
