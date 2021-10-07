@@ -122,14 +122,14 @@ def _load_route_types() -> Tuple[Dict[int, int], Set[int], Set[int]]:
         bus_route_types
         )
 
-class _TransitFeedObject(metaclass=ABCMeta):
+class AbstractFeedObject(metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def latest(self, latest_data: DataFrame) -> '_TransitFeedObject':
+    def latest(self, latest_data: DataFrame) -> 'AbstractFeedObject':
         pass
 
-class TransitFeedBase(_TransitFeedObject):
+class TransitFeedBase(AbstractFeedObject):
 
     def __init__(self, data: Dict[Any, Any]) -> None:
         self._data = data
@@ -157,7 +157,7 @@ class TransitFeedBase(_TransitFeedObject):
         return NotImplemented
 
 
-class Agency(_TransitFeedObject):
+class Agency(AbstractFeedObject):
 
     def __init__(
         self,
@@ -211,7 +211,7 @@ class Agency(_TransitFeedObject):
     from_dataframe = latest
 
 
-class Stops(_TransitFeedObject):
+class Stops(AbstractFeedObject):
 
     def __init__(
         self,
@@ -262,7 +262,7 @@ class Stops(_TransitFeedObject):
         return cls(stops_data)
     from_dataframe = latest
 
-class Routes(_TransitFeedObject):
+class Routes(AbstractFeedObject):
 
     OLD_ROUTE_MAP: ClassVar[Dict[int, int]]
     BUS_ROUTE_TYPES: ClassVar[Set[int]]
@@ -358,7 +358,7 @@ class Routes(_TransitFeedObject):
 
     from_dataframe = latest
 
-class Trips(_TransitFeedObject):
+class Trips(AbstractFeedObject):
 
     def __init__(
         self,
@@ -450,7 +450,7 @@ class Trips(_TransitFeedObject):
     from_dataframe = latest
 
 
-class StopTimes(_TransitFeedObject):
+class StopTimes(AbstractFeedObject):
 
     def __init__(
         self,
@@ -496,7 +496,7 @@ class StopTimes(_TransitFeedObject):
         return cls(stoptimes_data)
     from_dataframe = latest
 
-class Transfers(_TransitFeedObject):
+class Transfers(AbstractFeedObject):
 
     def __init__(self, transfers_data: List[Dict[str, Any]]) -> None:
         self._data = transfers_data
@@ -528,7 +528,7 @@ class Transfers(_TransitFeedObject):
 
         return cls(transfers_data)
 
-class Calendar(_TransitFeedObject):
+class Calendar(AbstractFeedObject):
 
     ALL_CALENDARS: ClassVar[List['Calendar']]
     ALL_CALENDARS = []
@@ -590,7 +590,7 @@ class MultiCalendar:
 
 
 
-class CalendarDates(_TransitFeedObject):
+class CalendarDates(AbstractFeedObject):
 
     ALL_CALENDAR_DATES: ClassVar[List['CalendarDates']]
     ALL_CALENDAR_DATES = []
@@ -638,7 +638,7 @@ class MultiCalendarDates:
         self.calendar_dates = list(calendar_dates)
 
 
-class Shapes(_TransitFeedObject):
+class Shapes(AbstractFeedObject):
 
     ALL_SHAPES: ClassVar[List['Shapes']]
     ALL_SHAPES = []
