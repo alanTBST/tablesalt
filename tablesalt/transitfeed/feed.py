@@ -33,7 +33,8 @@ from msgpack.exceptions import ExtraData
 from pandas.core.frame import DataFrame
 from shapely import geometry, wkt
 from shapely.geometry import LineString
-from tablesalt.resources.config import load_config
+
+from tablesalt.resources.config.config import load_config
 
 log = logging.getLogger(__name__)
 
@@ -45,8 +46,6 @@ ALL_FILES = ast.literal_eval(CONFIG['rejseplanen']['all_files'])
 REQD_FILES = ast.literal_eval(CONFIG['rejseplanen']['required_files'])
 
 TNum = TypeVar('TNum', int, float)
-
-
 
 
 # using unverified ssl certificate - maybe a bit dodgy
@@ -137,27 +136,30 @@ class TransitFeedBase(AbstractFeedObject):
 
     def __add__(self, other: 'TransitFeedBase'):
         if self.__class__ != other.__class__:
-            raise TypeError("Cannot combain different GTFS datasets")
-
-        updated_data = {**self._data, **other._data}
-        new_instance = TransitFeedBase(updated_data)
+            raise TypeError("Cannot combine different GTFS datasets")
+        try:
+            updated_data = {**self.data, **other.data}
+        except TypeError:
+            updated_data = self.data + other.data
+        
+        new_instance = self.__class__(updated_data)
         new_instance._is_composite = True
 
         return new_instance
 
     @property
-    def data(self) -> Dict[Any, Any]:
+    def data(self) -> Union[List[Any], Dict[Any, Any]]:
         return self._data
 
     @data.setter
-    def data(self, val: Dict[Any, Any]) -> None:
+    def data(self, val: Union[List[Any], Dict[Any, Any]]) -> None:
         self._data = val
 
     def latest(self, latest_data: Dict[Any, Any]):
         return NotImplemented
 
 
-class Agency(AbstractFeedObject):
+class Agency(TransitFeedBase):
 
     def __init__(
         self,
@@ -169,16 +171,6 @@ class Agency(AbstractFeedObject):
         :type agency_data: Dict[int, str]
         """
         self._data = agency_data
-        self._is_composite: bool = False
-
-
-    def __add__(self, other: 'Agency') -> 'Agency':
-
-        updated_data = {**self._data, **other._data}
-        new_agency = Agency(updated_data)
-        new_agency._is_composite = True
-
-        return new_agency
 
     def __getitem__(self, item: int) -> str:
 
@@ -211,7 +203,7 @@ class Agency(AbstractFeedObject):
     from_dataframe = latest
 
 
-class Stops(AbstractFeedObject):
+class Stops(TransitFeedBase):
 
     def __init__(
         self,
@@ -224,15 +216,6 @@ class Stops(AbstractFeedObject):
         """
 
         self._data = stops_data
-        self._is_composite: bool = False
-
-    def __add__(self, other: 'Stops') -> 'Stops':
-
-        updated_data = {**self._data, **other._data}
-        new_stops = Stops(updated_data)
-        new_stops._is_composite = True
-
-        return new_stops
 
     def __getitem__(self, item: int) -> Dict[str, Any]:
 
@@ -262,7 +245,7 @@ class Stops(AbstractFeedObject):
         return cls(stops_data)
     from_dataframe = latest
 
-class Routes(AbstractFeedObject):
+class Routes(TransitFeedBase):
 
     OLD_ROUTE_MAP: ClassVar[Dict[int, int]]
     BUS_ROUTE_TYPES: ClassVar[Set[int]]
@@ -283,16 +266,6 @@ class Routes(AbstractFeedObject):
 
         self._rail_routes: Optional[Dict[str, Dict[str, Any]]] = None
         self._bus_routes: Optional[Dict[str, Dict[str, Any]]] = None
-
-        self._is_composite: bool = False
-
-    def __add__(self, other: 'Routes') -> 'Routes':
-
-        updated_data = {**self._data, **other._data}
-        new_routes = Routes(updated_data)
-        new_routes._is_composite = True
-
-        return new_routes
 
     def __getitem__(self, item: str) -> Dict[str, Any]:
 
@@ -340,6 +313,10 @@ class Routes(AbstractFeedObject):
         }
         return self._bus_routes
 
+    @bus_routes.setter
+    def bus_routes(self, value: Dict[str, Dict[str, Any]]) -> None:
+        self._bus_routes = value
+
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'Routes':
         """Create and instance of Routes from the latest data
@@ -358,7 +335,7 @@ class Routes(AbstractFeedObject):
 
     from_dataframe = latest
 
-class Trips(AbstractFeedObject):
+class Trips(TransitFeedBase):
 
     def __init__(
         self,
@@ -372,17 +349,6 @@ class Trips(AbstractFeedObject):
         self._data = trips_data
         self._trip_route_map: Optional[Dict[int, str]] = None
         self._route_trip_map: Optional[Dict[str, Tuple[int, ...]]] = None
-
-        self._is_composite: bool = False
-
-
-    def __add__(self, other: 'Trips') -> 'Trips':
-
-        updated_data = {**self._data, **other._data}
-        new_trips = Trips(updated_data)
-        new_trips._is_composite = True
-
-        return new_trips
 
 
     def __getitem__(self, item: int) -> Dict[str, Any]:
@@ -450,24 +416,13 @@ class Trips(AbstractFeedObject):
     from_dataframe = latest
 
 
-class StopTimes(AbstractFeedObject):
+class StopTimes(TransitFeedBase):
 
     def __init__(
         self,
         stoptimes_data: Dict[int, Tuple[Dict[str, Any], ...]]
         ) -> None:
         self._data = stoptimes_data
-
-        self._is_composite: bool = False
-
-    def __add__(self, other: 'StopTimes') -> 'StopTimes':
-
-        updated_data = {**self._data, **other._data}
-        new_stop_times = StopTimes(updated_data)
-        new_stop_times._is_composite = True
-
-        return new_stop_times
-
 
     @classmethod
     def latest(cls, latest_data: DataFrame) -> 'StopTimes':
@@ -496,7 +451,8 @@ class StopTimes(AbstractFeedObject):
         return cls(stoptimes_data)
     from_dataframe = latest
 
-class Transfers(AbstractFeedObject):
+
+class Transfers(TransitFeedBase):
 
     def __init__(self, transfers_data: List[Dict[str, Any]]) -> None:
         self._data = transfers_data
@@ -769,7 +725,7 @@ class TransitFeed:
         :param stop_times: an instance of Agency from the feed
         :type stop_times: StopTimes
         :param calendar: an instance of Agency from the feed
-        :type calendar: C
+        :type calendar: Union[Calendar, MultiCalendar]
         :param calendar_dates: an instance of Agency from the feed
         :type calendar_dates: CD
         :param transfers: an instance of Agency from the feed, defaults to None
@@ -793,16 +749,26 @@ class TransitFeed:
 
     def __add__(self, other: 'TransitFeed') -> 'TransitFeed':
 
+        this_period = self.feed_period()
+        other_period = other.feed_period()
+
         new_agency = self.agency + other.agency
         new_stops = self.stops + other.stops
         new_routes = self.routes + other.routes
-        new_trips = self.trips = other.trips
+        new_trips = self.trips + other.trips
         new_stop_times = self.stop_times + other.stop_times
 
         new_calendars = MultiCalendar(self.calendar, other.calendar)
         new_calendar_dates = MultiCalendarDates(self.calendar_dates, other.calendar_dates)
-        new_transfers = None
-        new_shapes = None
+        
+        for transfer in self.transfers.data:
+            transfer.update({'feed_period': this_period})
+
+        for transfer in other.transfers.data:
+            transfer.update({'feed_period': other_period})
+        
+        new_transfers = self.transfers + other.transfers
+        new_shapes = MultiShapes(self.shapes, other.shapes)
 
         new_feed = TransitFeed(
             new_agency,
@@ -899,7 +865,6 @@ def latest_transitfeed(
     :rtype: TransitFeed
     """
 
-
     # order matches TransitFeed args
     required = [
         ('agency.txt', Agency.latest),
@@ -912,7 +877,7 @@ def latest_transitfeed(
     ]
 
     latest_gtfs_data = download_latest_feed()
-    req_classes = tuple(v(latest_gtfs_data[k]) for k, v in required)
+    req_classes = tuple(method(latest_gtfs_data[dset]) for dset, method in required)
 
     transfers: Optional[Transfers]
     shapes: Optional[Shapes]
