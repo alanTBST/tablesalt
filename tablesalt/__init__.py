@@ -82,8 +82,11 @@ from . import topology
 from . import revenue
 from . import season
 
+
 from .common.io import StoreReader
 from . import running
+from . import resources
+from . import transitfeed
 
 from ._version import get_versions
 __version__ = get_versions()['version']
