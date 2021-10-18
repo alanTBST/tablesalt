@@ -5,12 +5,14 @@ Classes to interact with passenger stations and the operators that serve them
 #standard imports
 import json
 from collections import defaultdict
-from itertools import chain
+from itertools import chain, permutations
 from typing import Any, AnyStr, Dict, List, Optional, Set, Tuple, Union
 
 import h5py  # type: ignore
 import pandas as pd  # type: ignore
 import pkg_resources
+from tablesalt import transitfeed
+from tablesalt.transitfeed.feed import TransitFeed
 from tablesalt.common.io import mappers
 from tablesalt.topology.tools import determine_takst_region, TakstZones
 from tablesalt.topology.stopnetwork import ALTERNATE_STATIONS
@@ -233,6 +235,33 @@ def _grouped_lines_dict(config_dict):
                 groupdict[l] = line
     return groupdict
 
+class StationOperators:
+
+    def __init__(self, feed: TransitFeed) -> None:
+
+        self.feed = feed
+        self._lookup = self._process_stop_times()
+        self._bus_map: Dict[int, int] = _load_bus_station_map()
+    
+    def _process_stop_times(self) -> Dict[int, Tuple[Tuple[int, int]]]:
+
+        relation_operators = defaultdict(set)
+        for trip_id, stoptime in self.feed.stop_times.data.items():
+            stopids = (x['stop_id'] for x in stoptime)
+            perms = permutations(stopids, 2)
+            route_id = self.feed.trips.get(trip_id)['route_id']
+            agency_id = self.feed.routes.get(route_id)['agency_id']
+            agency = self.feed.agency.get(agency_id)            
+            for stop_relation in perms:
+                relation_operators[stop_relation].add(agency)
+        
+        return relation_operators
+    
+    def station_pair(self, start_stop_id: int, end_stop_id: int) -> Set[str]:
+
+        return self._lookup[(start_stop_id, end_stop_id)]
+
+    
 
 # make a separate lookup class
 class StationOperators():
