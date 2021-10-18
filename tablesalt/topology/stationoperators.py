@@ -8,7 +8,6 @@ from collections import defaultdict
 from itertools import chain, permutations
 from typing import Any, AnyStr, Dict, List, Optional, Set, Tuple, Union
 
-import h5py  # type: ignore
 import pandas as pd  # type: ignore
 import pkg_resources
 from tablesalt import transitfeed
@@ -16,6 +15,7 @@ from tablesalt.transitfeed.feed import TransitFeed
 from tablesalt.common.io import mappers
 from tablesalt.topology.tools import determine_takst_region, TakstZones
 from tablesalt.topology.stopnetwork import ALTERNATE_STATIONS
+
 
 M_RANGE: Set[int] = set(range(8603301, 8603400))
 S_RANGE: Set[int] = set(range(8690000, 8699999))
@@ -109,24 +109,6 @@ def _load_operator_settings(
         'lines': chosen_lines,
         'use_groups': use_groups
         }
-
-
-def load_bus_station_connectors() -> Dict[int, int]:
-    """
-    Load the bus stops station array from the support data
-
-    :return: a mapping of bus top numbers to station uic numbers
-    :rtype: Dict[int, int]
-
-    """
-
-    support_store = pkg_resources.resource_filename(
-        'tablesalt', 'resources/support_store.h5')
-
-    with h5py.File(support_store, 'r') as store:
-        bus_map = store['datasets/bus_closest_station'][:]
-
-    return {x[0]: x[1] for x in bus_map}
 
 
 def _load_bus_station_map() -> Dict[int, int]:
@@ -241,6 +223,7 @@ class StationOperators:
 
         self.feed = feed
         self._lookup = self._process_stop_times()
+        self._rail_lookup = {k: v for k, v in self._lookup.items() if 7400000 < k[0] < 9999999}
         self._bus_map: Dict[int, int] = _load_bus_station_map()
     
     def _process_stop_times(self) -> Dict[int, Tuple[Tuple[int, int]]]:
@@ -254,6 +237,7 @@ class StationOperators:
             agency = self.feed.agency.get(agency_id)            
             for stop_relation in perms:
                 relation_operators[stop_relation].add(agency)
+        
         
         return relation_operators
     
