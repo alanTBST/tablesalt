@@ -745,6 +745,8 @@ class TransitFeed:
         self.transfers = transfers
         self.shapes = shapes
 
+        self._stop_operators = None
+
         self._is_composite: bool = False
 
     def __add__(self, other: 'TransitFeed') -> 'TransitFeed':
@@ -784,6 +786,12 @@ class TransitFeed:
         new_feed._is_composite = True
 
         return new_feed
+    
+    @property
+    def stop_operators(self):
+        if self._stop_operators is None:
+            self._stop_operators = self._identify_stop_operators()
+        return self._stop_operators
 
     def rail_routes(self) ->  Dict[str, Dict[str, Any]]:
         """Return only the rail routes of the feed
@@ -813,11 +821,22 @@ class TransitFeed:
 
         return bus_routes
     
-    def _get_agency_name(feed, tripid):
+    def _identify_stop_operators(self):    
+        stop_operators = defaultdict(set)
+
+        for tripid, stoptime in  self.stop_times.data.items():
+            stopids = set(x['stop_id'] for x in stoptime)
+            agency_name = self._get_agency_name_for_trip(tripid)      
+            for stopid in stopids:
+                stop_operators[stopid].add(agency_name)
+        return stop_operators    
+    
+    def _get_agency_name_for_trip(self, tripid: int) -> str:
         
-        sub_route_id = feed.trips.data[tripid]['route_id'] 
-        sub_agency_id = feed.routes.data[sub_route_id]['agency_id']
-        sub_agency_name = feed.agency.get(sub_agency_id)
+        sub_route_id = self.trips.data[tripid]['route_id'] 
+        sub_agency_id = self.routes.data[sub_route_id]['agency_id']
+        sub_agency_name = self.agency.get(sub_agency_id)
+        
         return sub_agency_name
     
     def feed_period(self) -> Tuple[datetime, datetime]:
