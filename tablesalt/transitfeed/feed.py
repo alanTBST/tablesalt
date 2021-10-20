@@ -826,12 +826,12 @@ class TransitFeed:
 
         for tripid, stoptime in  self.stop_times.data.items():
             stopids = set(x['stop_id'] for x in stoptime)
-            agency_name = self._get_agency_name_for_trip(tripid)      
+            agency_name = self.get_agency_name_for_trip(tripid)      
             for stopid in stopids:
                 stop_operators[stopid].add(agency_name)
         return stop_operators    
     
-    def _get_agency_name_for_trip(self, tripid: int) -> str:
+    def get_agency_name_for_trip(self, tripid: int) -> str:
         
         sub_route_id = self.trips.data[tripid]['route_id'] 
         sub_agency_id = self.routes.data[sub_route_id]['agency_id']
