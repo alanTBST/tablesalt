@@ -812,7 +812,14 @@ class TransitFeed:
             bus_routes[route_id] = info
 
         return bus_routes
-
+    
+    def _get_agency_name(feed, tripid):
+        
+        sub_route_id = feed.trips.data[tripid]['route_id'] 
+        sub_agency_id = feed.routes.data[sub_route_id]['agency_id']
+        sub_agency_name = feed.agency.get(sub_agency_id)
+        return sub_agency_name
+    
     def feed_period(self) -> Tuple[datetime, datetime]:
         """Return the time period that the feed is valid for
 
