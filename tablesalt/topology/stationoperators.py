@@ -239,7 +239,10 @@ def _grouped_lines_dict(config_dict):
                 groupdict[l] = line
     return groupdict
 
+
 feed = transitfeed.archived_transitfeed('20211011_20220105')
+
+
 class StationOperators:
 
     BUS_ID_MAP: Dict[int, int] = _load_bus_station_map()
@@ -248,122 +251,175 @@ class StationOperators:
         """class to determine the operator between stop point ids
 
         :param feed: a gtfs transitfeed from rejseplanen
+            The feed can be created from using tablesalt.transitfeed.archived_transitfeed,
+            or the very latest available feed using tablesalt.transitfeed.latest_transitfeed,
+
         :type feed: TransitFeed
         """
 
-        self.feed = feed       
+        self.feed = feed
         self._suburban_operator, self._metro_operator, self._local_operator = \
             self._determine_operators()
 
         self._lookup = self._process_stop_times()
-        self._suburban_lookup = self._process_suburban_stops()
-    
+
     def _determine_operators(self):
 
         stoptimes = list(self.feed.stop_times.data.items())
-        
+
         suburban_trip = None
         metro_trip = None
         kastrup_trip = None
-        local_trip = None  # NOTE. only one local operator
-        
+        local_trip = None  # NOTE. only one local operator for sjælland (must fix this)
+
         for tripid, stoptime in stoptimes:
             stopids = set(x['stop_id'] for x in stoptime)
             if stopids.intersection(SUBURBAN_TEST_STOPS):
                 suburban_trip = tripid
-            
+
             elif stopids.intersection(METRO_TEST_STOPS):
                 metro_trip = tripid
             elif stopids.intersection(KASTRUP_TEST_STOPS):
-                kastrup_trip = tripid     
+                kastrup_trip = tripid
             elif stopids.intersection(LOCAL_TEST_STOPS):
-                local_trip = tripid 
-                    
+                local_trip = tripid
 
-            if (suburban_trip is not None and 
+            if (suburban_trip is not None and
                 metro_trip is not None and
-                kastrup_trip is not None and 
+                kastrup_trip is not None and
                 local_trip is not None):
-                break        
+                break
         else:
             raise ValueError("Cannot determine suburban/metro operator")
-    
+
         sub_agency_name = self.feed.get_agency_name_for_trip(suburban_trip)
         met_agency_name = self.feed.get_agency_name_for_trip(metro_trip)
         kast_agency_name = self.feed.get_agency_name_for_trip(kastrup_trip)
         local_agency_name = self.feed.get_agency_name_for_trip(local_trip)
         return sub_agency_name, met_agency_name, local_agency_name
 
+    @staticmethod
+    def _start_operator_changes(stop_map, leg_permutations, operator):
+        start_perms = {(stop_map.get(x[0], x[0]), x[1]) for x in leg_permutations}
+        new_perms = start_perms - leg_permutations
+        if new_perms:
+            return {stop_relation: {operator} for stop_relation in new_perms}
+
+        return {}
+
+    @staticmethod
+    def _end_operator_changes(stop_map, leg_permutations, operator):
+        end_perms = {(x[0], stop_map.get(x[1], x[1])) for x in leg_permutations}
+        new_perms = end_perms - leg_permutations
+        if new_perms:
+            return {stop_relation: {operator} for stop_relation in new_perms}
+        return {}
+
     def _process_stop_times(self) -> Dict[int, Tuple[Tuple[int, int]]]:
+        """
+        This method creates the dictionary in self._lookup
+        It uses the stop_times dataset from the given transit feed
+        """
         relation_operators = {}
-        
+
         for trip_id, stoptime in self.feed.stop_times.data.items():
-            
+
             stopids = (x['stop_id'] for x in stoptime)
             perms = set(permutations(stopids, 2))
-            
-            route_id = self.feed.trips.get(trip_id)['route_id']
-            agency_id = self.feed.routes.get(route_id)['agency_id']
-            agency = self.feed.agency.get(agency_id)            
-            
+            agency = self.feed.get_agency_name_for_trip(trip_id)
+
             for stop_relation in perms:
                 try:
-                    relation_operators[stop_relation].add(agency)      
+                    relation_operators[stop_relation].add(agency)
                 except KeyError:
                     relation_operators[stop_relation] = {agency}
-
-            # put in SUBURBAN_UIC
+            # this deals only with sjælland correctly
+            # needs more work for jylland
             if agency == self._suburban_operator:
-                start_suburban_perms = {(SUBURBAN_UIC.get(x[0], x[0]), x[1]) for x in perms}
-                # end_metro_perms
-                end_metro_perms = {(x[0], METRO_UIC.get(x[1], x[1])) for x in perms}
-                # end_local_perms
-                end_local_perms = {(x[0], LOCAL_UIC.get(x[1], x[1])) for x in perms}
-                suburban_perms = start_suburban_perms - perms
-                local_perms = end_local_perms - perms
-                metro_perms = end_metro_perms - perms
-                suburban_ops = {stop_relation: {self._suburban_operator} for stop_relation in suburban_perms}  
-                local_ops = {stop_relation: {self._suburban_operator} for stop_relation in local_perms}    
-                metro_ops = {stop_relation: {self._suburban_operator} for stop_relation in metro_perms}      
+                # legs starting at 869 platform must only be suburban operator
+                suburban_ops = self._start_operator_changes(
+                    SUBURBAN_UIC, perms, self._suburban_operator
+                    )
                 relation_operators.update(suburban_ops)
-                relation_operators.update(local_ops)
-                relation_operators.update(metro_ops)
-            # put in LOCAL
-            elif agency == self._local_operator:
-                start_local_perms = {(LOCAL_UIC.get(x[0], x[0]), x[1]) for x in perms}
-                local_perms = start_local_perms - perms
-                local_ops = {stop_relation: {self._local_operator} for stop_relation in local_perms}
-                relation_operators.update(local_ops)
-                # put in METRO
-            elif agency == self._metro_operator:
-                start_metro_perms = {(x[0], REV_METRO_UIC.get(x[1], x[1])) for x in perms}
-                metro_perms = start_metro_perms - perms
-                metro_ops = {
-                    stop_relation: {self._metro_operator} for 
-                    stop_relation in metro_perms
-                    }
-                relation_operators.update(metro_ops)
-           
-        
-        return relation_operators
- 
-    def station_pair(self, start_stop_id: int, end_stop_id: int) -> Set[str]:
+                suburban_ops = self._end_operator_changes(
+                    SUBURBAN_UIC, perms, self._suburban_operator
+                    )
+                relation_operators.update(suburban_ops)
 
+                # if starting platform is local num 861/862... the operator should still be suburban
+                local_ops = self._start_operator_changes(
+                    LOCAL_UIC, perms, self._suburban_operator
+                    )
+                relation_operators.update(local_ops)
+                # if end platform is local num 861/862... the operator should still be suburban
+                local_ops = self._end_operator_changes(
+                     LOCAL_UIC, perms, self._suburban_operator
+                    )
+                relation_operators.update(local_ops)
+                # if end number is a metro number operator still suburban
+                metro_ops = self._end_operator_changes(
+                     METRO_UIC, perms, self._suburban_operator
+                    )
+                relation_operators.update(metro_ops)
+
+            elif agency == self._local_operator:
+                local_ops = self._start_operator_changes(
+                    LOCAL_UIC, perms, self._local_operator
+                    )
+                relation_operators.update(local_ops)
+
+                local_ops = self._end_operator_changes(
+                     LOCAL_UIC, perms, self._local_operator
+                    )
+                relation_operators.update(local_ops)
+
+                suburban_ops = self._start_operator_changes(
+                    SUBURBAN_UIC, perms, self._local_operator
+                    )
+                relation_operators.update(suburban_ops)
+
+            elif agency == self._metro_operator:
+
+                metro_ops = self._end_operator_changes(
+                    REV_METRO_UIC, perms, self._metro_operator
+                    )
+                relation_operators.update(metro_ops)
+
+        return relation_operators
+
+    def station_pair(
+        self,
+        start_stop_id: int,
+        end_stop_id: int
+        ) -> Set[str]:
+        """[summary]
+
+        :param start_stop_id: [description]
+        :type start_stop_id: int
+        :param end_stop_id: [description]
+        :type end_stop_id: int
+        :return: [description]
+        :rtype: Set[str]
+        """
+
+        # if start bus-end train, check end station and stops around it...must be a bus leg to one of the stops
+
+        # if start train - end bus, find the closest station to the bus stop and check leg
         try:
-            return self._lookup[(start_stop_id, end_stop_id)]          
+            return self._lookup[(start_stop_id, end_stop_id)]
         except KeyError:
             op = self._lookup[(SUBURBAN_UIC.get(start_stop_id, start_stop_id), end_stop_id)]
             return op.intersection({self._suburban_operator})
         except KeyError:
-            op = self._lookup[(SUBURBAN_UIC.get(start_stop_id, start_stop_id), SUBURBAN_UIC.get(end_stop_id, end_stop_id))] 
-            return op.intersection({self._suburban_operator})       
+            op = self._lookup[(SUBURBAN_UIC.get(start_stop_id, start_stop_id), SUBURBAN_UIC.get(end_stop_id, end_stop_id))]
+            return op.intersection({self._suburban_operator})
         except KeyError:
-            op = self._lookup[(start_stop_id, SUBURBAN_UIC.get(end_stop_id, end_stop_id))] 
-            return op - {self._suburban_operator}          
+            op = self._lookup[(start_stop_id, SUBURBAN_UIC.get(end_stop_id, end_stop_id))]
+            return op - {self._suburban_operator}
         except KeyError:
             raise
 
-    
+
 
 # make a separate lookup class
 # class StationOperators():
