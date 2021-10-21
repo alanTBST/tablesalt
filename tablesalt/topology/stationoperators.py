@@ -27,6 +27,8 @@ METRO_UIC = dict(CONFIG['metro_platform_numbers'])
 METRO_UIC = {int(k): int(v) for k, v in METRO_UIC.items()}
 REV_METRO_UIC = {v:k for k, v in METRO_UIC.items()}
 
+METRO_SUBURBAN = {k: SUBURBAN_UIC.get(v, v) for k, v in REV_METRO_UIC.items()}
+
 LOCAL_UIC_1 =  dict(CONFIG['local_platform_numbers_1'])
 LOCAL_UIC_1 = {int(k): int(v) for k, v in LOCAL_UIC_1.items()}
 
@@ -379,11 +381,15 @@ class StationOperators:
                 relation_operators.update(suburban_ops)
 
             elif agency == self._metro_operator:
-
                 metro_ops = self._end_operator_changes(
                     REV_METRO_UIC, perms, self._metro_operator
                     )
                 relation_operators.update(metro_ops)
+
+                suburban_ops = self._end_operator_changes(
+                    METRO_SUBURBAN, perms, self._metro_operator
+                    )
+                relation_operators.update(suburban_ops)
 
         return relation_operators
 
