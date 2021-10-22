@@ -6,7 +6,7 @@ Classes to interact with passenger stations and the operators that serve them
 import ast
 import json
 from collections import defaultdict
-from itertools import chain, permutations
+from itertools import chain, permutations, product
 from typing import Any, AnyStr, Dict, List, Optional, Set, Tuple, Union
 
 import pandas as pd  # type: ignore
@@ -317,6 +317,54 @@ class StationOperators:
             return {stop_relation: {operator} for stop_relation in new_perms}
         return {}
 
+    def _suburban_stop_changes(self, leg_permutations):
+        # legs starting at 869 platform must only be suburban operator
+        s_suburban_ops = self._start_operator_changes(
+            SUBURBAN_UIC, leg_permutations, self._suburban_operator
+            )
+        e_suburban_ops = self._end_operator_changes(
+            SUBURBAN_UIC, leg_permutations, self._suburban_operator
+            )
+         # if starting platform is local num 861/862... the operator should still be suburban
+        s_local_ops = self._start_operator_changes(
+            LOCAL_UIC, leg_permutations, self._suburban_operator
+            )
+        # if end platform is local num 861/862... the operator should still be suburban
+        e_local_ops = self._end_operator_changes(
+                LOCAL_UIC, leg_permutations, self._suburban_operator
+            )
+        # if end number is a metro number operator still suburban
+        e_metro_ops = self._end_operator_changes(
+                METRO_UIC, leg_permutations, self._suburban_operator
+            )
+        return {**s_suburban_ops, **e_suburban_ops, **s_local_ops, **e_local_ops, **e_metro_ops}
+
+    def _local_stop_changes(self, leg_permutations):
+        s_local_ops = self._start_operator_changes(
+            LOCAL_UIC, leg_permutations, self._local_operator
+            )
+
+        e_local_ops = self._end_operator_changes(
+                LOCAL_UIC, leg_permutations, self._local_operator
+            )
+
+        s_suburban_ops = self._start_operator_changes(
+            SUBURBAN_UIC, leg_permutations, self._local_operator
+            )
+
+        return  {**s_suburban_ops, **s_local_ops, **e_local_ops}
+
+    def _metro_stop_changes(self, leg_permutations):
+
+        metro_ops = self._end_operator_changes(
+            REV_METRO_UIC, leg_permutations, self._metro_operator
+            )
+        suburban_ops = self._end_operator_changes(
+            METRO_SUBURBAN, leg_permutations, self._metro_operator
+            )
+
+        return {**metro_ops, **suburban_ops}
+
     def _process_stop_times(self) -> Dict[int, Tuple[Tuple[int, int]]]:
         """
         This method creates the dictionary in self._lookup
@@ -324,12 +372,14 @@ class StationOperators:
         """
         relation_operators = {}
 
+        seen = set()
         for trip_id, stoptime in self.feed.stop_times.data.items():
-
             stopids = (x['stop_id'] for x in stoptime)
             perms = set(permutations(stopids, 2))
+            if tuple(perms) in seen: # perms must remain a set
+                continue
+            seen.add(tuple(perms))
             agency = self.feed.get_agency_name_for_trip(trip_id)
-
             for stop_relation in perms:
                 try:
                     relation_operators[stop_relation].add(agency)
@@ -338,60 +388,37 @@ class StationOperators:
             # this deals only with sjælland correctly
             # needs more work for jylland
             if agency == self._suburban_operator:
-                # legs starting at 869 platform must only be suburban operator
-                suburban_ops = self._start_operator_changes(
-                    SUBURBAN_UIC, perms, self._suburban_operator
-                    )
-                relation_operators.update(suburban_ops)
-                suburban_ops = self._end_operator_changes(
-                    SUBURBAN_UIC, perms, self._suburban_operator
-                    )
-                relation_operators.update(suburban_ops)
-
-                # if starting platform is local num 861/862... the operator should still be suburban
-                local_ops = self._start_operator_changes(
-                    LOCAL_UIC, perms, self._suburban_operator
-                    )
-                relation_operators.update(local_ops)
-                # if end platform is local num 861/862... the operator should still be suburban
-                local_ops = self._end_operator_changes(
-                     LOCAL_UIC, perms, self._suburban_operator
-                    )
-                relation_operators.update(local_ops)
-                # if end number is a metro number operator still suburban
-                metro_ops = self._end_operator_changes(
-                     METRO_UIC, perms, self._suburban_operator
-                    )
-                relation_operators.update(metro_ops)
-
+                updated_leg_permutations = self._suburban_stop_changes(perms)
             elif agency == self._local_operator:
-                local_ops = self._start_operator_changes(
-                    LOCAL_UIC, perms, self._local_operator
-                    )
-                relation_operators.update(local_ops)
-
-                local_ops = self._end_operator_changes(
-                     LOCAL_UIC, perms, self._local_operator
-                    )
-                relation_operators.update(local_ops)
-
-                suburban_ops = self._start_operator_changes(
-                    SUBURBAN_UIC, perms, self._local_operator
-                    )
-                relation_operators.update(suburban_ops)
-
+                updated_leg_permutations = self._local_stop_changes(perms)
             elif agency == self._metro_operator:
-                metro_ops = self._end_operator_changes(
-                    REV_METRO_UIC, perms, self._metro_operator
-                    )
-                relation_operators.update(metro_ops)
+                updated_leg_permutations = self._metro_stop_changes(perms)
+            else:
+                updated_leg_permutations = {}
 
-                suburban_ops = self._end_operator_changes(
-                    METRO_SUBURBAN, perms, self._metro_operator
-                    )
-                relation_operators.update(suburban_ops)
+            relation_operators.update(updated_leg_permutations)
+
+        #deal with the alternate rejsekort station numbers
+        alts = self._alternate_stop_numbers(relation_operators)
+        relation_operators.update(alts)
 
         return relation_operators
+
+    def _alternate_stop_numbers(self, relation_operators):
+        alts = {}
+        for k, v in relation_operators.items():
+            if any(x in ALTERNATE_UIC for x in k):
+                start = ALTERNATE_UIC.get(k[0], k[0])
+                end = ALTERNATE_UIC.get(k[1], k[1])
+                if isinstance(start, int):
+                    start = [start]
+                if isinstance(end, int):
+                    end = [end]
+                new_keys = product(start, end)
+                for nk in new_keys:
+                    alts[nk] = v
+        return alts
+
 
     def station_pair(
         self,
@@ -411,21 +438,7 @@ class StationOperators:
         # if start bus-end train, check end station and stops around it...must be a bus leg to one of the stops
 
         # if start train - end bus, find the closest station to the bus stop and check leg
-        try:
-            return self._lookup[(start_stop_id, end_stop_id)]
-        except KeyError:
-            op = self._lookup[(SUBURBAN_UIC.get(start_stop_id, start_stop_id), end_stop_id)]
-            return op.intersection({self._suburban_operator})
-        except KeyError:
-            op = self._lookup[(SUBURBAN_UIC.get(start_stop_id, start_stop_id), SUBURBAN_UIC.get(end_stop_id, end_stop_id))]
-            return op.intersection({self._suburban_operator})
-        except KeyError:
-            op = self._lookup[(start_stop_id, SUBURBAN_UIC.get(end_stop_id, end_stop_id))]
-            return op - {self._suburban_operator}
-        except KeyError:
-            raise
-
-
+        return self._lookup[(start_stop_id, end_stop_id)]
 
 # make a separate lookup class
 # class StationOperators():
