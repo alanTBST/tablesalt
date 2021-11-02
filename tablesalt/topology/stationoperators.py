@@ -6,7 +6,8 @@ Classes to interact with passenger stations and the operators that serve them
 import ast
 import json
 from collections import defaultdict
-from itertools import chain, permutations, product
+from itertools import groupby, permutations, product
+from operator import itemgetter
 from typing import Any, AnyStr, Dict, List, Optional, Set, Tuple, Union
 
 import pandas as pd  # type: ignore
@@ -22,6 +23,7 @@ CONFIG = load_config()
 
 SUBURBAN_UIC = dict(CONFIG['suburban_platform_numbers'])
 SUBURBAN_UIC = {int(k): int(v) for k, v in SUBURBAN_UIC.items()}
+REV_SUBURBAN_UIC = {v:k for k, v in SUBURBAN_UIC.items()}
 
 METRO_UIC = dict(CONFIG['metro_platform_numbers'])
 METRO_UIC = {int(k): int(v) for k, v in METRO_UIC.items()}
@@ -36,6 +38,7 @@ LOCAL_UIC_2 =  dict(CONFIG['local_platform_numbers_2'])
 LOCAL_UIC_2 = {int(k): int(v) for k, v in LOCAL_UIC_2.items()}
 
 LOCAL_UIC = {**LOCAL_UIC_1, **LOCAL_UIC_2}
+REV_LOCAL_UIC = {v:k for k, v in METRO_UIC.items()}
 
 ALTERNATE_UIC =  dict(CONFIG['alternate_numbers'])
 ALTERNATE_UIC = {int(k): ast.literal_eval(v) for k, v in ALTERNATE_UIC.items()}
@@ -49,6 +52,10 @@ LOCAL_TEST_STOPS =  set(ast.literal_eval(CONFIG['local']['test_stops']))
 
 M_RANGE: Set[int] = set(range(8603301, 8603400))
 S_RANGE: Set[int] = set(range(8690000, 8699999))
+
+# this is temporary, must change this. Use Transit feed to see if the stops service buses.
+MAX_RAIL_UIC: int = 9999999
+MIN_RAIL_UIC: int = 7400000
 
 def _load_default_config() -> Dict[str, str]:
     """load the operator configuration from the package
@@ -242,9 +249,6 @@ def _grouped_lines_dict(config_dict):
     return groupdict
 
 
-feed = transitfeed.archived_transitfeed('20211011_20220105')
-
-
 class StationOperators:
 
     BUS_ID_MAP: Dict[int, int] = _load_bus_station_map()
@@ -264,6 +268,22 @@ class StationOperators:
             self._determine_operators()
 
         self._lookup = self._process_stop_times()
+        self.bus_to_station_map: Dict[int, int] = _load_bus_station_map()
+        self.station_to_bus_map = self._reverse_bus_map()
+
+    def _reverse_bus_map(self):
+        bmap = tuple(self.bus_to_station_map.items())
+        bmap = sorted(bmap, key=itemgetter(1))
+
+        station_to_bus = {
+            key: tuple(x[0] for x in grp) for
+            key, grp in groupby(bmap, key=itemgetter(1))
+            }
+
+        suburban = {SUBURBAN_UIC[k]: v for k, v in station_to_bus.items() if k in SUBURBAN_UIC}
+        local = {LOCAL_UIC[k]: v for k, v in station_to_bus.items() if k in LOCAL_UIC}
+
+        return {**station_to_bus, **suburban, **local}
 
     def _determine_operators(self):
 
@@ -298,6 +318,7 @@ class StationOperators:
         met_agency_name = self.feed.get_agency_name_for_trip(metro_trip)
         kast_agency_name = self.feed.get_agency_name_for_trip(kastrup_trip)
         local_agency_name = self.feed.get_agency_name_for_trip(local_trip)
+
         return sub_agency_name, met_agency_name, local_agency_name
 
     @staticmethod
@@ -337,7 +358,13 @@ class StationOperators:
         e_metro_ops = self._end_operator_changes(
                 METRO_UIC, leg_permutations, self._suburban_operator
             )
-        return {**s_suburban_ops, **e_suburban_ops, **s_local_ops, **e_local_ops, **e_metro_ops}
+        return {
+            **s_suburban_ops,
+            **e_suburban_ops,
+            **s_local_ops,
+            **e_local_ops,
+            **e_metro_ops
+            }
 
     def _local_stop_changes(self, leg_permutations):
         s_local_ops = self._start_operator_changes(
@@ -397,7 +424,6 @@ class StationOperators:
                 updated_leg_permutations = {}
 
             relation_operators.update(updated_leg_permutations)
-
         #deal with the alternate rejsekort station numbers
         alts = self._alternate_stop_numbers(relation_operators)
         relation_operators.update(alts)
@@ -405,6 +431,8 @@ class StationOperators:
         return relation_operators
 
     def _alternate_stop_numbers(self, relation_operators):
+        """"replace the station numbers with their alternate numbers
+        so that the alternate stations are also in the lookup"""
         alts = {}
         for k, v in relation_operators.items():
             if any(x in ALTERNATE_UIC for x in k):
@@ -419,31 +447,45 @@ class StationOperators:
                     alts[nk] = v
         return alts
 
-
     def station_pair(
         self,
         start_stop_id: int,
         end_stop_id: int
         ) -> Set[str]:
-        """[summary]
+        """Determine the possible operators for a pair of stations.
+        Can be used to determine the operator servicing a leg of a trip
 
-        :param start_stop_id: [description]
+        If no operator services the given station pair, a KeyError is raised
+        :param start_stop_id: the station number of the starting station
         :type start_stop_id: int
-        :param end_stop_id: [description]
+        :param end_stop_id: the station number of the end station
         :type end_stop_id: int
-        :return: [description]
+        :return: a set of possible operators servicing the station pair
         :rtype: Set[str]
         """
 
         # if start bus-end train, check end station and stops around it...must be a bus leg to one of the stops
 
         # if start train - end bus, find the closest station to the bus stop and check leg
-        return self._lookup[(start_stop_id, end_stop_id)]
+        try:
+            return self._lookup[(start_stop_id, end_stop_id)]
+        except KeyError:
+            for mapping in [REV_METRO_UIC, REV_SUBURBAN_UIC, self.bus_to_station_map]:
+                end_id = mapping.get(end_stop_id, end_stop_id)
+                try:
+                    op = self._lookup[(start_stop_id, end_id)]
+                    self._lookup[(start_stop_id, end_id)] = op
+                    return op
+                except KeyError:
+                    continue
+            else:
+                raise
+
 
 # make a separate lookup class
 # class StationOperators():
 
-#     BUS_ID_MAP: Dict[int, int] = _load_bus_station_map()
+#     BUS_ID_MAP: Dict[int, int] = _load_bus_station_map() self.station_pair(8600669, 6584)
 
 #     LINE_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
 #     OP_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
