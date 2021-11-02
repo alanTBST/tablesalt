@@ -25,8 +25,6 @@ from tablesalt.topology.zonegraph import ZoneGraph
 from tablesalt.topology.tools import determine_takst_region
 
 
-OPGETTER = None
-
 OP_MAP = {v: k.lower() for k, v in mappers['operator_id'].items()}
 REV_OP_MAP = {v: k for k, v in OP_MAP.items()}
 
@@ -155,10 +153,10 @@ def to_legs(sequence: Tuple[int, ...]) ->Tuple[int, ...]:
     return triptools.sep_legs(sequence)
 
 @lru_cache(2**8)
-def _to_legs_stops(stop_legs):
+def _to_legs_stops(stop_legs, opgetter):
     """convert to legs and map the bus id to station if possible"""
     return tuple(
-            (leg[0], OPGETTER.BUS_ID_MAP.get(leg[1])) if
+            (leg[0], opgetter.BUS_ID_MAP.get(leg[1])) if
             (not _is_bus(leg[0]) and _is_bus(leg[1])) else leg
             for leg in stop_legs
             )
@@ -181,6 +179,7 @@ class ZoneProperties():
 
     def __init__(self,
                  graph: ZoneGraph,
+                 station_operators: stationoperators.StationOperators,
                  zone_sequence: Tuple[int, ...],
                  stop_sequence: Tuple[int, ...],
                  region: Optional[str] = 'sjælland'
@@ -204,12 +203,13 @@ class ZoneProperties():
         """
 
         self.graph = graph
+        self.opgetter = station_operators
         # self.ring_dict = self.graph.ring_dict(region)
         self.zone_sequence: Tuple[int, ...] = zone_sequence
         self.stop_sequence: Tuple[int, ...] = stop_sequence
 
         self.stop_legs: Tuple[Tuple[int, ...], ...] = to_legs(stop_sequence)
-        self.stop_legs = _to_legs_stops(self.stop_legs)
+        self.stop_legs = _to_legs_stops(self.stop_legs, self.opgetter)
         self.zone_legs: Tuple[Tuple[int, ...], ...] = to_legs(zone_sequence)
 
         self.border_trip: bool = False
@@ -457,9 +457,6 @@ def aggregated_zone_operators(v):
                  key, grp in groupby(out_list, key=lambda x: x[1]))
 
 
-
-STOPS = StopsList.default_denmark().stops_dict
-
 class ZoneSharer(ZoneProperties):
 
     SHARE_CACHE = {}
@@ -467,10 +464,12 @@ class ZoneSharer(ZoneProperties):
     def __init__(
             self,
             graph: ZoneGraph,
+            station_operators: stationoperators.StationOperators,
             zone_sequence: Tuple[int, ...],
             stop_sequence: Tuple[int, ...],
             operator_sequence: Tuple[int, ...],
             usage_sequence: Tuple[int, ...]
+
             ) -> None:
         """Main class to determine the zone shares for each operator
         on a trip.
@@ -488,7 +487,7 @@ class ZoneSharer(ZoneProperties):
         :type usage_sequence: Tuple[int, ...]
         """
 
-        super().__init__(graph, zone_sequence, stop_sequence)
+        super().__init__(graph, station_operators, zone_sequence, stop_sequence)
 
         self.zone_sequence = zone_sequence
         self.stop_sequence = stop_sequence
@@ -498,7 +497,8 @@ class ZoneSharer(ZoneProperties):
         self.usage_legs = to_legs(self.usage_sequence)
 
         self.single: bool = self._is_single()
-        self.stops_dict = STOPS
+        self.stops_dict = StopsList.default_denmark().stops_dict
+        self.opgetter = station_operators
 
         self.region: str = determine_takst_region(self.zone_sequence)
 
@@ -554,8 +554,28 @@ class ZoneSharer(ZoneProperties):
 
         opsequence = ()
         for x in self.stop_legs:
-            ops = OPGETTER.station_pair(*x, format='operator')
-            op = stationoperators.REV_OP_MAP[(list(ops)[0])]
+            try:
+                ops = self.opgetter.station_pair(*x)
+            except KeyError:
+                # starting with bus check then train check on leg
+                possible_bus_stops = (
+                    x for x in self.opgetter.station_to_bus_map[x[1]]
+                    if _is_bus(x)
+                )
+
+                for stopid in possible_bus_stops:
+                    try:
+                        ops = self.opgetter.station_pair(x[0], stopid)
+                        if ops:
+                            print('wooo')
+                            break
+                    except KeyError:
+                        continue
+                else:
+                    raise KeyError(
+                        f"could not find a bus stop at station {x[1]} servicing a leg from bus stop{x[0]}"
+                        )
+            op = ops.pop()
             opsequence += (op, )
 
         return opsequence
@@ -794,6 +814,7 @@ class ZoneSharer(ZoneProperties):
             pass
 
         self._remove_cotr()
+
         try:
             self._remove_susu()
         except KeyError:
@@ -801,14 +822,19 @@ class ZoneSharer(ZoneProperties):
             self.SHARE_CACHE[val] = shares
             return shares
 
+        # this deals with situations such as checking in at a station and then the next
+        # checkin is on a bus
         if not all(len(set(x)) == 1 for x in self.operator_legs):
             try:
                 new_op_legs = self._station_operators()
-            except (ValueError, TypeError):
+            except KeyError:
+                shares = self._error_shares('operator_error')
+                self.SHARE_CACHE[val] = shares
+            except ValueError:
                 shares = self._error_shares('station_map_error')
                 self.SHARE_CACHE[val] = shares
                 return shares
-            except IndexError:
+            except (IndexError, TypeError):
                 shares = self._error_shares('operator_error')
                 self.SHARE_CACHE[val] = shares
                 return shares
