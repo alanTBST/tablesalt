@@ -44,7 +44,7 @@ REGIONS = {
     # 'sydjyllandsyd'
     }
 
-
+# to config
 REGION_ZONES = {
     'hovedstaden': (1000, 1100), # 200
     'vestsjælland': (1100, 1200), # 230
