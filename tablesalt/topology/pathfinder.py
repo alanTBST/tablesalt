@@ -491,17 +491,26 @@ class ZoneSharer(ZoneProperties):
 
         self.zone_sequence = zone_sequence
         self.stop_sequence = stop_sequence
-        self.operator_sequence = operator_sequence
+
         self.usage_sequence = usage_sequence
-        self.operator_legs = to_legs(self.operator_sequence)
         self.usage_legs = to_legs(self.usage_sequence)
 
+        self.operator_sequence = operator_sequence
+        self.operator_legs = to_legs(self.operator_sequence)
+
+
         self.single: bool = self._is_single()
-        self.stops_dict = StopsList.default_denmark().stops_dict
+
         self.opgetter = station_operators
+
+        self.stops_dict = self.opgetter.stops.data
 
         self.region: str = determine_takst_region(self.zone_sequence)
 
+    def _find_operators(self):
+
+        opsequence = self._station_operators()
+        return
 
     def _is_single(self) -> bool:
         """has only one operator"""
@@ -553,28 +562,11 @@ class ZoneSharer(ZoneProperties):
         """Get the operators at the visited stations"""
 
         opsequence = ()
-        for x in self.stop_legs:
+        for leg in self.stop_legs:
             try:
-                ops = self.opgetter.station_pair(*x)
+                ops = self.opgetter.station_pair(*leg)
             except KeyError:
-                # starting with bus check then train check on leg
-                possible_bus_stops = (
-                    x for x in self.opgetter.station_to_bus_map[x[1]]
-                    if _is_bus(x)
-                )
-
-                for stopid in possible_bus_stops:
-                    try:
-                        ops = self.opgetter.station_pair(x[0], stopid)
-                        if ops:
-                            print('wooo')
-                            break
-                    except KeyError:
-                        continue
-                else:
-                    raise KeyError(
-                        f"could not find a bus stop at station {x[1]} servicing a leg from bus stop{x[0]}"
-                        )
+                raise
             op = ops.pop()
             opsequence += (op, )
 
@@ -602,7 +594,6 @@ class ZoneSharer(ZoneProperties):
         touched_zone_leg_count,
         ops_in_touched_zones
         ):
-
 
         zone_share = 1
         if zone in touched_zones:
@@ -742,7 +733,6 @@ class ZoneSharer(ZoneProperties):
             previous_op_id = op_id
 
         out_standard = {k: tuple(v) for k, v in out_standard.items()}
-
         standard = aggregated_zone_operators(tuple(out_standard.values()))
 
         if self.single:
@@ -796,7 +786,6 @@ class ZoneSharer(ZoneProperties):
         :return: [description]
         :rtype: Dict[str, Tuple[Tuple[Union[int, float], str], ...]]
         """
-
 
         val = tuple(
             (self.stop_sequence,
