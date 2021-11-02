@@ -269,6 +269,7 @@ def chunk_shares(
         try:
             sharer = ZoneSharer(graph, opgetter, zones, stops, operators, usage)
             trip_shares = sharer.share()
+            model_one_shares[k] = trip_shares['standard']
         except Exception as e:
             continue
 
@@ -328,7 +329,17 @@ def main():
     region = 'sjælland'
 
     graph = ZoneGraph(region=region)
-    feed = transitfeed.archived_transitfeed('20211011_20220105')
+
+    allfeeds = transitfeed.available_archives()
+
+    year_archives = [x for x in allfeeds if str(year) in x]
+
+    feed = transitfeed.archived_transitfeed(year_archives[0])
+    for archive in year_archives[1:]:
+        archive_feed = transitfeed.archived_transitfeed(archive)
+        feed = feed + archive_feed
+
+
     opgetter = StationOperators(feed)
 
     pfunc = partial(chunk_shares,
