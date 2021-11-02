@@ -73,11 +73,11 @@ def download_latest_feed() -> Dict[str, DataFrame]:
         log.critical(f"GTFS download failed - error {resp.code}")
         raise URLError("Could not download GTFS data")
 
-    gtfs_data = _load_gtfs_zip(REQD_FILES, resp)
+    gtfs_data = _load_gtfs_response_zip(REQD_FILES, resp)
 
     return gtfs_data
 
-def _load_gtfs_zip(required: Set[str], resp: HTTPResponse) -> Dict[str, DataFrame]:
+def _load_gtfs_response_zip(required: Set[str], resp: HTTPResponse) -> Dict[str, DataFrame]:
 
     gtfs_data: Dict[str, pd.core.frame.DataFrame] = {}
 
@@ -92,6 +92,23 @@ def _load_gtfs_zip(required: Set[str], resp: HTTPResponse) -> Dict[str, DataFram
             df = pd.read_csv(zfile.open(x), low_memory=False)
             gtfs_data[x] = df
     return gtfs_data
+
+def _load_gtfs_normal_zip(required: Set[str], filepath: str) -> Dict[str, DataFrame]:
+
+    gtfs_data: Dict[str, pd.core.frame.DataFrame] = {}
+    with zipfile.ZipFile(filepath) as zfile:
+        names = zfile.namelist()
+        missing = {x for x in required if x not in names}
+        if missing:
+            raise TransitFeedError(
+                f"Mandatory dataset/s [{', '.join(missing)}] are missing from the feed."
+                )
+        for name in names:
+            df = pd.read_csv(zfile.open(name), low_memory=False)
+            gtfs_data[name] = df
+
+    return gtfs_data
+
 
 def _load_route_types() -> Tuple[Dict[int, int], Set[int], Set[int]]:
     """load the rail and bus route types from the config.ini file
@@ -141,7 +158,7 @@ class TransitFeedBase(AbstractFeedObject):
             updated_data = {**self.data, **other.data}
         except TypeError:
             updated_data = self.data + other.data
-        
+
         new_instance = self.__class__(updated_data)
         new_instance._is_composite = True
 
@@ -762,13 +779,13 @@ class TransitFeed:
 
         new_calendars = MultiCalendar(self.calendar, other.calendar)
         new_calendar_dates = MultiCalendarDates(self.calendar_dates, other.calendar_dates)
-        
+
         for transfer in self.transfers.data:
             transfer.update({'feed_period': this_period})
 
         for transfer in other.transfers.data:
             transfer.update({'feed_period': other_period})
-        
+
         new_transfers = self.transfers + other.transfers
         new_shapes = MultiShapes(self.shapes, other.shapes)
 
@@ -786,7 +803,7 @@ class TransitFeed:
         new_feed._is_composite = True
 
         return new_feed
-    
+
     @property
     def stop_operators(self):
         if self._stop_operators is None:
@@ -820,25 +837,25 @@ class TransitFeed:
             bus_routes[route_id] = info
 
         return bus_routes
-    
-    def _identify_stop_operators(self):    
+
+    def _identify_stop_operators(self):
         stop_operators = defaultdict(set)
 
         for tripid, stoptime in  self.stop_times.data.items():
             stopids = set(x['stop_id'] for x in stoptime)
-            agency_name = self.get_agency_name_for_trip(tripid)      
+            agency_name = self.get_agency_name_for_trip(tripid)
             for stopid in stopids:
                 stop_operators[stopid].add(agency_name)
-        return stop_operators    
-    
+        return stop_operators
+
     def get_agency_name_for_trip(self, tripid: int) -> str:
-        
-        sub_route_id = self.trips.data[tripid]['route_id'] 
+
+        sub_route_id = self.trips.data[tripid]['route_id']
         sub_agency_id = self.routes.data[sub_route_id]['agency_id']
         sub_agency_name = self.agency.get(sub_agency_id)
-        
+
         return sub_agency_name
-    
+
     def feed_period(self) -> Tuple[datetime, datetime]:
         """Return the time period that the feed is valid for
 
@@ -879,7 +896,7 @@ def latest_transitfeed(
     add_to_archive: bool = False
     ) -> TransitFeed:
     """Factory function that returns the latest available transit
-    feed data fro Rejseplan as a TransitFeed object
+    feed data from Rejseplan as a TransitFeed object
 
     :param add_transfers:  add the Transfers object to the TransitFeed, defaults to True
     :type add_transfers: bool, optional
@@ -903,6 +920,62 @@ def latest_transitfeed(
     ]
 
     latest_gtfs_data = download_latest_feed()
+    req_classes = tuple(method(latest_gtfs_data[dset]) for dset, method in required)
+
+    transfers: Optional[Transfers]
+    shapes: Optional[Shapes]
+
+    if add_transfers:
+        transfers_df = latest_gtfs_data['transfers.txt']
+        transfers = Transfers.latest(transfers_df)
+    else:
+        transfers = None
+
+    if add_shapes:
+        shapes_df = latest_gtfs_data['shapes.txt']
+        shapes = Shapes.latest(shapes_df)
+    else:
+        shapes = None
+
+    feed = TransitFeed(*req_classes, transfers=transfers, shapes=shapes)
+    if add_to_archive:
+        feed.to_archive()
+
+    return feed
+
+
+# refactor this
+def transitfeed_from_zip(
+    filepath: str,
+    add_transfers: bool = True,
+    add_shapes: bool = True,
+    add_to_archive: bool = False
+    ) -> TransitFeed:
+    """Factory function that returns an instance of TransitFeed from a zip file
+
+    :param filepath: the path to the gtfs .zip file
+    :type filepath: str
+    :param add_transfers: add the Transfers object to the TransitFeed, defaults to True
+    :type add_transfers: bool, optional
+    :param add_shapes: add the Shapes object to the TransitFeed, defaults to True
+    :type add_shapes: bool, optional
+    :param add_to_archive: True to write to the package feed archive, defaults to False
+    :type add_to_archive: bool, optional
+    :return: the GTFS feed as an instance of TransfitFeed
+    :rtype: TransitFeed
+    """
+
+    required = [
+        ('agency.txt', Agency.latest),
+        ('stops.txt', Stops.latest),
+        ('routes.txt', Routes.latest),
+        ('trips.txt', Trips.latest),
+        ('stop_times.txt', StopTimes.latest),
+        ('calendar.txt', Calendar.latest),
+        ('calendar_dates.txt', CalendarDates.latest)
+    ]
+
+    latest_gtfs_data = _load_gtfs_normal_zip(REQD_FILES, filepath)
     req_classes = tuple(method(latest_gtfs_data[dset]) for dset, method in required)
 
     transfers: Optional[Transfers]
