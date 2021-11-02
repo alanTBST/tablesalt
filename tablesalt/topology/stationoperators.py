@@ -251,8 +251,6 @@ def _grouped_lines_dict(config_dict):
 
 class StationOperators:
 
-    BUS_ID_MAP: Dict[int, int] = _load_bus_station_map()
-
     def __init__(self, feed: TransitFeed) -> None:
         """class to determine the operator between stop point ids
 
@@ -267,9 +265,9 @@ class StationOperators:
         self._suburban_operator, self._metro_operator, self._local_operator = \
             self._determine_operators()
 
-        self._lookup = self._process_stop_times()
         self.bus_to_station_map: Dict[int, int] = _load_bus_station_map()
         self.station_to_bus_map = self._reverse_bus_map()
+        self._lookup = self._process_stop_times()
 
     def _reverse_bus_map(self):
         bmap = tuple(self.bus_to_station_map.items())
@@ -392,6 +390,35 @@ class StationOperators:
 
         return {**metro_ops, **suburban_ops}
 
+    def _end_stop_changes(self, relation_operators):
+
+        metro = {k: v for k, v in relation_operators.items() if k[1] in METRO_UIC}
+        suburban = {k: v for k, v in relation_operators.items() if k[1] in SUBURBAN_UIC}
+        buses = {k: v for k, v in relation_operators.items() if k[1] in self.station_to_bus_map}
+        buses_start = {k:v for k, v in relation_operators.items() if k[1] in self.bus_to_station_map}
+
+        st_to_bus = {}
+        for k, v in buses.items():
+            new_legs = ((k[0], x) for x in self.station_to_bus_map[k[1]])
+            new = {x: v for x in new_legs}
+            st_to_bus.update(new)
+
+        bus_to_st = {}
+        for k, v in buses_start.items():
+            leg = (k[0], self.bus_to_station_map[k[1]])
+            if leg not in relation_operators:
+                bus_to_st[leg] = v
+
+        new_metro = {(k[0], METRO_UIC[k[1]]): v for k, v in metro.items()}
+        new_sub = {(k[0], SUBURBAN_UIC[k[1]]): v for k, v in suburban.items()}
+
+        return {
+            **st_to_bus,
+            **bus_to_st,
+            **new_metro,
+            **new_sub
+            }
+
     def _process_stop_times(self) -> Dict[int, Tuple[Tuple[int, int]]]:
         """
         This method creates the dictionary in self._lookup
@@ -427,6 +454,9 @@ class StationOperators:
         #deal with the alternate rejsekort station numbers
         alts = self._alternate_stop_numbers(relation_operators)
         relation_operators.update(alts)
+
+        end_changes = self._end_stop_changes(relation_operators)
+        relation_operators.update(end_changes)
 
         return relation_operators
 
@@ -470,16 +500,9 @@ class StationOperators:
         try:
             return self._lookup[(start_stop_id, end_stop_id)]
         except KeyError:
-            for mapping in [REV_METRO_UIC, REV_SUBURBAN_UIC, self.bus_to_station_map]:
-                end_id = mapping.get(end_stop_id, end_stop_id)
-                try:
-                    op = self._lookup[(start_stop_id, end_id)]
-                    self._lookup[(start_stop_id, end_id)] = op
-                    return op
-                except KeyError:
-                    continue
-            else:
-                raise
+            raise KeyError(
+                f"No operator found servicing leg {start_stop_id}, {end_stop_id}"
+                )
 
 
 # make a separate lookup class
