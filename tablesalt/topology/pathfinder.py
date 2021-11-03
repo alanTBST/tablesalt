@@ -212,6 +212,7 @@ class ZoneProperties():
         self.stop_legs = _to_legs_stops(self.stop_legs, self.opgetter)
         self.zone_legs: Tuple[Tuple[int, ...], ...] = to_legs(zone_sequence)
 
+
         self.border_trip: bool = False
         self.border_legs: Union[Tuple[()], Tuple[int, ...]]  = ()
 
@@ -498,12 +499,11 @@ class ZoneSharer(ZoneProperties):
         self.operator_sequence = operator_sequence
         self.operator_legs = to_legs(self.operator_sequence)
 
-
         self.single: bool = self._is_single()
 
         self.opgetter = station_operators
 
-        self.stops_dict = self.opgetter.stops.data
+        self.stops_dict = StopsList.default_denmark().stops_dict
 
         self.region: str = determine_takst_region(self.zone_sequence)
 
