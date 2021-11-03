@@ -204,19 +204,19 @@ class ZoneProperties():
 
         self.graph = graph
         self.opgetter = station_operators
-        # self.ring_dict = self.graph.ring_dict(region)
+
         self.zone_sequence: Tuple[int, ...] = zone_sequence
         self.stop_sequence: Tuple[int, ...] = stop_sequence
 
         self.stop_legs: Tuple[Tuple[int, ...], ...] = to_legs(stop_sequence)
-        self.stop_legs = _to_legs_stops(self.stop_legs, self.opgetter)
+        # self.stop_legs = _to_legs_stops(self.stop_legs, self.opgetter)
         self.zone_legs: Tuple[Tuple[int, ...], ...] = to_legs(zone_sequence)
 
 
         self.border_trip: bool = False
         self.border_legs: Union[Tuple[()], Tuple[int, ...]]  = ()
 
-        if any(x in BORDER_STATIONS for x in chain(*self.stop_legs)):
+        if any(x in BORDER_STATIONS for x in self.stop_sequence):
             self.border_trip = True
 
         self.border_legs = self._border_touch_legs() if \
@@ -458,6 +458,8 @@ def aggregated_zone_operators(v):
                  key, grp in groupby(out_list, key=lambda x: x[1]))
 
 
+STOPS = StopsList.default_denmark().stops_dict
+
 class ZoneSharer(ZoneProperties):
 
     SHARE_CACHE = {}
@@ -468,7 +470,7 @@ class ZoneSharer(ZoneProperties):
             station_operators: stationoperators.StationOperators,
             zone_sequence: Tuple[int, ...],
             stop_sequence: Tuple[int, ...],
-            operator_sequence: Tuple[int, ...],
+            # operator_sequence: Tuple[int, ...],
             usage_sequence: Tuple[int, ...]
 
             ) -> None:
@@ -490,27 +492,19 @@ class ZoneSharer(ZoneProperties):
 
         super().__init__(graph, station_operators, zone_sequence, stop_sequence)
 
-        self.zone_sequence = zone_sequence
-        self.stop_sequence = stop_sequence
-
         self.usage_sequence = usage_sequence
         self.usage_legs = to_legs(self.usage_sequence)
 
-        self.operator_sequence = operator_sequence
-        self.operator_legs = to_legs(self.operator_sequence)
+        # self.operator_sequence = operator_sequence
+        # self.operator_legs = to_legs(self.operator_sequence)
 
-        self.single: bool = self._is_single()
+        # self.single: bool = self._is_single() # uses operators
 
         self.opgetter = station_operators
 
-        self.stops_dict = StopsList.default_denmark().stops_dict
+        self.stops_dict = STOPS
 
         self.region: str = determine_takst_region(self.zone_sequence)
-
-    def _find_operators(self):
-
-        opsequence = self._station_operators()
-        return
 
     def _is_single(self) -> bool:
         """has only one operator"""
@@ -539,7 +533,6 @@ class ZoneSharer(ZoneProperties):
         """
         # NOTE...THIS can be put in TRIPRECORD
 
-
         susu_idxs = ()
         for i, j in enumerate(self.stop_legs):
             if j[0] == j[1]:
@@ -558,7 +551,7 @@ class ZoneSharer(ZoneProperties):
             self.zone_legs = _remove_idxs(susu_idxs, self.zone_legs)
             self.usage_legs = _remove_idxs(susu_idxs, self.usage_legs)
 
-    def _station_operators(self) -> Tuple[int, ...]:
+    def _operator_sequence(self) -> Tuple[int, ...]:
         """Get the operators at the visited stations"""
 
         opsequence = ()
@@ -813,6 +806,9 @@ class ZoneSharer(ZoneProperties):
 
         # this deals with situations such as checking in at a station and then the next
         # checkin is on a bus
+
+
+
         if not all(len(set(x)) == 1 for x in self.operator_legs):
             try:
                 new_op_legs = self._station_operators()
