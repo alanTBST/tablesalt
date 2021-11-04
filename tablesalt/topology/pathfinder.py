@@ -7,24 +7,25 @@ in which a user taps in or out
 
 """
 
-from itertools import chain, groupby
+import random
 from collections import Counter, defaultdict
 from functools import lru_cache
-from typing import Tuple, Union, Optional, Dict, Any
-import pkg_resources
+from itertools import chain, groupby
+from typing import Any, Dict, Optional, Tuple, Union
 
-import pandas as pd  #type: ignore
-import numpy as np  #type: ignore
-from networkx.classes.graph import Graph #type: ignore
+import numpy as np  # type: ignore
+import pandas as pd  # type: ignore
+import pkg_resources
+from networkx.classes.graph import Graph  # type: ignore
 
 from tablesalt.common import triptools
 from tablesalt.common.io import mappers
 from tablesalt.topology import stationoperators
 from tablesalt.topology.stopnetwork import StopsList
-from tablesalt.topology.zonegraph import ZoneGraph
 from tablesalt.topology.tools import determine_takst_region
+from tablesalt.topology.zonegraph import ZoneGraph
 
-
+# get this stuff from config
 OP_MAP = {v: k.lower() for k, v in mappers['operator_id'].items()}
 REV_OP_MAP = {v: k for k, v in OP_MAP.items()}
 
@@ -560,7 +561,7 @@ class ZoneSharer(ZoneProperties):
                 ops = self.opgetter.station_pair(*leg)
             except KeyError:
                 raise
-            op = ops.pop()
+            op = random.choice(ops)
             opsequence += (op, )
 
         return opsequence
