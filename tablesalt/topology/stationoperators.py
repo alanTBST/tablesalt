@@ -419,6 +419,14 @@ class StationOperators:
             **new_sub
             }
 
+    def _start_stop_changes(self, relation_operators):
+
+        suburban = {k: v for k, v in relation_operators.items() if k[0] in SUBURBAN_UIC}
+        new_suburban = {
+            {(SUBURBAN_UIC[k[0]], k[1]): v for k, v in suburban.items()}
+        }
+        return new_suburban
+
     def _process_stop_times(self) -> Dict[int, Tuple[Tuple[int, int]]]:
         """
         This method creates the dictionary in self._lookup
@@ -458,8 +466,9 @@ class StationOperators:
         end_changes = self._end_stop_changes(relation_operators)
         relation_operators.update(end_changes)
 
+        start_changes = self._start_stop_changes(relation_operators)
+        relation_operators.update(start_changes)
         relation_operators = {k: tuple(v) for k, v in relation_operators.items()}
-
 
         return relation_operators
 
