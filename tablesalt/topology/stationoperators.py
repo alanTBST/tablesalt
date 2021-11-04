@@ -458,6 +458,9 @@ class StationOperators:
         end_changes = self._end_stop_changes(relation_operators)
         relation_operators.update(end_changes)
 
+        relation_operators = {k: tuple(v) for k, v in relation_operators.items()}
+
+
         return relation_operators
 
     def _alternate_stop_numbers(self, relation_operators):
