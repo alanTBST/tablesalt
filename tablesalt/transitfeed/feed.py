@@ -743,11 +743,12 @@ class BusMapper:
             self._bus_station_frame = self._make_bus_to_station_frame(self._crs)
         return self._bus_station_frame
 
-    def get_bus_map(self, bus_distance_cutoff: int = 500)
+    def get_bus_map(self, bus_distance_cutoff: int = 500) -> Dict[int, int]:
 
         gdf = self.bus_station_frame
         gdf = gdf.loc[gdf.loc[:, 'dist'] <= bus_distance_cutoff]
         gdf = gdf.sort_values(['stop_id', 'dist'])
+
         return dict(zip(gdf.loc[:, 'stop_id'], gdf.loc[:, 'station_id']))
 
 
