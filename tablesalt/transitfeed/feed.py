@@ -19,7 +19,7 @@ from collections import defaultdict
 from datetime import datetime
 from http.client import HTTPResponse
 from io import BytesIO
-from itertools import groupby, chain
+from itertools import groupby, chain, repeat
 from operator import attrgetter, itemgetter
 from pathlib import Path
 from typing import (Any, ClassVar, DefaultDict, Dict, Iterable, List, Optional,
@@ -27,10 +27,13 @@ from typing import (Any, ClassVar, DefaultDict, Dict, Iterable, List, Optional,
 from urllib.error import URLError
 from urllib.request import urlopen
 
+import geopandas as gpd
 import msgpack
+import numpy as np
 import pandas as pd
 from msgpack.exceptions import ExtraData
 from pandas.core.frame import DataFrame
+from scipy.spatial import cKDTree
 from shapely import geometry, wkt
 from shapely.geometry import LineString
 
@@ -724,6 +727,83 @@ class MultiShapes:
 
 C = TypeVar('C', bound=Union[Calendar, MultiCalendar])
 CD = TypeVar('CD', bound=Union[CalendarDates, MultiCalendarDates])
+
+
+
+class BusMapper:
+
+    def __init__(self, transit_feed: TransitFeed, crs: int = 25832):
+
+        self.transit_feed = transit_feed
+        self._bus_station_frame = None
+        self._crs = crs
+    @property
+    def bus_station_frame(self):
+        if self._bus_station_frame is None:
+            self._bus_station_frame = self._make_bus_to_station_frame(self._crs)
+        return self._bus_station_frame
+
+    def get_bus_map(self, bus_distance_cutoff: int = 500)
+
+        gdf = self.bus_station_frame
+        gdf = gdf.loc[gdf.loc[:, 'dist'] <= bus_distance_cutoff]
+        gdf = gdf.sort_values(['stop_id', 'dist'])
+        return dict(zip(gdf.loc[:, 'stop_id'], gdf.loc[:, 'station_id']))
+
+
+    def _stops_to_geoframe(self, stop_ids, crs):
+
+        data = {
+            k: v for k, v in self.transit_feed.stops.data.items() if k in stop_ids
+            }
+        frame = pd.DataFrame.from_dict(data, orient='index')
+        frame.index.name = 'stop_id'
+        frame = frame.reset_index()
+
+        gdf = gpd.GeoDataFrame(
+            frame,
+            geometry=gpd.points_from_xy(frame.stop_lon, frame.stop_lat),
+            crs = 4326
+            )
+
+        gdf = gdf.to_crs(crs)
+
+        return gdf
+
+    def _make_bus_to_station_frame(self, crs) -> gpd.GeoDataFrame:
+        """use a k-d tree to
+
+        :return: a geodataframe of bus stops and close rail stops
+        :rtype: GeoDataFrame
+        """
+
+        bus_stops = {k for k, v in self.stop_modes.items() if 'bus' in v}
+        rail_stops = {k for k, v in self.stop_modes.items() if 'rail' in v}
+
+        common = bus_stops.intersection(rail_stops)
+        bus_stops = bus_stops - common
+
+        bus_gdf = self._stops_to_geoframe(bus_stops, crs)
+        rail_gdf = self._stops_to_geoframe(rail_stops, crs)
+        rail_gdf = rail_gdf.rename(columns={'stop_id': 'station_id'})
+
+        A = np.concatenate(
+            [np.array(geom.coords) for geom in bus_gdf.geometry.to_list()]
+            )
+        B = [np.array(geom.coords) for geom in rail_gdf.geometry.to_list()]
+        B_ix = tuple(chain.from_iterable(
+            [repeat(i, x) for i, x in enumerate(list(map(len, B)))])
+            )
+        B = np.concatenate(B)
+        ckd_tree = cKDTree(B)
+        dist, idx = ckd_tree.query(A, k=2)
+        idx = itemgetter(*idx)(B_ix)
+        gdf = pd.concat(
+            [bus_gdf, rail_gdf.loc[idx, ['station_id']].reset_index(drop=True),
+            pd.Series(dist, name='dist')], axis=1
+            )
+
+        return gdf
 
 
 class TransitFeed:
