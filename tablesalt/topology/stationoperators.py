@@ -284,6 +284,7 @@ class StationOperators:
         return {**station_to_bus, **suburban, **local}
 
     def _determine_operators(self):
+        # this must be changed in future for each local line
 
         stoptimes = list(self.feed.stop_times.data.items())
 
@@ -314,7 +315,7 @@ class StationOperators:
 
         sub_agency_name = self.feed.get_agency_name_for_trip(suburban_trip)
         met_agency_name = self.feed.get_agency_name_for_trip(metro_trip)
-        kast_agency_name = self.feed.get_agency_name_for_trip(kastrup_trip)
+        # kast_agency_name = self.feed.get_agency_name_for_trip(kastrup_trip)
         local_agency_name = self.feed.get_agency_name_for_trip(local_trip)
 
         return sub_agency_name, met_agency_name, local_agency_name
@@ -392,28 +393,38 @@ class StationOperators:
 
     def _end_stop_changes(self, relation_operators):
 
-        metro = {k: v for k, v in relation_operators.items() if k[1] in METRO_UIC}
-        suburban = {k: v for k, v in relation_operators.items() if k[1] in SUBURBAN_UIC}
+        metro = {k: v for k, v in relation_operators.items() if k[1] in METRO_UIC and k[0] not in METRO_UIC}
+        suburban = {k: v for k, v in relation_operators.items() if k[1] in SUBURBAN_UIC and k[0] not in SUBURBAN_UIC}
         buses = {k: v for k, v in relation_operators.items() if k[1] in self.station_to_bus_map}
-        buses_start = {k:v for k, v in relation_operators.items() if k[1] in self.bus_to_station_map}
+        buses_start = {k: v for k, v in relation_operators.items() if k[1] in self.bus_to_station_map}
 
         st_to_bus = {}
         for k, v in buses.items():
-            new_legs = ((k[0], x) for x in self.station_to_bus_map[k[1]])
+            new_legs = tuple((k[0], x) for x in self.station_to_bus_map[k[1]])
             new = {x: v for x in new_legs}
             st_to_bus.update(new)
+
 
         bus_to_st = {}
         for k, v in buses_start.items():
             leg = (k[0], self.bus_to_station_map[k[1]])
+            mapped_leg = (leg[0], SUBURBAN_UIC.get(leg[1], leg[1]))
+            mapped_leg_l = (leg[0], LOCAL_UIC.get(leg[1], leg[1]))
+            mapped_leg_m = (leg[0], METRO_UIC.get(leg[1], leg[1]))
             if leg not in relation_operators:
                 bus_to_st[leg] = v
+            if mapped_leg not in relation_operators:
+                bus_to_st[mapped_leg] = v
+            if mapped_leg_l not in relation_operators:
+                bus_to_st[mapped_leg_l] = v
+            if mapped_leg_m not in relation_operators:
+                bus_to_st[mapped_leg_m] = v
 
         new_metro = {(k[0], METRO_UIC[k[1]]): v for k, v in metro.items()}
         new_sub = {(k[0], SUBURBAN_UIC[k[1]]): v for k, v in suburban.items()}
 
         return {
-            **st_to_bus,
+            # **st_to_bus,
             **bus_to_st,
             **new_metro,
             **new_sub
@@ -423,32 +434,41 @@ class StationOperators:
 
         suburban = {k: v for k, v in relation_operators.items() if k[0] in SUBURBAN_UIC}
         new_suburban = {
-            {(SUBURBAN_UIC[k[0]], k[1]): v for k, v in suburban.items()}
+            (SUBURBAN_UIC[k[0]], k[1]): v for k, v in suburban.items()
         }
-        return new_suburban
+
+        local = {k: v for k, v in relation_operators.items() if k[0] in LOCAL_UIC}
+        new_local = {
+            (LOCAL_UIC[k[0]], k[1]): v for k, v in local.items()
+        }
+
+        metro = {k: v for k, v in relation_operators.items() if k[0] in METRO_UIC}
+        new_metro = {
+            (METRO_UIC[k[0]], k[1]): v for k, v in metro.items()
+        }
+
+
+        return {**new_suburban, **new_local, **new_metro}
 
     def _process_stop_times(self) -> Dict[int, Tuple[Tuple[int, int]]]:
         """
         This method creates the dictionary in self._lookup
         It uses the stop_times dataset from the given transit feed
         """
-        relation_operators = {}
+        relation_operators = defaultdict(set)
 
         seen = set()
         for trip_id, stoptime in self.feed.stop_times.data.items():
-            stopids = (x['stop_id'] for x in stoptime)
-            perms = set(permutations(stopids, 2))
-            if tuple(perms) in seen: # perms must remain a set
+            stopids = tuple(x['stop_id'] for x in stoptime)
+            if stopids in seen:
                 continue
-            seen.add(tuple(perms))
+            perms = set(permutations(stopids, 2))
+            seen.add(stopids)
             agency = self.feed.get_agency_name_for_trip(trip_id)
             for stop_relation in perms:
-                try:
-                    relation_operators[stop_relation].add(agency)
-                except KeyError:
-                    relation_operators[stop_relation] = {agency}
+                relation_operators[stop_relation].add(agency)
             # this deals only with sjælland correctly
-            # needs more work for jylland
+            # needs more work for jylland maybe
             if agency == self._suburban_operator:
                 updated_leg_permutations = self._suburban_stop_changes(perms)
             elif agency == self._local_operator:
@@ -459,6 +479,8 @@ class StationOperators:
                 updated_leg_permutations = {}
 
             relation_operators.update(updated_leg_permutations)
+
+        relation_operators = dict(relation_operators)
         #deal with the alternate rejsekort station numbers
         alts = self._alternate_stop_numbers(relation_operators)
         relation_operators.update(alts)
@@ -489,11 +511,35 @@ class StationOperators:
                     alts[nk] = v
         return alts
 
+    def _same_network(self, start_stop_id, end_stop_id):
+
+        start_stop_id = 8603301
+        end_stop_id = 8603334
+
+        # O(n2)
+        options_start = (x for x in self._lookup if x[0] == start_stop_id)
+        options_end = tuple(x for x in self._lookup if x[1] == end_stop_id)
+
+        possible_operators = set()
+        for option in options_start:
+            try:
+                match = tuple(x for x in options_end if option[1]==x[0])
+                op_1 = set(self._lookup[option])
+                for m in match:
+                    op_2 = set(self._lookup[m])
+                    op = op_1.intersection(op_2)
+                    if op:
+                        possible_operators.add(tuple(op))
+            except (IndexError, StopIteration):
+                continue
+
+        raise KeyError
+
     def station_pair(
         self,
         start_stop_id: int,
         end_stop_id: int
-        ) -> Set[str]:
+        ) -> Tuple[str]:
         """Determine the possible operators for a pair of stations.
         Can be used to determine the operator servicing a leg of a trip
 
@@ -512,9 +558,12 @@ class StationOperators:
         try:
             return self._lookup[(start_stop_id, end_stop_id)]
         except KeyError:
-            raise KeyError(
-                f"No operator found servicing leg {start_stop_id}, {end_stop_id}"
-                )
+            msg = (f"No operator found servicing leg {start_stop_id}, {end_stop_id} "
+                   f"in the period {self.feed.feed_period()}")
+            raise KeyError(msg)
+
+# HHHHHHHHHHHHHH
+# KeyError: 'No operator found servicing leg 38300, 50348 in the period (datetime.datetime(2021, 10, 25, 0, 0), datetime.datetime(2022, 1, 19, 0, 0))'
 
 
 # make a separate lookup class
