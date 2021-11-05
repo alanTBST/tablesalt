@@ -263,14 +263,18 @@ def chunk_shares(
     model_two_shares = {} # solo_zone_price
     model_three_shares = {} # bumped
     model_four_shares = {}
+    errs = {}
 
     for k, zones, stops, operators, usage in tqdm(gen):
         # k, zones, stops, operators, usage = next(gen)
         try:
-            sharer = ZoneSharer(graph, opgetter, zones, stops, operators, usage)
+
+            sharer = ZoneSharer(graph, opgetter, zones, stops, usage, takst_suffix=False)
             trip_shares = sharer.share()
-            model_one_shares[k] = trip_shares['standard']
+        except KeyError:
+            continue
         except Exception as e:
+            errs[k] = str(e)
             continue
 
         if sharer.border_trip:
@@ -385,13 +389,14 @@ def main():
 # import numpy as np
 # from tqdm import tqdm
 
-# from tablesalt import StoreReader
+# from tablesalt import StoreReader, transitfeed
 # from tablesalt.common import make_store
 # from tablesalt.common.io import mappers
 # from tablesalt.preprocessing.parsing import TableArgParser
 # from tablesalt.preprocessing.tools import db_paths, find_datastores
 # from tablesalt.running import WindowsInhibitor
 # from tablesalt.topology import ZoneGraph, ZoneSharer
+# from tablesalt.topology.stationoperators import StationOperators
 # from tablesalt.topology.tools import TakstZones
 
 
@@ -417,6 +422,19 @@ def main():
 
 
 # store = stores[0]
+
+
+# allfeeds = transitfeed.available_archives()
+
+# year_archives = [x for x in allfeeds if str(year) in x]
+
+# feed = transitfeed.archived_transitfeed(year_archives[0])
+# for archive in year_archives[1:]:
+#     archive_feed = transitfeed.archived_transitfeed(archive)
+#     feed = feed + archive_feed
+
+
+# opgetter = StationOperators(feed)
 
 # stopsd, zonesd, usaged, operatorsd = _load_store_data(
 #     store, region, zonemap, region_contractors
