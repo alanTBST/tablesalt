@@ -386,6 +386,10 @@ class Trips(TransitFeedBase):
         :return: a dictionary of trip_id as key and route_id as value
         :rtype: Optional[Dict[int, str]]
         """
+        if self._trip_route_map is None:
+            triproute = {k: v['route_id'] for k, v in self.data.items()}
+            self._trip_route_map = triproute
+
 
         return self._trip_route_map
 
@@ -400,6 +404,12 @@ class Trips(TransitFeedBase):
         :return: a dictionary of route_id as key and tuple of trip_ids as value
         :rtype: Optional[Dict[str, Tuple[int, ...]]]
         """
+        if self._route_trip_map is None:
+            route_trips = ((v['route_id'], k) for k, v in self.data.items())
+            route_trips = sorted(route_trips, key=itemgetter(0))
+            route_tripsmap = {key: tuple(x[1] for x in grp) for
+                              key, grp in groupby(route_trips, key=itemgetter(0))}
+            self._route_trip_map = route_tripsmap
         return self._route_trip_map
 
     @route_trip_map.setter
@@ -419,7 +429,8 @@ class Trips(TransitFeedBase):
         triproute = dict(zip(latest_data.loc[:, 'trip_id'], latest_data.loc[:, 'route_id']))
 
         route_trips = zip(latest_data.loc[:, 'route_id'], latest_data.loc[:, 'trip_id'])
-        route_tripsmap = {key:tuple(x[1] for x in grp) for
+        route_trips = sorted(route_trips, key=itemgetter(0))
+        route_tripsmap = {key: tuple(x[1] for x in grp) for
                           key, grp in groupby(route_trips, key=itemgetter(0))}
 
         trips_data = latest_data.set_index('trip_id').T.to_dict()
@@ -763,6 +774,7 @@ class TransitFeed:
         self.shapes = shapes
 
         self._stop_operators = None
+        self._stop_modes = None
 
         self._is_composite: bool = False
 
@@ -810,6 +822,12 @@ class TransitFeed:
             self._stop_operators = self._identify_stop_operators()
         return self._stop_operators
 
+    @property
+    def stop_modes(self):
+        if self._stop_modes is None:
+            self._stop_modes = self._identify_stop_modes()
+        return self._stop_modes
+
     def rail_routes(self) ->  Dict[str, Dict[str, Any]]:
         """Return only the rail routes of the feed
 
@@ -847,6 +865,28 @@ class TransitFeed:
             for stopid in stopids:
                 stop_operators[stopid].add(agency_name)
         return stop_operators
+
+    def _identify_stop_modes(self):
+
+        stop_modes = defaultdict(set)
+
+        bus_routes = set(self.bus_routes())
+        rail_routes = set(self.rail_routes())
+
+        routetrip_map = self.trips.route_trip_map
+        rail_trips = set(chain(*{v for k, v in routetrip_map.items() if k in rail_routes}))
+        bus_trips = set(chain(*{v for k, v in routetrip_map.items() if k in bus_routes}))
+
+        for tripid, stoptime in  self.stop_times.data.items():
+            stopids = set(x['stop_id'] for x in stoptime)
+            if tripid in rail_trips:
+                for stopid in stopids:
+                    stop_modes[stopid].add('rail')
+            if tripid in bus_trips:
+                for stopid in stopids:
+                    stop_modes[stopid].add('bus')
+
+        return stop_modes
 
     def get_agency_name_for_trip(self, tripid: int) -> str:
 
