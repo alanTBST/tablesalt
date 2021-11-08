@@ -571,8 +571,7 @@ def main(dirpath, year, outfile):
     if not outdir.is_dir():
         outdir.mkdir(parents=True, exist_ok=True)
 
-    fp = outdir / f'{outfile}.csv'
-
+    fp = outdir / f'{outfile}'
     df.to_csv(fp, index=False)
 
 
