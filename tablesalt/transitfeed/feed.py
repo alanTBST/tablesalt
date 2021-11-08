@@ -956,7 +956,6 @@ class BusMapper:
 
         return dict(zip(gdf.loc[:, 'stop_id'], gdf.loc[:, 'station_id']))
 
-
     def _stops_to_geoframe(self, stop_ids, crs):
 
         data = {
@@ -977,7 +976,7 @@ class BusMapper:
         return gdf
 
     def _make_bus_to_station_frame(self, crs) -> gpd.GeoDataFrame:
-        """use a k-d tree to
+        """use a k-d tree to find the nearest station to a bus stop
 
         :return: a geodataframe of bus stops and close rail stops
         :rtype: GeoDataFrame
