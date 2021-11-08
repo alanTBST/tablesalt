@@ -938,10 +938,18 @@ class TransitFeed:
 class BusMapper:
 
     def __init__(self, transit_feed: TransitFeed, crs: int = 25832):
+        """Class to create a map of bus stops to their closest stations
+
+        :param transit_feed: a rejseplan GTFS feed instance
+        :type transit_feed: TransitFeed
+        :param crs: the coordinate reference system the transit feed area, defaults to 25832 (UTM 32N) for Denmark
+        :type crs: int, optional
+        """
 
         self.transit_feed = transit_feed
         self._bus_station_frame = None
         self._crs = crs
+
     @property
     def bus_station_frame(self):
         if self._bus_station_frame is None:
@@ -949,6 +957,13 @@ class BusMapper:
         return self._bus_station_frame
 
     def get_bus_map(self, bus_distance_cutoff: int = 500) -> Dict[int, int]:
+        """Return a dictionary mapping of bus stop id -> station id
+
+        :param bus_distance_cutoff: the maximum radius (m) around the stop to check, defaults to 500
+        :type bus_distance_cutoff: int, optional
+        :return: a dictionary
+        :rtype: Dict[int, int]
+        """
 
         gdf = self.bus_station_frame
         gdf = gdf.loc[gdf.loc[:, 'dist'] <= bus_distance_cutoff]
@@ -985,8 +1000,10 @@ class BusMapper:
         bus_stops = {k for k, v in self.transit_feed.stop_modes.items() if 'bus' in v}
         rail_stops = {k for k, v in self.transit_feed.stop_modes.items() if 'rail' in v}
 
-        common = bus_stops.intersection(rail_stops)
-        bus_stops = bus_stops - common
+        # assert the numbers are rail stops
+        # uic numbers are only seven digits long
+        # what about letbane stops?
+        rail_stops = {k for k in rail_stops if len(str(k)) == 7}
 
         bus_gdf = self._stops_to_geoframe(bus_stops, crs)
         rail_gdf = self._stops_to_geoframe(rail_stops, crs)
