@@ -576,12 +576,12 @@ def main(dirpath, year, outfile):
     df.to_csv(fp, index=False)
 
 
-# if __name__ == "__main__":
-#     from datetime import datetime
-#     args = parseargs()
-#     dir_path = args['directory']
-#     year = args['year']
-#     outfile = args['outfilename']
-#     st = datetime.now()
-#     main(dir_path, year, outfile)
-#     print(datetime.now() - st)
+if __name__ == "__main__":
+    from datetime import datetime
+    args = parseargs()
+    dir_path = args['directory']
+    year = args['year']
+    outfile = args['outfilename']
+    st = datetime.now()
+    main(dir_path, year, outfile)
+    print(datetime.now() - st)
