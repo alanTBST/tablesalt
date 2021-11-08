@@ -268,7 +268,6 @@ def chunk_shares(
     for k, zones, stops, operators, usage in tqdm(gen):
         # k, zones, stops, operators, usage = next(gen)
         try:
-
             sharer = ZoneSharer(graph, opgetter, zones, stops, usage, takst_suffix=False)
             trip_shares = sharer.share()
         except KeyError:
@@ -363,92 +362,92 @@ def main():
             make_store(model_four, db_path + '_model_4', start_size=DB_START_SIZE)
             gc.collect()
 
-# if __name__ == "__main__":
-#     if os.name == 'nt':
-#         INHIBITOR = WindowsInhibitor()
-#         INHIBITOR.inhibit()
-#         main()
-#         INHIBITOR.uninhibit()
-#     else:
-#         main()
+if __name__ == "__main__":
+    if os.name == 'nt':
+        INHIBITOR = WindowsInhibitor()
+        INHIBITOR.inhibit()
+        main()
+        INHIBITOR.uninhibit()
+    else:
+        main()
 
 
 
-# fp = r'C:\Users\B087115\Documents\GitHub\tablesalt\tablesalt\scripts'
+# # fp = r'C:\Users\B087115\Documents\GitHub\tablesalt\tablesalt\scripts'
 
-# import gc
-# import os
-# import pickle
-# from functools import partial
-# from itertools import chain, groupby
-# from multiprocessing import Pool
-# from operator import itemgetter
-# from pathlib import Path
-# from typing import Dict, List, Tuple, TypedDict, Iterator
+# # import gc
+# # import os
+# # import pickle
+# # from functools import partial
+# # from itertools import chain, groupby
+# # from multiprocessing import Pool
+# # from operator import itemgetter
+# # from pathlib import Path
+# # from typing import Dict, List, Tuple, TypedDict, Iterator
 
-# import numpy as np
-# from tqdm import tqdm
+# # import numpy as np
+# # from tqdm import tqdm
 
-# from tablesalt import StoreReader, transitfeed
-# from tablesalt.common import make_store
-# from tablesalt.common.io import mappers
-# from tablesalt.preprocessing.parsing import TableArgParser
-# from tablesalt.preprocessing.tools import db_paths, find_datastores
-# from tablesalt.running import WindowsInhibitor
-# from tablesalt.topology import ZoneGraph, ZoneSharer
-# from tablesalt.topology.stationoperators import StationOperators
-# from tablesalt.topology.tools import TakstZones
-
-
-# THIS_DIR = Path(fp)
-
-# year = 2019
-# store_loc = find_datastores()
-# paths = db_paths(store_loc, year)
-# stores = paths['store_paths']
-# db_path = paths['calculated_stores']
-
-# zones = TakstZones()
-# zonemap = zones.stop_zone_map()
-
-# # TODO into config
-# region_contractors = {
-#     'hovedstaden': ['Movia_H', 'DSB', 'First', 'Stog', 'Metro'],
-#     'sjælland': ['Movia_H', 'Movia_S', 'Movia_V', 'DSB', 'First', 'Stog', 'Metro']
-#     }
-
-# region = 'sjælland'
-# graph = ZoneGraph(region=region)
+# # from tablesalt import StoreReader, transitfeed
+# # from tablesalt.common import make_store
+# # from tablesalt.common.io import mappers
+# # from tablesalt.preprocessing.parsing import TableArgParser
+# # from tablesalt.preprocessing.tools import db_paths, find_datastores
+# # from tablesalt.running import WindowsInhibitor
+# # from tablesalt.topology import ZoneGraph, ZoneSharer
+# # from tablesalt.topology.stationoperators import StationOperators
+# # from tablesalt.topology.tools import TakstZones
 
 
-# store = stores[0]
+# # THIS_DIR = Path(fp)
+
+# # year = 2019
+# # store_loc = find_datastores()
+# # paths = db_paths(store_loc, year)
+# # stores = paths['store_paths']
+# # db_path = paths['calculated_stores']
+
+# # zones = TakstZones()
+# # zonemap = zones.stop_zone_map()
+
+# # # TODO into config
+# # region_contractors = {
+# #     'hovedstaden': ['Movia_H', 'DSB', 'First', 'Stog', 'Metro'],
+# #     'sjælland': ['Movia_H', 'Movia_S', 'Movia_V', 'DSB', 'First', 'Stog', 'Metro']
+# #     }
+
+# # region = 'sjælland'
+# # graph = ZoneGraph(region=region)
 
 
-# allfeeds = transitfeed.available_archives()
-
-# year_archives = [x for x in allfeeds if str(year) in x]
-
-# feed = transitfeed.archived_transitfeed(year_archives[0])
-# for archive in year_archives[1:]:
-#     archive_feed = transitfeed.archived_transitfeed(archive)
-#     feed = feed + archive_feed
+# # store = stores[0]
 
 
-# opgetter = StationOperators(feed)
+# # allfeeds = transitfeed.available_archives()
 
-# stopsd, zonesd, usaged, operatorsd = _load_store_data(
-#     store, region, zonemap, region_contractors
-#     )
+# # year_archives = [x for x in allfeeds if str(year) in x]
 
-# gen = _get_input(stopsd, zonesd, usaged, operatorsd)
+# # feed = transitfeed.archived_transitfeed(year_archives[0])
+# # for archive in year_archives[1:]:
+# #     archive_feed = transitfeed.archived_transitfeed(archive)
+# #     feed = feed + archive_feed
 
-# border_changes = {}
-# model_one_shares = {}
-# model_two_shares = {} # solo_zone_price
-# model_three_shares = {} # bumped
-# model_four_shares = {}
-# for k, zones, stops, operators, usage in tqdm(gen):
-#     # k, zones, stops, operators, usage = next(gen)
-#     sharer = ZoneSharer(graph, zones, stops, operators, usage)
-#     if any(len(set(x)) == 1 for x in sharer.stop_legs):
-#         break
+
+# # opgetter = StationOperators(feed)
+
+# # stopsd, zonesd, usaged, operatorsd = _load_store_data(
+# #     store, region, zonemap, region_contractors
+# #     )
+
+# # gen = _get_input(stopsd, zonesd, usaged, operatorsd)
+
+# # border_changes = {}
+# # model_one_shares = {}
+# # model_two_shares = {} # solo_zone_price
+# # model_three_shares = {} # bumped
+# # model_four_shares = {}
+# # for k, zones, stops, operators, usage in tqdm(gen):
+# #     # k, zones, stops, operators, usage = next(gen)
+# #     sharer = ZoneSharer(graph, zones, stops, operators, usage)
+# #     if any(len(set(x)) == 1 for x in sharer.stop_legs):
+# #         break
