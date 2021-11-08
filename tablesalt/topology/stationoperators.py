@@ -17,7 +17,7 @@ from tablesalt.common.io import mappers
 from tablesalt.resources.config.config import load_config
 from tablesalt.topology.stopnetwork import ALTERNATE_STATIONS
 from tablesalt.topology.tools import TakstZones, determine_takst_region
-from tablesalt.transitfeed.feed import TransitFeed
+from tablesalt.transitfeed.feed import TransitFeed, BusMapper
 
 CONFIG = load_config()
 
@@ -251,7 +251,12 @@ def _grouped_lines_dict(config_dict):
 
 class StationOperators:
 
-    def __init__(self, feed: TransitFeed) -> None:
+    def __init__(
+        self,
+        feed: TransitFeed,
+        bus_distance_cutoff: int = 500,
+        crs: int = 25832
+        ) -> None:
         """class to determine the operator between stop point ids
 
         :param feed: a gtfs transitfeed from rejseplanen
@@ -265,11 +270,15 @@ class StationOperators:
         self._suburban_operator, self._metro_operator, self._local_operator = \
             self._determine_operators()
 
-        self.bus_to_station_map: Dict[int, int] = _load_bus_station_map()
+        self.bus_mapper = BusMapper(self.feed, crs=crs)
+        self.bus_to_station_map: Dict[int, int] = \
+            self.bus_mapper.get_bus_map(bus_distance_cutoff=bus_distance_cutoff)
+
         self.station_to_bus_map = self._reverse_bus_map()
         self._lookup = self._process_stop_times()
 
     def _reverse_bus_map(self):
+
         bmap = tuple(self.bus_to_station_map.items())
         bmap = sorted(bmap, key=itemgetter(1))
 
