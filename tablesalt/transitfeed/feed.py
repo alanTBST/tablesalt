@@ -937,12 +937,17 @@ class TransitFeed:
 
 class BusMapper:
 
-    def __init__(self, transit_feed: TransitFeed, crs: int = 25832):
+    def __init__(
+        self,
+        transit_feed: TransitFeed,
+        crs: int = 25832
+        ):
         """Class to create a map of bus stops to their closest stations
 
         :param transit_feed: a rejseplan GTFS feed instance
         :type transit_feed: TransitFeed
-        :param crs: the coordinate reference system the transit feed area, defaults to 25832 (UTM 32N) for Denmark
+        :param crs: the coordinate reference system (ESPG) the transit feed area,
+            defaults to 25832 (UTM 32N) for Denmark
         :type crs: int, optional
         """
 
