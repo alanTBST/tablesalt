@@ -210,7 +210,8 @@ class _PendlerInput():
                 encoding='iso-8859-1',
                 sep=';',
                 usecols= col1,
-                dtype={'EncryptedCardEngravedID': str, 'SeasonPassID':int}
+                dtype={'EncryptedCardEngravedID': str, 'SeasonPassID':int},
+                on_bad_lines='skip'
                 )
         except ValueError:
             pendler_product = pd.read_csv(
@@ -218,7 +219,8 @@ class _PendlerInput():
                 encoding='utf-8',
                 sep=',',
                 usecols= col1,
-                dtype={'EncryptedCardEngravedID':str, 'SeasonPassID':int}
+                dtype={'EncryptedCardEngravedID':str, 'SeasonPassID':int},
+                on_bad_lines='skip'
                 )
 
         pendler_product = pendler_product.fillna(0)
@@ -255,7 +257,8 @@ class _PendlerInput():
         """
         pendler_zones = pd.read_csv(
             self.product_zones_path,
-            sep=';'
+            sep=';',
+            on_bad_lines='skip'
             )
         pendler_zones['key'] = list(zip(
             pendler_zones['EncryptedCardEngravedID'],
