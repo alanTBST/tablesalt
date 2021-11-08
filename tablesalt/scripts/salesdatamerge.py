@@ -581,7 +581,7 @@ if __name__ == "__main__":
     args = parseargs()
     dir_path = args['directory']
     year = args['year']
-    outfile = args['outfile']
+    outfile = args['outfilename']
     st = datetime.now()
     main(dir_path, year, outfile)
     print(datetime.now() - st)
