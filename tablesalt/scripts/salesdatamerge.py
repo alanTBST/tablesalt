@@ -566,22 +566,22 @@ def main(dirpath, year, outfile):
     columns_matched = match_columns(given_columns)
     df = read_and_merge(operators, columns_matched)
     df = clean_frame(df)
-    fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__',
-        f'{year}',
-        'preprocessed',
-        f'{outfile}.csv'
-        )
+
+    outdir = Path(THIS_DIR, '__result_cache__', f'{year}', 'preprocessed')
+    if not outdir.is_dir():
+        outdir.mkdir(parents=True, exist_ok=True)
+
+    fp = outdir / f'{outfile}.csv'
+
     df.to_csv(fp, index=False)
 
 
-if __name__ == "__main__":
-    from datetime import datetime
-    args = parseargs()
-    dir_path = args['directory']
-    year = args['year']
-    outfile = args['outfilename']
-    st = datetime.now()
-    main(dir_path, year, outfile)
-    print(datetime.now() - st)
+# if __name__ == "__main__":
+#     from datetime import datetime
+#     args = parseargs()
+#     dir_path = args['directory']
+#     year = args['year']
+#     outfile = args['outfilename']
+#     st = datetime.now()
+#     main(dir_path, year, outfile)
+#     print(datetime.now() - st)
