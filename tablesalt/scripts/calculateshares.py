@@ -342,8 +342,8 @@ def main():
         archive_feed = transitfeed.archived_transitfeed(archive)
         feed = feed + archive_feed
 
-
-    opgetter = StationOperators(feed)
+    BUS_DIST = 500 # make cmd option
+    opgetter = StationOperators(feed, bus_distance_cutoff=BUS_DIST)
 
     pfunc = partial(chunk_shares,
                     year=year,
