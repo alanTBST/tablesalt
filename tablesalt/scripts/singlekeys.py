@@ -787,8 +787,6 @@ def main() -> None:
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
 
-
-
     ringzones = ZoneGraph.ring_dict('sjælland')
     stopzone_map = TakstZones().stop_zone_map()
 
