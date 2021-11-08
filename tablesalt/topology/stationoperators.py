@@ -257,13 +257,14 @@ class StationOperators:
         bus_distance_cutoff: int = 500,
         crs: int = 25832
         ) -> None:
-        """class to determine the operator between stop point ids
+        """[summary]
 
-        :param feed: a gtfs transitfeed from rejseplanen
-            The feed can be created from using tablesalt.transitfeed.archived_transitfeed,
-            or the very latest available feed using tablesalt.transitfeed.latest_transitfeed,
-
+        :param feed: [description]
         :type feed: TransitFeed
+        :param bus_distance_cutoff: [description], defaults to 500
+        :type bus_distance_cutoff: int, optional
+        :param crs: [description], defaults to 25832
+        :type crs: int, optional
         """
 
         self.feed = feed
