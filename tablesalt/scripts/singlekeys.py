@@ -462,7 +462,7 @@ def _get_store_keys(
     op_tripkeys['all'] = tripkeys
     op_tripkeys['dr_byen'] = dr_keys
 
-    num = _get_store_num(store)
+    num = _get_store_num(str(store))
     fp = os.path.join(
         '__result_cache__',
         f'{year}',
