@@ -63,9 +63,8 @@ from tablesalt.topology.tools import TakstZones
 
 THIS_DIR = Path(__file__).parent
 
-CPU_USAGE = 0.6 # % of processors
+CPU_USAGE = 0.4 # % of processors
 DB_START_SIZE = 8 # gb
-
 
 # this should be in common.io as contractor_to_array
 def proc_contractors(contrpack) -> np.ndarray:
@@ -310,7 +309,7 @@ def main():
     using CPU_USAGE % processing power
     """
 
-    parser = TableArgParser('year')
+    parser = TableArgParser('year', 'bus_stop_distance')
     args = parser.parse()
 
     year = args['year']
@@ -319,6 +318,7 @@ def main():
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
+    bus_distance = args['bus_stop_distance']
 
     zones = TakstZones()
     zonemap = zones.stop_zone_map()
@@ -334,16 +334,15 @@ def main():
     graph = ZoneGraph(region=region)
 
     allfeeds = transitfeed.available_archives()
-
     year_archives = [x for x in allfeeds if str(year) in x]
-
     feed = transitfeed.archived_transitfeed(year_archives[0])
-    for archive in year_archives[1:]:
+
+    for archive in tqdm(year_archives[4:], f'merging transit feeds for {year}'):
         archive_feed = transitfeed.archived_transitfeed(archive)
         feed = feed + archive_feed
 
-    BUS_DIST = 500 # make cmd option
-    opgetter = StationOperators(feed, bus_distance_cutoff=BUS_DIST)
+
+    opgetter = StationOperators(feed, bus_distance_cutoff=bus_distance)
 
     pfunc = partial(chunk_shares,
                     year=year,
