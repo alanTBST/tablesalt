@@ -28,28 +28,29 @@ and -m is the model to run (1 --> standard zonework model,
 
 """
 import ast
-from collections import defaultdict
 import os
 import pickle
-import pkg_resources
+from collections import defaultdict
 from datetime import datetime
-from itertools import groupby, chain
 from functools import lru_cache
+from itertools import chain, groupby
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
-from typing import AnyStr, Set, Tuple, Dict
+from typing import AnyStr, Dict, Set, Tuple
 
 import lmdb
 import msgpack
 import pandas as pd
+import pkg_resources
 from tqdm import tqdm
 
-from tablesalt.running import WindowsInhibitor
 from tablesalt import StoreReader
-from tablesalt.season.users import PendlerKombiUsers
-from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
+from tablesalt.preprocessing.tools import db_paths, find_datastores
+from tablesalt.running import WindowsInhibitor
+from tablesalt.season.users import PendlerKombiUsers
+
 
 THIS_DIR = Path(__file__).parent
 
@@ -538,7 +539,6 @@ def main():
             result_path = db_path + f'_model_{model}'
         else:
             result_path = db_path
-
 
         _chosen_zones(
             userdict,
