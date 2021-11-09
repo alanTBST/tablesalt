@@ -48,10 +48,9 @@ calculateshares.py must be run prior to this script
 
 To run this script for the year 2019 using model 1
 
-     python **./path/to/tablesalt/tablesalt/scripts/singlekeys.py -y 2019 -m 1**
+     python **./path/to/tablesalt/tablesalt/scripts/singlekeys.py -y 2019**
 
-where -y is the analysis year and -m is model 1 or 2. 1 for the normal zone work
-shares and 2 for the solozoner price adjusted zone work shares
+where -y is the analysis year
 
 """
 
@@ -101,6 +100,7 @@ def _load_border_trips(year: int) -> Dict[int, Tuple[int, ...]]:
     return borders
 
 # put in common.io
+# also give option of using the helrejser zip file for the year
 def helrejser_rabattrin(rabattrin: int, year: int) -> Set[int]:
     """return a set of tripkeys for the given year and rabattrin
     that: a) are full trips; b) are rejsekort classic cards
