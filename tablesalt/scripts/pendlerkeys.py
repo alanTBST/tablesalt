@@ -568,10 +568,15 @@ def main():
 
 
 if __name__ == "__main__":
+    st = datetime.now()
+
+    INHIBITOR = None
     if os.name == 'nt':
         INHIBITOR = WindowsInhibitor()
         INHIBITOR.inhibit()
-        main()
+    main()
+
+    if INHIBITOR:
         INHIBITOR.uninhibit()
-    else:
-        main()
+
+    print(datetime.now() - st)

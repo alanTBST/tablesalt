@@ -24,6 +24,7 @@ import pandas as pd
 import pkg_resources
 from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.preprocessing.tools import db_paths, find_datastores
+from tablesalt.running import WindowsInhibitor
 from tablesalt.season.users import PendlerKombiUsers
 from tablesalt.topology.tools import determine_takst_region
 from tqdm import tqdm
@@ -39,48 +40,48 @@ USER_SHARES = Dict[Tuple[str, int], Dict[str, Union[int, float]]]
 def sort_df_by_colums(df):
 
     priority = {
-        'EncryptedCardEngravedID': 1, 
-        'SeasonPassID': 2, 
+        'EncryptedCardEngravedID': 1,
+        'SeasonPassID': 2,
         'SeasonPassTemplateID': 3,
-        'SeasonPassName': 4, 
-        'Fareset': 5, 
-        'PsedoFareset': 6, 
+        'SeasonPassName': 4,
+        'Fareset': 5,
+        'PsedoFareset': 6,
         'takstsæt': 6,
-        'SeasonPassType': 7, 
-        'PassengerGroupType1': 8, 
-        'SeasonPassStatus': 9, 
-        'ValidityStartDT': 10, 
-        'ValidityEndDT': 11, 
-        'ValidDays': 12,  
+        'SeasonPassType': 7,
+        'PassengerGroupType1': 8,
+        'SeasonPassStatus': 9,
+        'ValidityStartDT': 10,
+        'ValidityEndDT': 11,
+        'ValidDays': 12,
         'FromZoneNr': 13,
-        'startzone': 14, 
-        'ToZoneNr': 15, 
+        'startzone': 14,
+        'ToZoneNr': 15,
         'slutzone': 16,
-        'ViaZoneNr': 17, 
-        'SeasonPassZones': 18,  
-        'PassagerType': 19, 
-        'TpurseRequired': 20, 
-        'SeasonPassCategory': 21,  
-        'Pris': 22, 
-        'RefundType': 23, 
-        'productdate': 24, 
+        'ViaZoneNr': 17,
+        'SeasonPassZones': 18,
+        'PassagerType': 19,
+        'TpurseRequired': 20,
+        'SeasonPassCategory': 21,
+        'Pris': 22,
+        'RefundType': 23,
+        'productdate': 24,
         'valgtezoner': 25,
         'betaltezoner': 26,
-        'dsb': 27, 
-        's-tog': 28, 
+        'dsb': 27,
+        's-tog': 28,
         'first': 29,
-        'metro': 31, 
-        'movia_h': 31, 
+        'metro': 31,
+        'movia_h': 31,
         'movia_v': 32,
         'movia_s': 33,
-        'dsb_andel': 34, 
-        's-tog_andel': 35, 
+        'dsb_andel': 34,
+        's-tog_andel': 35,
         'first_andel': 36,
-        'metro_andel': 37, 
-        'movia_h_andel': 38, 
-        'movia_v_andel': 39,  
-        'movia_s_andel': 40,  
-        'n_trips': 41, 
+        'metro_andel': 37,
+        'movia_h_andel': 38,
+        'movia_v_andel': 39,
+        'movia_s_andel': 40,
+        'n_trips': 41,
         'n_users': 42,
         'n_period_cards': 43,
         'note': 44
@@ -91,7 +92,7 @@ def sort_df_by_colums(df):
     cols = df.columns
     for col in cols:
         q.put((priority[col], col))
-    
+
     column_order = []
     while not q.empty():
         column_order.append(q.get()[1])
@@ -365,8 +366,8 @@ def _user_share_dict_df(usershares: USER_SHARES):
 
 def _match_user_specific_results(
         kombi_products: pd.core.frame.DataFrame,
-        usershares: USER_SHARES, 
-        year: int, 
+        usershares: USER_SHARES,
+        year: int,
         model: int
         ):
 
@@ -379,10 +380,10 @@ def _match_user_specific_results(
         )
     merged = merged.fillna(0)
     missed = merged.query("n_trips == 0").copy()
-    
+
     kombi_match = merged.query("n_trips != 0").copy()
     kombi_match['note'] = 'user_period_shares'
-    
+
     missed = missed[kombi_products.columns]
 
     missed = _match_pendler(missed, year, model)
@@ -452,7 +453,7 @@ def _match_pendler_record(
         if not r:
             note.append('from_to_zones')
             from_to_results = {
-                k[:2]:v for k, v in zone_relation_results.items() if 
+                k[:2]:v for k, v in zone_relation_results.items() if
                 k[0]==start and k[1]==end
                 }
             r = from_to_results.get((start, end), {})
@@ -465,7 +466,7 @@ def _match_pendler_record(
                 if r:
                     note.append(f'_{pos}')
                     break
-        
+
     else:
         mro = ['zonerelation_match', f'kombi_paid_zones_{takst}']
         for method in mro:
@@ -475,8 +476,8 @@ def _match_pendler_record(
             if r and r['n_trips'] >= min_trips:
                 break
             else:
-                r = paid_zones_results[takst].get(paid, {})    
-    
+                r = paid_zones_results[takst].get(paid, {})
+
     if not r or r['n_trips'] < min_trips:
         note.append(f'kombi_paid_all_zones_{takst}')
         r = paid_zones_results[takst].get(99, {})
@@ -494,7 +495,7 @@ def _match_pendler(pendler_df, year, model):
     kombi_results = _load_kombi_shares(year, model)
     zone_relation_results = _load_zone_relation_results(kombi_results)
     paid_zones_results = _load_nzone_shares(year, model)
-    
+
     bad = set()
     out = {}
     for record in sub_tuples:
@@ -514,7 +515,7 @@ def _match_pendler(pendler_df, year, model):
     out_frame = out_frame.reset_index()
 
     output = pd.merge(pendler_df, out_frame, on='NR', how='left')
-    
+
     output.note = output.note.fillna('no_result')
     output = output.fillna(0)
 
@@ -528,12 +529,12 @@ def _process_pendler_df(period_products, zone_path):
     period_products.Pris = \
     period_products.Pris.str.replace(',','', regex=False
     ).str.replace('.','', regex=False).astype(float) / 100
-    
+
     pendler_product_zones = _load_process_zones(zone_path)
 
-    keys = dict(zip(zip(pendler_product_zones.EncryptedCardEngravedID, 
+    keys = dict(zip(zip(pendler_product_zones.EncryptedCardEngravedID,
                pendler_product_zones.SeasonPassID), pendler_product_zones.valgtezoner))
-    
+
     period_products['key'] = period_products.loc[
         :, ('EncryptedCardEngravedID', 'SeasonPassID')
         ].apply(tuple, axis=1)
@@ -541,15 +542,15 @@ def _process_pendler_df(period_products, zone_path):
     paid_map = _valid_zones_to_paid()
     paid_map = {str(k): v for k, v in paid_map.items()}
     period_products.loc[:, 'valgtezoner'] = period_products.loc[:, 'key'].map(keys)
-    
-    period_products.loc[:, 'valgtezoner'] = period_products.loc[:, 'valgtezoner'].astype(str)    
+
+    period_products.loc[:, 'valgtezoner'] = period_products.loc[:, 'valgtezoner'].astype(str)
     period_products.loc[:, 'betaltezoner'] = period_products.loc[:, 'valgtezoner'].map(paid_map)
     period_products.loc[:, 'betaltezoner'] = period_products.loc[:, 'betaltezoner'].fillna(0)
     period_products.rename(columns={'FromZoneNr': 'startzone', 'ToZoneNr': 'slutzone', 'PsedoFareset': 'takstsæt'}, inplace=True)
-    
+
     period_products.takstsæt = period_products.takstsæt.str.lower()
     takst_map = {'hovedstaden': 'th', 'sjælland': 'dsb', 'sydsjælland': 'ts', 'vestsjælland': 'tv'}
-    
+
     period_products.takstsæt = period_products.takstsæt.map(takst_map)
 
     return period_products
@@ -578,20 +579,20 @@ def make_output(usershares, product_path, zone_path, model, year):
         )
 
     period_products = _process_pendler_df(period_products, zone_path)
-    
+
     # this might need to change based on input data structure
     initial_columns = list(period_products.columns)
-    
+
     kombi_products = period_products.loc[
         period_products.loc[:, 'SeasonPassName'].str.lower().str.contains('kombi')
         ]
 
     kombi_match, missed = _match_user_specific_results(
         kombi_products, usershares, year, model
-        )   
+        )
      # =============================================================================
     # end of direct card match
-    # =============================================================================   
+    # =============================================================================
     pendler = period_products.loc[~
         period_products.loc[:, 'SeasonPassName'].str.lower().str.contains('kombi')
         ].copy()
@@ -600,13 +601,13 @@ def make_output(usershares, product_path, zone_path, model, year):
 
     final = pd.concat([kombi_match, missed, pendler_results])
     final = final.drop('key', axis=1)
-    
+
     stats_columns = ['n_trips', 'n_users', 'n_period_cards', 'note']
     operator_columns = [
-        x for x in final.columns if x not in initial_columns 
+        x for x in final.columns if x not in initial_columns
         and x not in stats_columns
         ]
-    
+
     andel_columns = []
     for col in operator_columns:
         new_col = f'{col}_andel'
@@ -682,7 +683,7 @@ def main():
     year = args['year']
     paths = db_paths(find_datastores(), year)
     db_path = paths['calculated_stores']
-    
+
     products = args['products']
     zones = args['zones']
 
@@ -720,4 +721,15 @@ def main():
 
 if __name__ == "__main__":
 
+    st = datetime.now()
+
+    INHIBITOR = None
+    if os.name == 'nt':
+        INHIBITOR = WindowsInhibitor()
+        INHIBITOR.inhibit()
     main()
+
+    if INHIBITOR:
+        INHIBITOR.uninhibit()
+
+    print(datetime.now() - st)

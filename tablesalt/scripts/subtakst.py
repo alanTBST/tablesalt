@@ -40,6 +40,7 @@ from tqdm import tqdm
 from tablesalt import StoreReader
 from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.preprocessing.tools import db_paths, find_datastores
+from tablesalt.running import WindowsInhibitor
 from tablesalt.topology import ZoneGraph
 from tablesalt.topology.tools import TakstZones
 
@@ -334,6 +335,15 @@ def main():
 
 if __name__ == "__main__":
     st = datetime.now()
+
+    INHIBITOR = None
+    if os.name == 'nt':
+        INHIBITOR = WindowsInhibitor()
+        INHIBITOR.inhibit()
     main()
+
+    if INHIBITOR:
+        INHIBITOR.uninhibit()
+
     print(datetime.now() - st)
 
