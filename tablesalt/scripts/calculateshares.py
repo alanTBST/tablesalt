@@ -277,13 +277,15 @@ def chunk_shares(
 
         if sharer.border_trip:
             initial_zone_sequence = sharer.zone_sequence
-            model_one_shares[k] = trip_shares['standard']
             final_zone_sequence = sharer.zone_sequence
             if initial_zone_sequence != final_zone_sequence:
                 border_changes[k] = final_zone_sequence
+
+            model_one_shares[k] = trip_shares['standard']
             model_two_shares[k] = trip_shares['solo_price']
             model_three_shares[k] = trip_shares['bumped']
             model_four_shares[k] = trip_shares['bumped_solo']
+
         else:
             model_one_shares[k] = trip_shares['standard']
             model_two_shares[k] = trip_shares['solo_price']
@@ -300,7 +302,12 @@ def chunk_shares(
     with open(fp, 'wb') as f:
         pickle.dump(border_changes, f)
 
-    return model_one_shares, model_two_shares, model_three_shares, model_four_shares
+    return (
+        model_one_shares,
+        model_two_shares,
+        model_three_shares,
+        model_four_shares
+        )
 
 def main():
     """
@@ -336,11 +343,9 @@ def main():
     # allfeeds = transitfeed.available_archives()
     # year_archives = [x for x in allfeeds if str(year) in x]
     feed = transitfeed.archived_transitfeed('20190911_20191204')
-
     # for archive in tqdm(year_archives[-2:], f'merging transit feeds for {year}'):
     #     archive_feed = transitfeed.archived_transitfeed(archive)
     #     feed = feed + archive_feed
-
     opgetter = StationOperators(feed, bus_distance_cutoff=bus_distance)
 
     pfunc = partial(chunk_shares,
