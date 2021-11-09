@@ -333,14 +333,13 @@ def main():
 
     graph = ZoneGraph(region=region)
 
-    allfeeds = transitfeed.available_archives()
-    year_archives = [x for x in allfeeds if str(year) in x]
-    feed = transitfeed.archived_transitfeed(year_archives[0])
+    # allfeeds = transitfeed.available_archives()
+    # year_archives = [x for x in allfeeds if str(year) in x]
+    feed = transitfeed.archived_transitfeed('20190911_20191204')
 
-    for archive in tqdm(year_archives[4:], f'merging transit feeds for {year}'):
-        archive_feed = transitfeed.archived_transitfeed(archive)
-        feed = feed + archive_feed
-
+    # for archive in tqdm(year_archives[-2:], f'merging transit feeds for {year}'):
+    #     archive_feed = transitfeed.archived_transitfeed(archive)
+    #     feed = feed + archive_feed
 
     opgetter = StationOperators(feed, bus_distance_cutoff=bus_distance)
 
