@@ -521,14 +521,10 @@ def main():
     year = args['year']
     paths = db_paths(find_datastores(), year)
     stores = paths['store_paths']
-
-    zero_travel_price = find_no_pay(stores, year)
-
     db_path = paths['calculated_stores']
-
-
     zone_path = args['zones']
     product_path = args['products']
+    zero_travel_price = find_no_pay(stores, year)
 
     userdict = PendlerKombiUsers(
         year,
@@ -564,8 +560,6 @@ def main():
             )
 
         _zonerelations(year, model)
-
-
 
 if __name__ == "__main__":
     st = datetime.now()
