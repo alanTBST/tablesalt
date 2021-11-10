@@ -152,8 +152,9 @@ def load_valid(valid_kombi_store: str) -> Dict:
 
     return {ast.literal_eval(k): v for k, v in valid_kombi.items()}
 
+# this gets done in pendlersetup now
 @lru_cache(2*16)
-def _date_in_window(test_period, test_date):
+def _date_in_window(test_period, test_date) -> bool:
     """test that a date is in a validity period"""
     return min(test_period) <= test_date <= max(test_period)
 
@@ -256,20 +257,16 @@ def n_operators(share_tuple):
 
     return len({x[1] for x in share_tuple})
 
-def pendler_reshare(share_tuple):
-
-    n_ops = n_operators(share_tuple)
-
-    return tuple((1/ n_ops, x[1]) for x in share_tuple)
-
 def get_zone_combination_shares(tofetch, db_path: str, model: int):
 
     final = {}
     errors = {'operator_error', 'station_map_error', 'rk_operator_error', 'no_available_trip'}
     with lmdb.open(db_path) as env:
         with env.begin() as txn:
-            for combo, trips in tqdm(tofetch.items(),'fetching combo results',
-                                     total=len(tofetch)):
+            for combo, trips in tqdm(tofetch.items(),
+                                     'fetching combo results',
+                                     total=len(tofetch)
+                                     ):
                 all_trips = {}
                 for trip in trips:
                     t = bytes(str(trip), 'utf-8')
@@ -279,10 +276,7 @@ def get_zone_combination_shares(tofetch, db_path: str, model: int):
                     res = res.decode('utf-8')
                     if res not in errors:
                         val = ast.literal_eval(res)
-                        # if model != 3:
                         all_trips[trip] = val
-                        # else:
-                        #     all_trips[trip] = pendler_reshare(val)
                 combo_result = get_user_shares(all_trips.values())
                 final[combo] = combo_result
 
@@ -329,8 +323,6 @@ def _get_trips(db_path, tripkeys, model):
                     val = ast.literal_eval(res)
                     # if model != 3:
                     out[int(k.decode('utf-8'))] = val
-                    # else:
-                        # out[int(k.decode('utf-8'))] = pendler_reshare(val)
 
     return out
 
