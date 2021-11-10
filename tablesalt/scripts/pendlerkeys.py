@@ -54,6 +54,12 @@ from tablesalt.season.users import PendlerKombiUsers
 
 THIS_DIR = Path(__file__).parent
 
+TRIP_ERRORS = {
+    'operator_error',
+    'station_map_error',
+    'rk_operator_error',
+    'no_available_trip'
+    }
 def get_zone_combinations(udata) -> Set[Tuple[int, ...]]:
     """Get all the chosen zone combinations of pendler kombi users
 
@@ -260,7 +266,7 @@ def n_operators(share_tuple):
 def get_zone_combination_shares(tofetch, db_path: str, model: int):
 
     final = {}
-    errors = {'operator_error', 'station_map_error', 'rk_operator_error', 'no_available_trip'}
+
     with lmdb.open(db_path) as env:
         with env.begin() as txn:
             for combo, trips in tqdm(tofetch.items(),
@@ -274,7 +280,7 @@ def get_zone_combination_shares(tofetch, db_path: str, model: int):
                     if not res:
                         continue
                     res = res.decode('utf-8')
-                    if res not in errors:
+                    if res not in TRIP_ERRORS:
                         val = ast.literal_eval(res)
                         all_trips[trip] = val
                 combo_result = get_user_shares(all_trips.values())
@@ -309,7 +315,6 @@ def _kombi_by_seasonpass(pendler_kombi, userdict):
 def _get_trips(db_path, tripkeys, model):
 
     tripkeys_ = (bytes(str(x), 'utf-8') for x in tripkeys)
-    errors = {'operator_error', 'station_map_error', 'rk_operator_error', 'no_available_trip'}
 
     out = {}
     with lmdb.open(db_path) as env:
@@ -319,9 +324,8 @@ def _get_trips(db_path, tripkeys, model):
                 if not res:
                     continue
                 res = res.decode('utf-8')
-                if res not in errors:
+                if res not in TRIP_ERRORS:
                     val = ast.literal_eval(res)
-                    # if model != 3:
                     out[int(k.decode('utf-8'))] = val
 
     return out
