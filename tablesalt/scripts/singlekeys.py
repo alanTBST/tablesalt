@@ -48,10 +48,9 @@ calculateshares.py must be run prior to this script
 
 To run this script for the year 2019 using model 1
 
-     python **./path/to/tablesalt/tablesalt/scripts/singlekeys.py -y 2019 -m 1**
+     python **./path/to/tablesalt/tablesalt/scripts/singlekeys.py -y 2019**
 
-where -y is the analysis year and -m is model 1 or 2. 1 for the normal zone work
-shares and 2 for the solozoner price adjusted zone work shares
+where -y is the analysis year
 
 """
 
@@ -101,6 +100,7 @@ def _load_border_trips(year: int) -> Dict[int, Tuple[int, ...]]:
     return borders
 
 # put in common.io
+# also give option of using the helrejser zip file for the year
 def helrejser_rabattrin(rabattrin: int, year: int) -> Set[int]:
     """return a set of tripkeys for the given year and rabattrin
     that: a) are full trips; b) are rejsekort classic cards
@@ -462,7 +462,7 @@ def _get_store_keys(
     op_tripkeys['all'] = tripkeys
     op_tripkeys['dr_byen'] = dr_keys
 
-    num = _get_store_num(store)
+    num = _get_store_num(str(store))
     fp = os.path.join(
         '__result_cache__',
         f'{year}',
@@ -787,8 +787,6 @@ def main() -> None:
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
 
-
-
     ringzones = ZoneGraph.ring_dict('sjælland')
     stopzone_map = TakstZones().stop_zone_map()
 
@@ -816,12 +814,15 @@ def main() -> None:
 
 if __name__ == "__main__":
     from datetime import datetime
-    dt = datetime.now()
+    st = datetime.now()
+
+    INHIBITOR = None
     if os.name == 'nt':
         INHIBITOR = WindowsInhibitor()
         INHIBITOR.inhibit()
-        main()
+    main()
+
+    if INHIBITOR:
         INHIBITOR.uninhibit()
-    else:
-        main()
-    print(datetime.now() - dt)
+
+    print(datetime.now() - st)

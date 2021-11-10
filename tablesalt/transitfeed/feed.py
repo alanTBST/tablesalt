@@ -19,7 +19,7 @@ from collections import defaultdict
 from datetime import datetime
 from http.client import HTTPResponse
 from io import BytesIO
-from itertools import groupby, chain
+from itertools import groupby, chain, repeat
 from operator import attrgetter, itemgetter
 from pathlib import Path
 from typing import (Any, ClassVar, DefaultDict, Dict, Iterable, List, Optional,
@@ -27,10 +27,13 @@ from typing import (Any, ClassVar, DefaultDict, Dict, Iterable, List, Optional,
 from urllib.error import URLError
 from urllib.request import urlopen
 
+import geopandas as gpd
 import msgpack
+import numpy as np
 import pandas as pd
 from msgpack.exceptions import ExtraData
 from pandas.core.frame import DataFrame
+from scipy.spatial import cKDTree
 from shapely import geometry, wkt
 from shapely.geometry import LineString
 
@@ -73,11 +76,11 @@ def download_latest_feed() -> Dict[str, DataFrame]:
         log.critical(f"GTFS download failed - error {resp.code}")
         raise URLError("Could not download GTFS data")
 
-    gtfs_data = _load_gtfs_zip(REQD_FILES, resp)
+    gtfs_data = _load_gtfs_response_zip(REQD_FILES, resp)
 
     return gtfs_data
 
-def _load_gtfs_zip(required: Set[str], resp: HTTPResponse) -> Dict[str, DataFrame]:
+def _load_gtfs_response_zip(required: Set[str], resp: HTTPResponse) -> Dict[str, DataFrame]:
 
     gtfs_data: Dict[str, pd.core.frame.DataFrame] = {}
 
@@ -92,6 +95,23 @@ def _load_gtfs_zip(required: Set[str], resp: HTTPResponse) -> Dict[str, DataFram
             df = pd.read_csv(zfile.open(x), low_memory=False)
             gtfs_data[x] = df
     return gtfs_data
+
+def _load_gtfs_normal_zip(required: Set[str], filepath: str) -> Dict[str, DataFrame]:
+
+    gtfs_data: Dict[str, pd.core.frame.DataFrame] = {}
+    with zipfile.ZipFile(filepath) as zfile:
+        names = zfile.namelist()
+        missing = {x for x in required if x not in names}
+        if missing:
+            raise TransitFeedError(
+                f"Mandatory dataset/s [{', '.join(missing)}] are missing from the feed."
+                )
+        for name in names:
+            df = pd.read_csv(zfile.open(name), low_memory=False)
+            gtfs_data[name] = df
+
+    return gtfs_data
+
 
 def _load_route_types() -> Tuple[Dict[int, int], Set[int], Set[int]]:
     """load the rail and bus route types from the config.ini file
@@ -141,7 +161,7 @@ class TransitFeedBase(AbstractFeedObject):
             updated_data = {**self.data, **other.data}
         except TypeError:
             updated_data = self.data + other.data
-        
+
         new_instance = self.__class__(updated_data)
         new_instance._is_composite = True
 
@@ -369,6 +389,10 @@ class Trips(TransitFeedBase):
         :return: a dictionary of trip_id as key and route_id as value
         :rtype: Optional[Dict[int, str]]
         """
+        if self._trip_route_map is None:
+            triproute = {k: v['route_id'] for k, v in self.data.items()}
+            self._trip_route_map = triproute
+
 
         return self._trip_route_map
 
@@ -383,6 +407,12 @@ class Trips(TransitFeedBase):
         :return: a dictionary of route_id as key and tuple of trip_ids as value
         :rtype: Optional[Dict[str, Tuple[int, ...]]]
         """
+        if self._route_trip_map is None:
+            route_trips = ((v['route_id'], k) for k, v in self.data.items())
+            route_trips = sorted(route_trips, key=itemgetter(0))
+            route_tripsmap = {key: tuple(x[1] for x in grp) for
+                              key, grp in groupby(route_trips, key=itemgetter(0))}
+            self._route_trip_map = route_tripsmap
         return self._route_trip_map
 
     @route_trip_map.setter
@@ -402,7 +432,8 @@ class Trips(TransitFeedBase):
         triproute = dict(zip(latest_data.loc[:, 'trip_id'], latest_data.loc[:, 'route_id']))
 
         route_trips = zip(latest_data.loc[:, 'route_id'], latest_data.loc[:, 'trip_id'])
-        route_tripsmap = {key:tuple(x[1] for x in grp) for
+        route_trips = sorted(route_trips, key=itemgetter(0))
+        route_tripsmap = {key: tuple(x[1] for x in grp) for
                           key, grp in groupby(route_trips, key=itemgetter(0))}
 
         trips_data = latest_data.set_index('trip_id').T.to_dict()
@@ -698,6 +729,7 @@ C = TypeVar('C', bound=Union[Calendar, MultiCalendar])
 CD = TypeVar('CD', bound=Union[CalendarDates, MultiCalendarDates])
 
 
+
 class TransitFeed:
 
     def __init__(
@@ -745,6 +777,9 @@ class TransitFeed:
         self.transfers = transfers
         self.shapes = shapes
 
+        self._stop_operators = None
+        self._stop_modes = None
+
         self._is_composite: bool = False
 
     def __add__(self, other: 'TransitFeed') -> 'TransitFeed':
@@ -760,13 +795,13 @@ class TransitFeed:
 
         new_calendars = MultiCalendar(self.calendar, other.calendar)
         new_calendar_dates = MultiCalendarDates(self.calendar_dates, other.calendar_dates)
-        
+
         for transfer in self.transfers.data:
             transfer.update({'feed_period': this_period})
 
         for transfer in other.transfers.data:
             transfer.update({'feed_period': other_period})
-        
+
         new_transfers = self.transfers + other.transfers
         new_shapes = MultiShapes(self.shapes, other.shapes)
 
@@ -784,6 +819,18 @@ class TransitFeed:
         new_feed._is_composite = True
 
         return new_feed
+
+    @property
+    def stop_operators(self):
+        if self._stop_operators is None:
+            self._stop_operators = self._identify_stop_operators()
+        return self._stop_operators
+
+    @property
+    def stop_modes(self):
+        if self._stop_modes is None:
+            self._stop_modes = self._identify_stop_modes()
+        return self._stop_modes
 
     def rail_routes(self) ->  Dict[str, Dict[str, Any]]:
         """Return only the rail routes of the feed
@@ -812,6 +859,46 @@ class TransitFeed:
             bus_routes[route_id] = info
 
         return bus_routes
+
+    def _identify_stop_operators(self):
+        stop_operators = defaultdict(set)
+
+        for tripid, stoptime in  self.stop_times.data.items():
+            stopids = set(x['stop_id'] for x in stoptime)
+            agency_name = self.get_agency_name_for_trip(tripid)
+            for stopid in stopids:
+                stop_operators[stopid].add(agency_name)
+        return stop_operators
+
+    def _identify_stop_modes(self):
+
+        stop_modes = defaultdict(set)
+
+        bus_routes = set(self.bus_routes())
+        rail_routes = set(self.rail_routes())
+
+        routetrip_map = self.trips.route_trip_map
+        rail_trips = set(chain(*{v for k, v in routetrip_map.items() if k in rail_routes}))
+        bus_trips = set(chain(*{v for k, v in routetrip_map.items() if k in bus_routes}))
+
+        for tripid, stoptime in  self.stop_times.data.items():
+            stopids = set(x['stop_id'] for x in stoptime)
+            if tripid in rail_trips:
+                for stopid in stopids:
+                    stop_modes[stopid].add('rail')
+            if tripid in bus_trips:
+                for stopid in stopids:
+                    stop_modes[stopid].add('bus')
+
+        return stop_modes
+
+    def get_agency_name_for_trip(self, tripid: int) -> str:
+
+        sub_route_id = self.trips.data[tripid]['route_id']
+        sub_agency_id = self.routes.data[sub_route_id]['agency_id']
+        sub_agency_name = self.agency.get(sub_agency_id)
+
+        return sub_agency_name
 
     def feed_period(self) -> Tuple[datetime, datetime]:
         """Return the time period that the feed is valid for
@@ -847,13 +934,112 @@ class TransitFeed:
         shutil.make_archive(str(path), 'zip', path)
         shutil.rmtree(path)
 
+
+class BusMapper:
+
+    def __init__(
+        self,
+        transit_feed: TransitFeed,
+        crs: int = 25832
+        ):
+        """Class to create a map of bus stops to their closest stations
+
+        :param transit_feed: a rejseplan GTFS feed instance
+        :type transit_feed: TransitFeed
+        :param crs: the coordinate reference system (ESPG) the transit feed area,
+            defaults to 25832 (UTM 32N) for Denmark
+        :type crs: int, optional
+        """
+
+        self.transit_feed = transit_feed
+        self._bus_station_frame = None
+        self._crs = crs
+
+    @property
+    def bus_station_frame(self):
+        if self._bus_station_frame is None:
+            self._bus_station_frame = self._make_bus_to_station_frame(self._crs)
+        return self._bus_station_frame
+
+    def get_bus_map(self, bus_distance_cutoff: int = 500) -> Dict[int, int]:
+        """Return a dictionary mapping of bus stop id -> station id
+
+        :param bus_distance_cutoff: the maximum radius (m) around the stop to check, defaults to 500
+        :type bus_distance_cutoff: int, optional
+        :return: a dictionary
+        :rtype: Dict[int, int]
+        """
+
+        gdf = self.bus_station_frame
+        gdf = gdf.loc[gdf.loc[:, 'dist'] <= bus_distance_cutoff]
+        gdf = gdf.sort_values(['stop_id', 'dist'])
+
+        return dict(zip(gdf.loc[:, 'stop_id'], gdf.loc[:, 'station_id']))
+
+    def _stops_to_geoframe(self, stop_ids, crs):
+
+        data = {
+            k: v for k, v in self.transit_feed.stops.data.items() if k in stop_ids
+            }
+        frame = pd.DataFrame.from_dict(data, orient='index')
+        frame.index.name = 'stop_id'
+        frame = frame.reset_index()
+
+        gdf = gpd.GeoDataFrame(
+            frame,
+            geometry=gpd.points_from_xy(frame.stop_lon, frame.stop_lat),
+            crs = 4326
+            )
+
+        gdf = gdf.to_crs(crs)
+
+        return gdf
+
+    def _make_bus_to_station_frame(self, crs) -> gpd.GeoDataFrame:
+        """use a k-d tree to find the nearest station to a bus stop
+
+        :return: a geodataframe of bus stops and close rail stops
+        :rtype: GeoDataFrame
+        """
+
+        bus_stops = {k for k, v in self.transit_feed.stop_modes.items() if 'bus' in v}
+        rail_stops = {k for k, v in self.transit_feed.stop_modes.items() if 'rail' in v}
+
+        # assert the numbers are rail stops
+        # uic numbers are only seven digits long
+        # what about letbane stops?
+        rail_stops = {k for k in rail_stops if len(str(k)) == 7}
+
+        bus_gdf = self._stops_to_geoframe(bus_stops, crs)
+        rail_gdf = self._stops_to_geoframe(rail_stops, crs)
+        rail_gdf = rail_gdf.rename(columns={'stop_id': 'station_id'})
+
+        A = np.concatenate(
+            [np.array(geom.coords) for geom in bus_gdf.geometry.to_list()]
+            )
+        B = [np.array(geom.coords) for geom in rail_gdf.geometry.to_list()]
+        B_ix = tuple(chain.from_iterable(
+            [repeat(i, x) for i, x in enumerate(list(map(len, B)))])
+            )
+        B = np.concatenate(B)
+        ckd_tree = cKDTree(B)
+        dist, idx = ckd_tree.query(A, k=1)
+        idx = itemgetter(*idx)(B_ix)
+        gdf = pd.concat(
+            [bus_gdf, rail_gdf.loc[idx, ['station_id']].reset_index(drop=True),
+            pd.Series(dist, name='dist')], axis=1
+            )
+
+        return gdf
+
+
 def latest_transitfeed(
     add_transfers: bool = True,
     add_shapes: bool = True,
     add_to_archive: bool = False
     ) -> TransitFeed:
     """Factory function that returns the latest available transit
-    feed data fro Rejseplan as a TransitFeed object
+    feed data from Rejseplan as a TransitFeed object
 
     :param add_transfers:  add the Transfers object to the TransitFeed, defaults to True
     :type add_transfers: bool, optional
@@ -877,6 +1063,62 @@ def latest_transitfeed(
     ]
 
     latest_gtfs_data = download_latest_feed()
+    req_classes = tuple(method(latest_gtfs_data[dset]) for dset, method in required)
+
+    transfers: Optional[Transfers]
+    shapes: Optional[Shapes]
+
+    if add_transfers:
+        transfers_df = latest_gtfs_data['transfers.txt']
+        transfers = Transfers.latest(transfers_df)
+    else:
+        transfers = None
+
+    if add_shapes:
+        shapes_df = latest_gtfs_data['shapes.txt']
+        shapes = Shapes.latest(shapes_df)
+    else:
+        shapes = None
+
+    feed = TransitFeed(*req_classes, transfers=transfers, shapes=shapes)
+    if add_to_archive:
+        feed.to_archive()
+
+    return feed
+
+
+# refactor this
+def transitfeed_from_zip(
+    filepath: str,
+    add_transfers: bool = True,
+    add_shapes: bool = True,
+    add_to_archive: bool = False
+    ) -> TransitFeed:
+    """Factory function that returns an instance of TransitFeed from a zip file
+
+    :param filepath: the path to the gtfs .zip file
+    :type filepath: str
+    :param add_transfers: add the Transfers object to the TransitFeed, defaults to True
+    :type add_transfers: bool, optional
+    :param add_shapes: add the Shapes object to the TransitFeed, defaults to True
+    :type add_shapes: bool, optional
+    :param add_to_archive: True to write to the package feed archive, defaults to False
+    :type add_to_archive: bool, optional
+    :return: the GTFS feed as an instance of TransfitFeed
+    :rtype: TransitFeed
+    """
+
+    required = [
+        ('agency.txt', Agency.latest),
+        ('stops.txt', Stops.latest),
+        ('routes.txt', Routes.latest),
+        ('trips.txt', Trips.latest),
+        ('stop_times.txt', StopTimes.latest),
+        ('calendar.txt', Calendar.latest),
+        ('calendar_dates.txt', CalendarDates.latest)
+    ]
+
+    latest_gtfs_data = _load_gtfs_normal_zip(REQD_FILES, filepath)
     req_classes = tuple(method(latest_gtfs_data[dset]) for dset, method in required)
 
     transfers: Optional[Transfers]

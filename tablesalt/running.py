@@ -12,11 +12,14 @@ import glob
 
 class WindowsInhibitor:
 
-    '''Prevent OS sleep/hibernate in windows'''
-
+    """Prevent OS sleep/hibernate in windows
+    See https://stackoverflow.com/questions/57647034/prevent-sleep-mode-python-wakelock-on-python
+    """
     ES_CONTINUOUS = 0x80000000
 
     ES_SYSTEM_REQUIRED = 0x00000001
+
+    ES_DISPLAY_REQUIRED= 0x00000002
 
 
     def __init__(self):
@@ -31,10 +34,10 @@ class WindowsInhibitor:
         print("\nPreventing Windows from going to sleep \n")
 
         ctypes.windll.kernel32.SetThreadExecutionState(
-
-            WindowsInhibitor.ES_CONTINUOUS | \
-
-            WindowsInhibitor.ES_SYSTEM_REQUIRED)
+            WindowsInhibitor.ES_CONTINUOUS |
+            WindowsInhibitor.ES_SYSTEM_REQUIRED |
+            WindowsInhibitor.ES_DISPLAY_REQUIRED
+            )
 
     def uninhibit(self):
         """stop the windows inhibitor"""
@@ -44,8 +47,8 @@ class WindowsInhibitor:
         print("\nAllowing Windows to go to sleep")
 
         ctypes.windll.kernel32.SetThreadExecutionState(
-
-            WindowsInhibitor.ES_CONTINUOUS)
+            WindowsInhibitor.ES_CONTINUOUS
+            )
 
 # =============================================================================
 def banner(text, chrc='=', length=70):

@@ -7,31 +7,27 @@ in which a user taps in or out
 
 """
 
-from itertools import chain, groupby
+import random
 from collections import Counter, defaultdict
 from functools import lru_cache
-from typing import Tuple, Union, Optional, Dict, Any
-import pkg_resources
+from itertools import chain, groupby
+from typing import Any, Dict, Optional, Tuple, Union
 
-import pandas as pd  #type: ignore
-import numpy as np  #type: ignore
-from networkx.classes.graph import Graph #type: ignore
+import numpy as np  # type: ignore
+import pandas as pd  # type: ignore
+import pkg_resources
+from networkx.classes.graph import Graph  # type: ignore
 
 from tablesalt.common import triptools
 from tablesalt.common.io import mappers
 from tablesalt.topology import stationoperators
 from tablesalt.topology.stopnetwork import StopsList
-from tablesalt.topology.zonegraph import ZoneGraph
 from tablesalt.topology.tools import determine_takst_region
+from tablesalt.topology.zonegraph import ZoneGraph
 
-
-OPGETTER = stationoperators.StationOperators(
-    'kystkastrup', 'sjællandlocal', 'metro',
-    'suburban', 'sjællandfjernregional',
-    )
-
-OP_MAP = {v: k.lower() for k, v in mappers['operator_id'].items()}
-REV_OP_MAP = {v: k for k, v in OP_MAP.items()}
+# get this stuff from config
+# OP_MAP = {v: k.lower() for k, v in mappers['operator_id'].items()}
+# REV_OP_MAP = {v: k for k, v in OP_MAP.items()}
 
 rev_model_dict = {v:k for k, v in mappers['model_dict'].items()}
 CO_TR = (rev_model_dict['Co'], rev_model_dict['Tr'])
@@ -43,24 +39,38 @@ REV_METRO_MAP = mappers['metro_map_rev']
 
 #TODO load from config with year
 SOLO_ZONE_PRIS = {
-    'movia_h': {
+    'th': {
         'dsb': 6.38,
+        'DSB': 6.38,
         'movia_h': 9.18,
+        'Movia':  9.18,
         'first': 6.42,
+        'DSB Øresund': 6.42,
+        'Öresundståg':  6.42,
         'stog': 7.12,
         's-tog': 7.12,
-        'metro': 9.44
+        'metro': 9.44,
+        'Metroselskabet': 9.44,
+        'DSB S-tog_th': 7.12,
+        'DSB S-tog': 7.12
         },
-    'movia_s': {
+    'ts': {
         'dsb': 6.55,
+        'DSB': 6.55,
+        'movia_s': 7.94,
+        'Movia': 7.94,
         'movia_s': 7.94,
         },
-    'movia_v': {
+    'tv': {
         'dsb': 6.74,
+        'DSB': 6.74,
         'movia_v': 8.43,
+        'Movia': 8.43
         },
     'dsb': {
         'dsb': 6.57,
+        'DSB': 6.57,
+        'Movia': 6.36,
         'movia_h': 6.36,
         'movia_s': 6.36,
         'movia_v': 6.36,
@@ -158,10 +168,10 @@ def to_legs(sequence: Tuple[int, ...]) ->Tuple[int, ...]:
     return triptools.sep_legs(sequence)
 
 @lru_cache(2**8)
-def _to_legs_stops(stop_legs):
+def _to_legs_stops(stop_legs, opgetter):
     """convert to legs and map the bus id to station if possible"""
     return tuple(
-            (leg[0], OPGETTER.BUS_ID_MAP.get(leg[1])) if
+            (leg[0], opgetter.BUS_ID_MAP.get(leg[1])) if
             (not _is_bus(leg[0]) and _is_bus(leg[1])) else leg
             for leg in stop_legs
             )
@@ -184,6 +194,7 @@ class ZoneProperties():
 
     def __init__(self,
                  graph: ZoneGraph,
+                 station_operators: stationoperators.StationOperators,
                  zone_sequence: Tuple[int, ...],
                  stop_sequence: Tuple[int, ...],
                  region: Optional[str] = 'sjælland'
@@ -207,18 +218,20 @@ class ZoneProperties():
         """
 
         self.graph = graph
-        # self.ring_dict = self.graph.ring_dict(region)
+        self.opgetter = station_operators
+
         self.zone_sequence: Tuple[int, ...] = zone_sequence
         self.stop_sequence: Tuple[int, ...] = stop_sequence
 
         self.stop_legs: Tuple[Tuple[int, ...], ...] = to_legs(stop_sequence)
-        self.stop_legs = _to_legs_stops(self.stop_legs)
+        # self.stop_legs = _to_legs_stops(self.stop_legs, self.opgetter)
         self.zone_legs: Tuple[Tuple[int, ...], ...] = to_legs(zone_sequence)
+
 
         self.border_trip: bool = False
         self.border_legs: Union[Tuple[()], Tuple[int, ...]]  = ()
 
-        if any(x in BORDER_STATIONS for x in chain(*self.stop_legs)):
+        if any(x in BORDER_STATIONS for x in self.stop_sequence):
             self.border_trip = True
 
         self.border_legs = self._border_touch_legs() if \
@@ -426,14 +439,12 @@ def operators_in_touched_(
 
     ops_in_touched = {}
     for tzone in tzones:
-        ops = []
+        ops = set()
         for i, j in enumerate(zonelegs):
             if tzone in j:
-                l_ops = list(oplegs[i])
-                ops.extend(l_ops)
-        # modulo:  only put in one operator value per leg
-        ops_in_touched[tzone] = \
-            tuple(j for i, j in enumerate(ops) if i % 2 == 0)
+                l_ops = oplegs[i]
+                ops.add(l_ops)
+        ops_in_touched[tzone] = tuple(ops)
 
     return ops_in_touched
 
@@ -450,7 +461,7 @@ def aggregated_zone_operators(v):
             continue
         for y in x:
             out_list.append(y)
-    out_list = [(x[0], OP_MAP[x[1]]) for x in out_list]
+    # out_list = [(x[0], OP_MAP[x[1]]) for x in out_list]
     # if any(isinstance(x[1], tuple) for x in out_list):
     #     out_list = [x if isinstance(x[1], int) else (x[0], x[1][0]) for x in out_list]
 
@@ -458,7 +469,6 @@ def aggregated_zone_operators(v):
 
     return tuple(((sum(x[0] for x in grp), key)) for
                  key, grp in groupby(out_list, key=lambda x: x[1]))
-
 
 
 STOPS = StopsList.default_denmark().stops_dict
@@ -470,10 +480,12 @@ class ZoneSharer(ZoneProperties):
     def __init__(
             self,
             graph: ZoneGraph,
+            station_operators: stationoperators.StationOperators,
             zone_sequence: Tuple[int, ...],
             stop_sequence: Tuple[int, ...],
-            operator_sequence: Tuple[int, ...],
-            usage_sequence: Tuple[int, ...]
+            # operator_sequence: Tuple[int, ...],
+            usage_sequence: Tuple[int, ...],
+            takst_suffix: str = False
             ) -> None:
         """Main class to determine the zone shares for each operator
         on a trip.
@@ -491,24 +503,53 @@ class ZoneSharer(ZoneProperties):
         :type usage_sequence: Tuple[int, ...]
         """
 
-        super().__init__(graph, zone_sequence, stop_sequence)
+        super().__init__(graph, station_operators, zone_sequence, stop_sequence)
 
-        self.zone_sequence = zone_sequence
-        self.stop_sequence = stop_sequence
-        self.operator_sequence = operator_sequence
         self.usage_sequence = usage_sequence
-        self.operator_legs = to_legs(self.operator_sequence)
         self.usage_legs = to_legs(self.usage_sequence)
 
-        self.single: bool = self._is_single()
+        self.opgetter = station_operators
+
         self.stops_dict = STOPS
 
         self.region: str = determine_takst_region(self.zone_sequence)
+        self._operator_sequence: Tuple[int, ...] = None
+        self._operator_legs = None # to_legs(self.operator_sequence)
 
+        self._takst_suffix = takst_suffix
 
-    def _is_single(self) -> bool:
+    @property
+    def operator_sequence(self) -> Tuple[int, ...]:
+        """Get the operators at the visited stations"""
+
+        if self._operator_sequence is not None:
+            return self._operator_sequence
+
+        opsequence = ()
+        for leg in self.stop_legs:
+            try:
+                ops = self.opgetter.station_pair(*leg)
+            except KeyError:
+                raise
+            op = random.choice(ops)
+            if self._takst_suffix:
+                takst = determine_takst_region(self.zone_sequence)
+                op += '_' + takst
+            opsequence += (op, )
+
+        return opsequence
+
+    # @property
+    # def operator_legs(self):
+    #     if self._operator_legs is not None:
+    #         return self._operator_legs
+
+    #     return to_legs(self.operator_sequence)
+
+    @property
+    def is_single(self) -> bool:
         """has only one operator"""
-        return len(set(chain(*self.operator_legs))) == 1
+        return len(set(self.operator_sequence)) == 1
 
     def _remove_cotr(self) -> None:
         """Remove all of the legs that are cotr touches
@@ -524,7 +565,7 @@ class ZoneSharer(ZoneProperties):
                 cotr_idxs += (i,)
 
         self.stop_legs = _remove_idxs(cotr_idxs, self.stop_legs)
-        self.operator_legs = _remove_idxs(cotr_idxs, self.operator_legs)
+        # self.operator_legs = _remove_idxs(cotr_idxs, self.operator_legs)
         self.zone_legs = _remove_idxs(cotr_idxs, self.zone_legs)
         self.usage_legs = _remove_idxs(cotr_idxs, self.usage_legs)
 
@@ -532,7 +573,6 @@ class ZoneSharer(ZoneProperties):
         """Remove SuSu legs if they occur at the same station
         """
         # NOTE...THIS can be put in TRIPRECORD
-
 
         susu_idxs = ()
         for i, j in enumerate(self.stop_legs):
@@ -548,23 +588,13 @@ class ZoneSharer(ZoneProperties):
                 susu_idxs += (i,)
         if susu_idxs:
             self.stop_legs = _remove_idxs(susu_idxs, self.stop_legs)
-            self.operator_legs = _remove_idxs(susu_idxs, self.operator_legs)
+            # self.operator_legs = _remove_idxs(susu_idxs, self.operator_legs)
             self.zone_legs = _remove_idxs(susu_idxs, self.zone_legs)
             self.usage_legs = _remove_idxs(susu_idxs, self.usage_legs)
 
-    def _station_operators(self) -> Tuple[int, ...]:
-        """Get the operators at the visited stations"""
-
-        opsequence = ()
-        for x in self.stop_legs:
-            ops = OPGETTER.station_pair(*x, format='operator')
-            op = stationoperators.REV_OP_MAP[(list(ops)[0])]
-            opsequence += (op, )
-
-        return opsequence
-
     @staticmethod
-    def leg_solo_price(region: str, op_id: int) -> float:
+    def leg_solo_price(region: str, op_id: str) -> float:
+        # change this to new operators
         """Find the solo price of the leg for the specified
         operator id
 
@@ -575,7 +605,7 @@ class ZoneSharer(ZoneProperties):
         :return: a solo zone price
         :rtype: float
         """
-        return SOLO_ZONE_PRIS[region][OP_MAP[op_id]]
+        return SOLO_ZONE_PRIS[region][op_id]
 
     def _single_zone_share(
         self,
@@ -585,7 +615,6 @@ class ZoneSharer(ZoneProperties):
         touched_zone_leg_count,
         ops_in_touched_zones
         ):
-
 
         zone_share = 1
         if zone in touched_zones:
@@ -689,7 +718,7 @@ class ZoneSharer(ZoneProperties):
         for legnum, imputed_leg in enumerate(imputed_zone_legs):
 
             leg_region = zone_leg_regions[legnum]
-            op_id = self.operator_legs[legnum][0]
+            op_id = self.operator_sequence[legnum]
             leg_solo_price = self.leg_solo_price(leg_region, op_id)
 
             if not op_id == previous_op_id and previous_op_id is not None:
@@ -708,7 +737,7 @@ class ZoneSharer(ZoneProperties):
                     seen_zone_opid.add((zone, op_id))
 
             try:
-                next_op_id = self.operator_legs[legnum+1][0]
+                next_op_id = self.operator_sequence[legnum+1]
                 if op_id != next_op_id:
                     if current_op_sum < min_zones:
                         current_op_sum = min_zones
@@ -725,15 +754,14 @@ class ZoneSharer(ZoneProperties):
             previous_op_id = op_id
 
         out_standard = {k: tuple(v) for k, v in out_standard.items()}
-
         standard = aggregated_zone_operators(tuple(out_standard.values()))
 
-        if self.single:
+        if self.is_single:
             solo_price = standard
         else:
             solo_price = self._weight_solo(out_standard.values(), out_solo.values())
 
-        if self.single:
+        if self.is_single:
             bumped = out_bumped
             bumped_solo = out_bumped
         else:
@@ -780,69 +808,45 @@ class ZoneSharer(ZoneProperties):
         :rtype: Dict[str, Tuple[Tuple[Union[int, float], str], ...]]
         """
 
-
-        val = tuple(
-            (self.stop_sequence,
-            self.operator_sequence,
-            self.usage_sequence)
-            )
-        if None in chain(*self.stop_legs):
-            shares = self._error_shares('station_map_error')
-            self.SHARE_CACHE[val] = shares
-            return shares
+        self._remove_cotr()
 
         try:
+            self._remove_susu()
+            if self.stop_legs == ():
+                shares = self._error_shares('no_available_trip')
+                return shares
+        except KeyError:
+            shares = self._error_shares('station_map_error')
+            return shares
+        try:
+            val = (self.stop_sequence,
+                self.operator_sequence,
+                self.usage_sequence)
+
             return self.SHARE_CACHE[val]
         except KeyError:
             pass
 
-        self._remove_cotr()
+        properties = self.property_dict()
+
         try:
-            self._remove_susu()
+            properties['ops_in_touched'] = operators_in_touched_(
+                properties['touched_zones'],
+                properties['zone_legs'],
+                self.operator_sequence
+                )
         except KeyError:
-            shares = self._error_shares('station_map_error')
-            self.SHARE_CACHE[val] = shares
-            return shares
-
-        if not all(len(set(x)) == 1 for x in self.operator_legs):
-            try:
-                new_op_legs = self._station_operators()
-            except (ValueError, TypeError):
-                shares = self._error_shares('station_map_error')
-                self.SHARE_CACHE[val] = shares
-                return shares
-            except IndexError:
-                shares = self._error_shares('operator_error')
-                self.SHARE_CACHE[val] = shares
-                return shares
-
-            self.operator_legs = tuple((x, x) for x in new_op_legs)
-
-        if not all(len(set(x)) == 1 for x in self.operator_legs):
             shares = self._error_shares('operator_error')
-            self.SHARE_CACHE[val] = shares
             return shares
-
-        try:
-            properties = self.property_dict()
-        except IndexError:
-             # all legs removed
-            shares = self._error_shares('no_available_trip')
-            self.SHARE_CACHE[val] = shares
-            return shares
-
-        properties['ops_in_touched'] = operators_in_touched_(
-            properties['touched_zones'],
-            properties['zone_legs'],
-            self.operator_legs
-            )
 
         try:
             shares = self.share_calculation(properties, minimum_operator_zones)
         except KeyError:
             shares = self._error_shares('rk_operator_error')
-            self.SHARE_CACHE[val] = shares
             return shares
 
+        val = (self.stop_sequence,
+            self.operator_sequence,
+            self.usage_sequence)
         self.SHARE_CACHE[val] = shares
         return shares

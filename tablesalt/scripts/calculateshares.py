@@ -50,21 +50,21 @@ from typing import Dict, List, Tuple, TypedDict, Iterator
 import numpy as np
 from tqdm import tqdm
 
-from tablesalt import StoreReader
+from tablesalt import StoreReader, transitfeed
 from tablesalt.common import make_store
 from tablesalt.common.io import mappers
 from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.preprocessing.tools import db_paths, find_datastores
 from tablesalt.running import WindowsInhibitor
 from tablesalt.topology import ZoneGraph, ZoneSharer
+from tablesalt.topology.stationoperators import StationOperators
 from tablesalt.topology.tools import TakstZones
 
 
 THIS_DIR = Path(__file__).parent
 
-CPU_USAGE = 0.6 # % of processors
+CPU_USAGE = 0.4 # % of processors
 DB_START_SIZE = 8 # gb
-
 
 # this should be in common.io as contractor_to_array
 def proc_contractors(contrpack) -> np.ndarray:
@@ -228,6 +228,7 @@ def chunk_shares(
     store: str,
     year: int,
     graph: ZoneGraph,
+    opgetter: StationOperators,
     region: str,
     zonemap: Dict[int, int],
     region_contractors: Dict[str, List[str]]
@@ -261,20 +262,30 @@ def chunk_shares(
     model_two_shares = {} # solo_zone_price
     model_three_shares = {} # bumped
     model_four_shares = {}
+    errs = {}
+
     for k, zones, stops, operators, usage in tqdm(gen):
         # k, zones, stops, operators, usage = next(gen)
-        sharer = ZoneSharer(graph, zones, stops, operators, usage)
-        trip_shares = sharer.share()
+        try:
+            sharer = ZoneSharer(graph, opgetter, zones, stops, usage, takst_suffix=False)
+            trip_shares = sharer.share()
+        except KeyError:
+            continue
+        except Exception as e:
+            errs[k] = str(e)
+            continue
 
         if sharer.border_trip:
             initial_zone_sequence = sharer.zone_sequence
-            model_one_shares[k] = trip_shares['standard']
             final_zone_sequence = sharer.zone_sequence
             if initial_zone_sequence != final_zone_sequence:
                 border_changes[k] = final_zone_sequence
+
+            model_one_shares[k] = trip_shares['standard']
             model_two_shares[k] = trip_shares['solo_price']
             model_three_shares[k] = trip_shares['bumped']
             model_four_shares[k] = trip_shares['bumped_solo']
+
         else:
             model_one_shares[k] = trip_shares['standard']
             model_two_shares[k] = trip_shares['solo_price']
@@ -291,7 +302,12 @@ def chunk_shares(
     with open(fp, 'wb') as f:
         pickle.dump(border_changes, f)
 
-    return model_one_shares, model_two_shares, model_three_shares, model_four_shares
+    return (
+        model_one_shares,
+        model_two_shares,
+        model_three_shares,
+        model_four_shares
+        )
 
 def main():
     """
@@ -300,7 +316,7 @@ def main():
     using CPU_USAGE % processing power
     """
 
-    parser = TableArgParser('year')
+    parser = TableArgParser('year', 'bus_stop_distance')
     args = parser.parse()
 
     year = args['year']
@@ -309,6 +325,7 @@ def main():
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
+    bus_distance = args['bus_stop_distance']
 
     zones = TakstZones()
     zonemap = zones.stop_zone_map()
@@ -320,11 +337,21 @@ def main():
         }
 
     region = 'sjælland'
+
     graph = ZoneGraph(region=region)
+
+    # allfeeds = transitfeed.available_archives()
+    # year_archives = [x for x in allfeeds if str(year) in x]
+    feed = transitfeed.archived_transitfeed('20190911_20191204')
+    # for archive in tqdm(year_archives[-2:], f'merging transit feeds for {year}'):
+    #     archive_feed = transitfeed.archived_transitfeed(archive)
+    #     feed = feed + archive_feed
+    opgetter = StationOperators(feed, bus_distance_cutoff=bus_distance)
 
     pfunc = partial(chunk_shares,
                     year=year,
                     graph=graph,
+                    opgetter=opgetter,
                     region=region,
                     zonemap=zonemap,
                     region_contractors=region_contractors)
@@ -346,70 +373,3 @@ if __name__ == "__main__":
         INHIBITOR.uninhibit()
     else:
         main()
-
-
-# fp = r'C:\Users\B087115\Documents\GitHub\tablesalt\tablesalt\scripts'
-
-# import gc
-# import os
-# import pickle
-# from functools import partial
-# from itertools import chain, groupby
-# from multiprocessing import Pool
-# from operator import itemgetter
-# from pathlib import Path
-# from typing import Dict, List, Tuple, TypedDict, Iterator
-
-# import numpy as np
-# from tqdm import tqdm
-
-# from tablesalt import StoreReader
-# from tablesalt.common import make_store
-# from tablesalt.common.io import mappers
-# from tablesalt.preprocessing.parsing import TableArgParser
-# from tablesalt.preprocessing.tools import db_paths, find_datastores
-# from tablesalt.running import WindowsInhibitor
-# from tablesalt.topology import ZoneGraph, ZoneSharer
-# from tablesalt.topology.tools import TakstZones
-
-
-# THIS_DIR = Path(fp)
-
-# year = 2019
-# store_loc = find_datastores()
-# paths = db_paths(store_loc, year)
-# stores = paths['store_paths']
-# db_path = paths['calculated_stores']
-
-# zones = TakstZones()
-# zonemap = zones.stop_zone_map()
-
-# # TODO into config
-# region_contractors = {
-#     'hovedstaden': ['Movia_H', 'DSB', 'First', 'Stog', 'Metro'],
-#     'sjælland': ['Movia_H', 'Movia_S', 'Movia_V', 'DSB', 'First', 'Stog', 'Metro']
-#     }
-
-# region = 'sjælland'
-# graph = ZoneGraph(region=region)
-
-
-# store = stores[0]
-
-# stopsd, zonesd, usaged, operatorsd = _load_store_data(
-#     store, region, zonemap, region_contractors
-#     )
-
-# gen = _get_input(stopsd, zonesd, usaged, operatorsd)
-
-# border_changes = {}
-# model_one_shares = {}
-# model_two_shares = {} # solo_zone_price
-# model_three_shares = {} # bumped
-# model_four_shares = {}
-# for k, zones, stops, operators, usage in tqdm(gen):
-#     # k, zones, stops, operators, usage = next(gen)
-#     sharer = ZoneSharer(graph, zones, stops, operators, usage)
-#     if any(len(set(x)) == 1 for x in sharer.stop_legs):
-#         break
-#

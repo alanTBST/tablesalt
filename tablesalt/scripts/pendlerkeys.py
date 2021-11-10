@@ -28,31 +28,38 @@ and -m is the model to run (1 --> standard zonework model,
 
 """
 import ast
-from collections import defaultdict
 import os
 import pickle
-import pkg_resources
+from collections import defaultdict
 from datetime import datetime
-from itertools import groupby, chain
 from functools import lru_cache
+from itertools import chain, groupby
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
-from typing import AnyStr, Set, Tuple, Dict
+from typing import AnyStr, Dict, Set, Tuple
 
 import lmdb
 import msgpack
 import pandas as pd
+import pkg_resources
 from tqdm import tqdm
 
-from tablesalt.running import WindowsInhibitor
 from tablesalt import StoreReader
-from tablesalt.season.users import PendlerKombiUsers
-from tablesalt.preprocessing.tools import find_datastores, db_paths
 from tablesalt.preprocessing.parsing import TableArgParser
+from tablesalt.preprocessing.tools import db_paths, find_datastores
+from tablesalt.running import WindowsInhibitor
+from tablesalt.season.users import PendlerKombiUsers
+
 
 THIS_DIR = Path(__file__).parent
 
+TRIP_ERRORS = {
+    'operator_error',
+    'station_map_error',
+    'rk_operator_error',
+    'no_available_trip'
+    }
 def get_zone_combinations(udata) -> Set[Tuple[int, ...]]:
     """Get all the chosen zone combinations of pendler kombi users
 
@@ -151,8 +158,9 @@ def load_valid(valid_kombi_store: str) -> Dict:
 
     return {ast.literal_eval(k): v for k, v in valid_kombi.items()}
 
+# this gets done in pendlersetup now
 @lru_cache(2*16)
-def _date_in_window(test_period, test_date):
+def _date_in_window(test_period, test_date) -> bool:
     """test that a date is in a validity period"""
     return min(test_period) <= test_date <= max(test_period)
 
@@ -255,20 +263,16 @@ def n_operators(share_tuple):
 
     return len({x[1] for x in share_tuple})
 
-def pendler_reshare(share_tuple):
-
-    n_ops = n_operators(share_tuple)
-
-    return tuple((1/ n_ops, x[1]) for x in share_tuple)
-
 def get_zone_combination_shares(tofetch, db_path: str, model: int):
 
     final = {}
-    errors = {'operator_error', 'station_map_error', 'rk_operator_error', 'no_available_trip'}
+
     with lmdb.open(db_path) as env:
         with env.begin() as txn:
-            for combo, trips in tqdm(tofetch.items(),'fetching combo results',
-                                     total=len(tofetch)):
+            for combo, trips in tqdm(tofetch.items(),
+                                     'fetching combo results',
+                                     total=len(tofetch)
+                                     ):
                 all_trips = {}
                 for trip in trips:
                     t = bytes(str(trip), 'utf-8')
@@ -276,12 +280,9 @@ def get_zone_combination_shares(tofetch, db_path: str, model: int):
                     if not res:
                         continue
                     res = res.decode('utf-8')
-                    if res not in errors:
+                    if res not in TRIP_ERRORS:
                         val = ast.literal_eval(res)
-                        # if model != 3:
                         all_trips[trip] = val
-                        # else:
-                        #     all_trips[trip] = pendler_reshare(val)
                 combo_result = get_user_shares(all_trips.values())
                 final[combo] = combo_result
 
@@ -314,7 +315,6 @@ def _kombi_by_seasonpass(pendler_kombi, userdict):
 def _get_trips(db_path, tripkeys, model):
 
     tripkeys_ = (bytes(str(x), 'utf-8') for x in tripkeys)
-    errors = {'operator_error', 'station_map_error', 'rk_operator_error', 'no_available_trip'}
 
     out = {}
     with lmdb.open(db_path) as env:
@@ -324,12 +324,9 @@ def _get_trips(db_path, tripkeys, model):
                 if not res:
                     continue
                 res = res.decode('utf-8')
-                if res not in errors:
+                if res not in TRIP_ERRORS:
                     val = ast.literal_eval(res)
-                    # if model != 3:
                     out[int(k.decode('utf-8'))] = val
-                    # else:
-                        # out[int(k.decode('utf-8'))] = pendler_reshare(val)
 
     return out
 
@@ -521,14 +518,10 @@ def main():
     year = args['year']
     paths = db_paths(find_datastores(), year)
     stores = paths['store_paths']
-
-    zero_travel_price = find_no_pay(stores, year)
-
     db_path = paths['calculated_stores']
-
-
     zone_path = args['zones']
     product_path = args['products']
+    zero_travel_price = find_no_pay(stores, year)
 
     userdict = PendlerKombiUsers(
         year,
@@ -542,7 +535,6 @@ def main():
             result_path = db_path + f'_model_{model}'
         else:
             result_path = db_path
-
 
         _chosen_zones(
             userdict,
@@ -565,13 +557,16 @@ def main():
 
         _zonerelations(year, model)
 
-
-
 if __name__ == "__main__":
+    st = datetime.now()
+
+    INHIBITOR = None
     if os.name == 'nt':
         INHIBITOR = WindowsInhibitor()
         INHIBITOR.inhibit()
-        main()
+    main()
+
+    if INHIBITOR:
         INHIBITOR.uninhibit()
-    else:
-        main()
+
+    print(datetime.now() - st)

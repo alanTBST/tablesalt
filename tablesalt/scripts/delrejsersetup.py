@@ -171,7 +171,7 @@ def card_trip_generator(
             zipfile.ZipFile(zfile).open(content),
             encoding='iso-8859-1', usecols=wanted_columns,
             chunksize=chunksize, skiprows=skiprows,
-            error_bad_lines=False, low_memory=False
+            on_bad_lines='skip', low_memory=False
             )
 
         for chunk in df_gen:
@@ -242,7 +242,8 @@ def delrejser_generator(
             zipfile.ZipFile(zfile).open(content),
             encoding='iso-8859-1', usecols=wanted_columns,
             chunksize=chunksize, skiprows=skiprows,
-            error_bad_lines=False, low_memory=False
+            on_bad_lines='skip', low_memory=False,
+            memory_map=True
             )
         for df in tqdm(
                 df_gen,
@@ -759,12 +760,15 @@ def main() -> None:
 
 if __name__ == "__main__":
 
-    dt = datetime.now()
+    st = datetime.now()
+
+    INHIBITOR = None
     if os.name == 'nt':
         INHIBITOR = WindowsInhibitor()
         INHIBITOR.inhibit()
-        main()
+    main()
+
+    if INHIBITOR:
         INHIBITOR.uninhibit()
-    else:
-        main()
-    print(datetime.now() - dt)
+
+    print(datetime.now() - st)

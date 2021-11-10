@@ -44,7 +44,7 @@ REGIONS = {
     # 'sydjyllandsyd'
     }
 
-
+# to config
 REGION_ZONES = {
     'hovedstaden': (1000, 1100), # 200
     'vestsjælland': (1100, 1200), # 230
@@ -77,44 +77,44 @@ def determine_takst_region(zone_sequence):
 def _(zone_sequence: int) -> str:
 
     if zone_sequence < 1100:
-        return "movia_h"
+        return "th"
     if 1100 < zone_sequence <= 1200:
-        return "movia_v"
+        return "tv"
     if 1200 < zone_sequence < 1300:
-        return "movia_s"
+        return "ts"
     raise ValueError(f"zone = {zone_sequence} is not supported")
 
 @determine_takst_region.register
 def _(zone_sequence: tuple) -> str:
 
     if all(x < 1100 for x in zone_sequence):
-        return "movia_h"
+        return "th"
     if all(1100 < x <= 1200 for x in zone_sequence):
-        return "movia_v"
+        return "tv"
     if all(1200 < x < 1300 for x in zone_sequence):
-        return "movia_s"
+        return "ts"
     return "dsb"
 
 @determine_takst_region.register
 def _(zone_sequence: list) -> str:
 
     if all(x < 1100 for x in zone_sequence):
-        return "movia_h"
+        return "th"
     if all(1100 < x <= 1200 for x in zone_sequence):
-        return "movia_v"
+        return "tv"
     if all(1200 < x < 1300 for x in zone_sequence):
-        return "movia_s"
+        return "ts"
     return "dsb"
 
 @determine_takst_region.register
 def _(zone_sequence: set) -> str:
 
     if all(x < 1100 for x in zone_sequence):
-        return "movia_h"
+        return "th"
     if all(1100 < x <= 1200 for x in zone_sequence):
-        return "movia_v"
+        return "tv"
     if all(1200 < x < 1300 for x in zone_sequence):
-        return "movia_s"
+        return "ts"
     return "dsb"
 
 class _StopLoader:

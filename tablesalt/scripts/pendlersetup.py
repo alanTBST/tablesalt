@@ -333,13 +333,13 @@ def validate_travel_dates(
     # validate the user trips using the kombi dates lmdb store
     # =========================================================================
     valid_user_season_dict = defaultdict(list)
-    with lmdb.open(kombidatespath) as env:      
-        with env.begin() as txn:  
+    with lmdb.open(kombidatespath) as env:
+        with env.begin() as txn:
             for k, v in usertrips.items():
                 try:
                     userdates = _card_periods(userdata[k])
                 except KeyError:
-                    continue            
+                    continue
                 for trip in v:
                     trip_date = txn.get(str(trip).encode('utf-8'))
                     if not trip_date:
@@ -377,7 +377,7 @@ def main():
     userdata = pendler_cards.get_user_data()
 
     pendler_trip_keys = get_pendler_trips(
-        userdata, 
+        userdata,
         paths['trip_card_db'],
         paths['user_trips_db']
         )
@@ -398,12 +398,16 @@ def main():
     return
 
 if __name__ == "__main__":
+
     st = datetime.now()
+
+    INHIBITOR = None
     if os.name == 'nt':
         INHIBITOR = WindowsInhibitor()
         INHIBITOR.inhibit()
-        main()
+    main()
+
+    if INHIBITOR:
         INHIBITOR.uninhibit()
-    else:
-        main()
+
     print(datetime.now() - st)

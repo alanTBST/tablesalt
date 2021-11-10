@@ -95,6 +95,14 @@ class TableArgParser:
            False,
            int,
            1
+           ),
+        'bus_stop_distance': ArgTuple(
+           '-b',
+           '--bus_stop_distance',
+           'the allowed distance of a bus stop from a train station for subsequent check-ins',
+           False,
+           int,
+           500
            )
 
         }

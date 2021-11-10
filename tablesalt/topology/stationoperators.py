@@ -3,26 +3,59 @@
 Classes to interact with passenger stations and the operators that serve them
 """
 #standard imports
+import ast
 import json
 from collections import defaultdict
-from itertools import chain
+from itertools import groupby, permutations, product
+from operator import itemgetter
 from typing import Any, AnyStr, Dict, List, Optional, Set, Tuple, Union
 
-import h5py  # type: ignore
 import pandas as pd  # type: ignore
 import pkg_resources
+from tablesalt import transitfeed
 from tablesalt.common.io import mappers
-from tablesalt.topology.tools import determine_takst_region, TakstZones
+from tablesalt.resources.config.config import load_config
 from tablesalt.topology.stopnetwork import ALTERNATE_STATIONS
+from tablesalt.topology.tools import TakstZones, determine_takst_region
+from tablesalt.transitfeed.feed import TransitFeed, BusMapper
+
+CONFIG = load_config()
+
+SUBURBAN_UIC = dict(CONFIG['suburban_platform_numbers'])
+SUBURBAN_UIC = {int(k): int(v) for k, v in SUBURBAN_UIC.items()}
+REV_SUBURBAN_UIC = {v:k for k, v in SUBURBAN_UIC.items()}
+
+METRO_UIC = dict(CONFIG['metro_platform_numbers'])
+METRO_UIC = {int(k): int(v) for k, v in METRO_UIC.items()}
+REV_METRO_UIC = {v:k for k, v in METRO_UIC.items()}
+
+METRO_SUBURBAN = {k: SUBURBAN_UIC.get(v, v) for k, v in REV_METRO_UIC.items()}
+
+LOCAL_UIC_1 =  dict(CONFIG['local_platform_numbers_1'])
+LOCAL_UIC_1 = {int(k): int(v) for k, v in LOCAL_UIC_1.items()}
+
+LOCAL_UIC_2 =  dict(CONFIG['local_platform_numbers_2'])
+LOCAL_UIC_2 = {int(k): int(v) for k, v in LOCAL_UIC_2.items()}
+
+LOCAL_UIC = {**LOCAL_UIC_1, **LOCAL_UIC_2}
+REV_LOCAL_UIC = {v:k for k, v in METRO_UIC.items()}
+
+ALTERNATE_UIC =  dict(CONFIG['alternate_numbers'])
+ALTERNATE_UIC = {int(k): ast.literal_eval(v) for k, v in ALTERNATE_UIC.items()}
+
+
+SUBURBAN_TEST_STOPS = set(ast.literal_eval(CONFIG['suburban_farum_cph']['test_stops']))
+METRO_TEST_STOPS = set(ast.literal_eval(CONFIG['metro_lindevang']['test_stops']))
+KASTRUP_TEST_STOPS =  set(ast.literal_eval(CONFIG['kastrup_cph']['test_stops']))
+LOCAL_TEST_STOPS =  set(ast.literal_eval(CONFIG['local']['test_stops']))
+
 
 M_RANGE: Set[int] = set(range(8603301, 8603400))
 S_RANGE: Set[int] = set(range(8690000, 8699999))
 
-MIN_RAIL_UIC: int = 7400000
+# this is temporary, must change this. Use Transit feed to see if the stops service buses.
 MAX_RAIL_UIC: int = 9999999
-
-OP_MAP = {v: k.lower() for k, v in mappers['operator_id'].items()}
-REV_OP_MAP = {v:k for k, v in OP_MAP.items()}
+MIN_RAIL_UIC: int = 7400000
 
 def _load_default_config() -> Dict[str, str]:
     """load the operator configuration from the package
@@ -107,24 +140,6 @@ def _load_operator_settings(
         'lines': chosen_lines,
         'use_groups': use_groups
         }
-
-
-def load_bus_station_connectors() -> Dict[int, int]:
-    """
-    Load the bus stops station array from the support data
-
-    :return: a mapping of bus top numbers to station uic numbers
-    :rtype: Dict[int, int]
-
-    """
-
-    support_store = pkg_resources.resource_filename(
-        'tablesalt', 'resources/support_store.h5')
-
-    with h5py.File(support_store, 'r') as store:
-        bus_map = store['datasets/bus_closest_station'][:]
-
-    return {x[0]: x[1] for x in bus_map}
 
 
 def _load_bus_station_map() -> Dict[int, int]:
@@ -234,307 +249,635 @@ def _grouped_lines_dict(config_dict):
     return groupdict
 
 
-# make a separate lookup class
-class StationOperators():
+class StationOperators:
 
-    BUS_ID_MAP: Dict[int, int] = _load_bus_station_map()
+    def __init__(
+        self,
+        feed: TransitFeed,
+        bus_distance_cutoff: int = 500,
+        crs: int = 25832
+        ) -> None:
+        """[summary]
 
-    LINE_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
-    OP_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
-
-    def __init__(self, *lines: str) -> None:
-        """
-        Class used to find the operators at stations and the
-        interoperability at stations
-
-        :param *lines: the physical rail lines to include
-            options: any combination of:
-                        'kystbanen',
-                        'local',
-                        'metro',
-                        'suburban',
-                        'fjernregional'
-
-        :type *lines: str
-        :return: ''
-        :rtype: None
-
+        :param feed: [description]
+        :type feed: TransitFeed
+        :param bus_distance_cutoff: [description], defaults to 500
+        :type bus_distance_cutoff: int, optional
+        :param crs: [description], defaults to 25832
+        :type crs: int, optional
         """
 
+        self.feed = feed
+        self._suburban_operator, self._metro_operator, self._local_operator = \
+            self._determine_operators()
 
-        self.lines = lines
-        self._settings = _load_operator_settings(*self.lines)
-        stop_lookup, line_lookup = self._pas_station_dict()
-        self._stop_lookup = stop_lookup
-        self._line_lookup = line_lookup
-        self._stop_zone_map = TakstZones().stop_zone_map()
-        self._group_lines = _grouped_lines_dict(self._settings['config'])
+        self.bus_mapper = BusMapper(self.feed, crs=crs)
+        self.bus_to_station_map: Dict[int, int] = \
+            self.bus_mapper.get_bus_map(bus_distance_cutoff=bus_distance_cutoff)
 
-        self._alternates = set(chain(*ALTERNATE_STATIONS.values()))
+        self.station_to_bus_map = self._reverse_bus_map()
+        self._lookup = self._process_stop_times()
 
-    def _pas_station_dict(self) -> Dict[Tuple[str, ...], List[int]]:
-        """
-        create the station dictionary from the underlying
-        dataset
-        """
-        lines = self._settings['lines']
-        pas_stations = _load_default_passenger_stations()
+    def _reverse_bus_map(self):
 
-        line_lookup = defaultdict(set)
-        for line in lines:
-            for frame in pas_stations:
-                s = frame[line]
-                good = set(s[s > 0].index)
-                line_lookup[line].update(good)
+        bmap = tuple(self.bus_to_station_map.items())
+        bmap = sorted(bmap, key=itemgetter(1))
 
-        stop_lookup = defaultdict(set)
-        for k, v in line_lookup.items():
-            for stopid in v:
-                stop_lookup[stopid].add(k)
-
-        return stop_lookup, line_lookup
-
-    def get_ops(
-        self, stop_number: int,
-        format: Optional[str] = 'operator_id'
-        ) -> Tuple[Union[int, str], ...]:
-        """
-        Returns a tuple of the operators at the given station id
-
-        :param stop_number: uic number of the station
-        :type stop_number: int
-        :param format: 'operator_id', 'operator' or 'line', defaults to 'operator_id'
-            'operator' - returns str values representing the operators at the stop
-            'line' - returns line names of the stop
-
-        :type format: Optional[str], optional
-        :raises ValueError: if incorrect format is given
-        :return: the operators or lines serving the given station
-        :rtype: Tuple[Union[int, str], ...]
-
-        :Example:
-
-        to return the operators at Copenhagen central station:
-            the uic number is 8600626
-
-        >>> op_getter = StationOperators()
-        >>> cph_operator_ids = op_getter.get_ops(8600626, format='operator_id')
-        >>> cph_operator_ids
-        >>> (4, 8, 5, 6)
-        >>> cph_operators = op_getter.get_ops(8600626, format='operator')
-        >>> cph_operators
-        >>> ('first', 's-tog', 'dsb', 'metro')
-
-        Copenhagen central also has an s-tog platform that has
-        the uic number 8690626
-
-        in this case:
-
-        >>> cph_stog_operators = op_getter.get_ops(8690626, format='operator')
-        >>> cph_stog_operators
-        >>> ('s-tog', 'first', 'dsb', 'metro')
-
-        """
-
-        if format not in {'operator', 'operator_id', 'line'}:
-            raise ValueError(
-        "format must be one of 'operator', 'operator_id', 'line'"
-        )
-
-        fdict: Dict[str,  Union[Tuple[int, ...], Tuple[str, ...]]]
-        fdict = {
-            'operator_id': self._get_operator_id(stop_number),
-            'operator': self._get_operator(stop_number),
-            'line': self._get_line(stop_number)
+        station_to_bus = {
+            key: tuple(x[0] for x in grp) for
+            key, grp in groupby(bmap, key=itemgetter(1))
             }
-        return fdict[format]
+
+        suburban = {SUBURBAN_UIC[k]: v for k, v in station_to_bus.items() if k in SUBURBAN_UIC}
+        local = {LOCAL_UIC[k]: v for k, v in station_to_bus.items() if k in LOCAL_UIC}
+
+        return {**station_to_bus, **suburban, **local}
+
+    def _determine_operators(self):
+        # this must be changed in future for each local line
+
+        stoptimes = list(self.feed.stop_times.data.items())
+
+        suburban_trip = None
+        metro_trip = None
+        kastrup_trip = None
+        local_trip = None  # NOTE. only one local operator for sjælland (must fix this)
+
+        for tripid, stoptime in stoptimes:
+            stopids = set(x['stop_id'] for x in stoptime)
+            if stopids.intersection(SUBURBAN_TEST_STOPS):
+                suburban_trip = tripid
+
+            elif stopids.intersection(METRO_TEST_STOPS):
+                metro_trip = tripid
+            elif stopids.intersection(KASTRUP_TEST_STOPS):
+                kastrup_trip = tripid
+            elif stopids.intersection(LOCAL_TEST_STOPS):
+                local_trip = tripid
+
+            if (suburban_trip is not None and
+                metro_trip is not None and
+                kastrup_trip is not None and
+                local_trip is not None):
+                break
+        else:
+            raise ValueError("Cannot determine suburban/metro operator")
+
+        sub_agency_name = self.feed.get_agency_name_for_trip(suburban_trip)
+        met_agency_name = self.feed.get_agency_name_for_trip(metro_trip)
+        # kast_agency_name = self.feed.get_agency_name_for_trip(kastrup_trip)
+        local_agency_name = self.feed.get_agency_name_for_trip(local_trip)
+
+        return sub_agency_name, met_agency_name, local_agency_name
+
+    @staticmethod
+    def _start_operator_changes(stop_map, leg_permutations, operator):
+        start_perms = {(stop_map.get(x[0], x[0]), x[1]) for x in leg_permutations}
+        new_perms = start_perms - leg_permutations
+        if new_perms:
+            return {stop_relation: {operator} for stop_relation in new_perms}
+
+        return {}
+
+    @staticmethod
+    def _end_operator_changes(stop_map, leg_permutations, operator):
+        end_perms = {(x[0], stop_map.get(x[1], x[1])) for x in leg_permutations}
+        new_perms = end_perms - leg_permutations
+        if new_perms:
+            return {stop_relation: {operator} for stop_relation in new_perms}
+        return {}
+
+    def _suburban_stop_changes(self, leg_permutations):
+        # legs starting at 869 platform must only be suburban operator
+        s_suburban_ops = self._start_operator_changes(
+            SUBURBAN_UIC, leg_permutations, self._suburban_operator
+            )
+        e_suburban_ops = self._end_operator_changes(
+            SUBURBAN_UIC, leg_permutations, self._suburban_operator
+            )
+         # if starting platform is local num 861/862... the operator should still be suburban
+        s_local_ops = self._start_operator_changes(
+            LOCAL_UIC, leg_permutations, self._suburban_operator
+            )
+        # if end platform is local num 861/862... the operator should still be suburban
+        e_local_ops = self._end_operator_changes(
+                LOCAL_UIC, leg_permutations, self._suburban_operator
+            )
+        # if end number is a metro number operator still suburban
+        e_metro_ops = self._end_operator_changes(
+                METRO_UIC, leg_permutations, self._suburban_operator
+            )
+        return {
+            **s_suburban_ops,
+            **e_suburban_ops,
+            **s_local_ops,
+            **e_local_ops,
+            **e_metro_ops
+            }
+
+    def _local_stop_changes(self, leg_permutations):
+        s_local_ops = self._start_operator_changes(
+            LOCAL_UIC, leg_permutations, self._local_operator
+            )
+
+        e_local_ops = self._end_operator_changes(
+                LOCAL_UIC, leg_permutations, self._local_operator
+            )
+
+        s_suburban_ops = self._start_operator_changes(
+            SUBURBAN_UIC, leg_permutations, self._local_operator
+            )
+
+        return  {**s_suburban_ops, **s_local_ops, **e_local_ops}
+
+    def _metro_stop_changes(self, leg_permutations):
+
+        metro_ops = self._end_operator_changes(
+            REV_METRO_UIC, leg_permutations, self._metro_operator
+            )
+        suburban_ops = self._end_operator_changes(
+            METRO_SUBURBAN, leg_permutations, self._metro_operator
+            )
+
+        return {**metro_ops, **suburban_ops}
+
+    def _end_stop_changes(self, relation_operators):
+
+        metro = {k: v for k, v in relation_operators.items() if k[1] in METRO_UIC and k[0] not in METRO_UIC}
+        suburban = {k: v for k, v in relation_operators.items() if k[1] in SUBURBAN_UIC and k[0] not in SUBURBAN_UIC}
+        buses = {k: v for k, v in relation_operators.items() if k[1] in self.station_to_bus_map}
+        buses_start = {k: v for k, v in relation_operators.items() if k[1] in self.bus_to_station_map}
+
+        st_to_bus = {}
+        for k, v in buses.items():
+            new_legs = tuple((k[0], x) for x in self.station_to_bus_map[k[1]])
+            new = {x: v for x in new_legs}
+            st_to_bus.update(new)
 
 
-    def _check_bus_location(self, bus_stop_id: int) -> int:
-        """map a bus id to a station if possible, else 0
+        bus_to_st = {}
+        for k, v in buses_start.items():
+            leg = (k[0], self.bus_to_station_map[k[1]])
+            mapped_leg = (leg[0], SUBURBAN_UIC.get(leg[1], leg[1]))
+            mapped_leg_l = (leg[0], LOCAL_UIC.get(leg[1], leg[1]))
+            mapped_leg_m = (leg[0], METRO_UIC.get(leg[1], leg[1]))
+            if leg not in relation_operators:
+                bus_to_st[leg] = v
+            if mapped_leg not in relation_operators:
+                bus_to_st[mapped_leg] = v
+            if mapped_leg_l not in relation_operators:
+                bus_to_st[mapped_leg_l] = v
+            if mapped_leg_m not in relation_operators:
+                bus_to_st[mapped_leg_m] = v
 
-        :param bus_stop_id: the stop number
-        :type bus_stop_id: int
-        :return: the mapped station number or 0 if no mapping exists
-        :rtype: int
+        new_metro = {(k[0], METRO_UIC[k[1]]): v for k, v in metro.items()}
+        new_sub = {(k[0], SUBURBAN_UIC[k[1]]): v for k, v in suburban.items()}
+
+        return {
+            # **st_to_bus,
+            **bus_to_st,
+            **new_metro,
+            **new_sub
+            }
+
+    def _start_stop_changes(self, relation_operators):
+
+        suburban = {k: v for k, v in relation_operators.items() if k[0] in SUBURBAN_UIC}
+        new_suburban = {
+            (SUBURBAN_UIC[k[0]], k[1]): v for k, v in suburban.items()
+        }
+
+        local = {k: v for k, v in relation_operators.items() if k[0] in LOCAL_UIC}
+        new_local = {
+            (LOCAL_UIC[k[0]], k[1]): v for k, v in local.items()
+        }
+
+        metro = {k: v for k, v in relation_operators.items() if k[0] in METRO_UIC}
+        new_metro = {
+            (METRO_UIC[k[0]], k[1]): v for k, v in metro.items()
+        }
+
+
+        return {**new_suburban, **new_local, **new_metro}
+
+    def _process_stop_times(self) -> Dict[int, Tuple[Tuple[int, int]]]:
         """
+        This method creates the dictionary in self._lookup
+        It uses the stop_times dataset from the given transit feed
+        """
+        relation_operators = defaultdict(set)
 
-        return self.BUS_ID_MAP.get(bus_stop_id, 0)
+        seen = set()
+        for trip_id, stoptime in self.feed.stop_times.data.items():
+            stopids = tuple(x['stop_id'] for x in stoptime)
+            if stopids in seen:
+                continue
+            perms = set(permutations(stopids, 2))
+            seen.add(stopids)
+            agency = self.feed.get_agency_name_for_trip(trip_id)
+            for stop_relation in perms:
+                relation_operators[stop_relation].add(agency)
+            # this deals only with sjælland correctly
+            # needs more work for jylland maybe
+            if agency == self._suburban_operator:
+                updated_leg_permutations = self._suburban_stop_changes(perms)
+            elif agency == self._local_operator:
+                updated_leg_permutations = self._local_stop_changes(perms)
+            elif agency == self._metro_operator:
+                updated_leg_permutations = self._metro_stop_changes(perms)
+            else:
+                updated_leg_permutations = {}
+
+            relation_operators.update(updated_leg_permutations)
+
+        relation_operators = dict(relation_operators)
+        #deal with the alternate rejsekort station numbers
+        alts = self._alternate_stop_numbers(relation_operators)
+        relation_operators.update(alts)
+
+        end_changes = self._end_stop_changes(relation_operators)
+        relation_operators.update(end_changes)
+
+        start_changes = self._start_stop_changes(relation_operators)
+        relation_operators.update(start_changes)
+        relation_operators = {k: tuple(v) for k, v in relation_operators.items()}
+
+        return relation_operators
+
+    def _alternate_stop_numbers(self, relation_operators):
+        """"replace the station numbers with their alternate numbers
+        so that the alternate stations are also in the lookup"""
+        alts = {}
+        for k, v in relation_operators.items():
+            if any(x in ALTERNATE_UIC for x in k):
+                start = ALTERNATE_UIC.get(k[0], k[0])
+                end = ALTERNATE_UIC.get(k[1], k[1])
+                if isinstance(start, int):
+                    start = [start]
+                if isinstance(end, int):
+                    end = [end]
+                new_keys = product(start, end)
+                for nk in new_keys:
+                    alts[nk] = v
+        return alts
+
+    def _same_network(self, start_stop_id, end_stop_id):
+
+        start_stop_id = 8603301
+        end_stop_id = 8603334
+
+        # O(n2)
+        options_start = (x for x in self._lookup if x[0] == start_stop_id)
+        options_end = tuple(x for x in self._lookup if x[1] == end_stop_id)
+
+        possible_operators = set()
+        for option in options_start:
+            try:
+                match = tuple(x for x in options_end if option[1]==x[0])
+                op_1 = set(self._lookup[option])
+                for m in match:
+                    op_2 = set(self._lookup[m])
+                    op = op_1.intersection(op_2)
+                    if op:
+                        possible_operators.add(tuple(op))
+            except (IndexError, StopIteration):
+                continue
+
+        raise KeyError
 
     def station_pair(
         self,
-        start_uic: int,
-        end_uic: int,
-        format: Optional[str] = 'operator'
-        ) -> Union[Tuple[int, ...], Tuple[str, ...]]:
+        start_stop_id: int,
+        end_stop_id: int
+        ) -> Tuple[str]:
+        """Determine the possible operators for a pair of stations.
+        Can be used to determine the operator servicing a leg of a trip
+
+        If no operator services the given station pair, a KeyError is raised
+        :param start_stop_id: the station number of the starting station
+        :type start_stop_id: int
+        :param end_stop_id: the station number of the end station
+        :type end_stop_id: int
+        :return: a set of possible operators servicing the station pair
+        :rtype: Set[str]
         """
-        Returns the possible operators that can perform
-        the journey between a given station pair
 
-        :param start_uic: the uic number of the start station
-        :type start_uic: int
-        :param end_uic: the uic number of the end station
-        :type end_uic: int
-        :param format:  the way in which you desire the output, defaults to 'operator_id'
-            'operator_id' - returns values as integer ids representing operators
-            'operator' - returns values as strings of the operator name
+        # if start bus-end train, check end station and stops around it...must be a bus leg to one of the stops
 
-        :type format: Optional[str], optional
-        :raises ValueError: if the end stopid is not mappable to a station
-        :return: the operators serving the given station pair
-        :rtype: Tuple[int, ...]
+        # if start train - end bus, find the closest station to the bus stop and check leg
+        try:
+            return self._lookup[(start_stop_id, end_stop_id)]
+        except KeyError:
+            msg = (f"No operator found servicing leg {start_stop_id}, {end_stop_id} "
+                   f"in the period {self.feed.feed_period()}")
+            raise KeyError(msg)
 
-        :Example:
-
-        to return the possbible operators servicing a leg from copenhagen central
-        station to helsingør station
-
-        >>> op_getter = StationOperators(
-                'kystkastrup', 'suburban',
-                'sjællandfjernregional',
-                'sjællandlocal', 'metro'
-                )
-        >>> op_getter.station_pair(8600626, 8600669, format='line')
-            ['kystbanen']
-        >>> opgetter.station_pair(8600626, 8600669, format='operator')
-            ['first']
-        """
-        if format == 'operator':
-            try:
-                return self.OP_CACHE[(start_uic, end_uic)]
-            except KeyError:
-                pass
-        elif format == 'line':
-            try:
-                return self.LINE_CACHE[(start_uic, end_uic)]
-            except KeyError:
-                pass
-        else:
-            raise ValueError(f"format={format} not available")
-
-        start_bus = start_uic > MAX_RAIL_UIC or start_uic < MIN_RAIL_UIC
-        end_bus = end_uic > MAX_RAIL_UIC or end_uic < MIN_RAIL_UIC
-
-        if start_bus:
-            startzone = self._stop_zone_map.get(start_uic)
-            if not startzone:
-                raise ValueError(f"Unknown bus stop id={start_uic}")
-            region = determine_takst_region(startzone)
-            line = {f'{region}_bus'}
-            operator = {self._settings['config']['bus'][region]}
-
-            self.OP_CACHE[(start_uic, end_uic)] = list(operator)
-            self.LINE_CACHE[(start_uic, end_uic)] = list(line)
-            if format == 'operator':
-                return self.OP_CACHE[(start_uic, end_uic)]
-            return self.LINE_CACHE[(start_uic, end_uic)]
+# HHHHHHHHHHHHHH
+# KeyError: 'No operator found servicing leg 38300, 50348 in the period (datetime.datetime(2021, 10, 25, 0, 0), datetime.datetime(2022, 1, 19, 0, 0))'
 
 
-        if not start_bus:
-            start_lines = self._stop_lookup[start_uic]
-        if not end_bus:
-            end_lines = self._stop_lookup[end_uic]
-        else:
-            bus_loc_check = self._check_bus_location(end_uic)
-            if not bus_loc_check:
-                 raise ValueError(f"Unknown bus stop id={end_uic}")
-            end_lines = self._stop_lookup[bus_loc_check]
+# make a separate lookup class
+# class StationOperators():
 
-        line_intersection = start_lines.intersection(end_lines)
+#     BUS_ID_MAP: Dict[int, int] = _load_bus_station_map() self.station_pair(8600669, 6584)
 
-        if not line_intersection:
-            # find missing stop point
-            start_groups = {self._group_lines.get(x) for x in start_lines}
-            start_groups = {x for x in start_groups if x}
-            end_groups = {self._group_lines.get(x) for x in end_lines}
-            end_groups = {x for x in end_groups if x}
-            group_intersection = start_groups.intersection(end_groups)
+#     LINE_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
+#     OP_CACHE: Dict[Tuple[int, int], Tuple[int, ...]] = {}
 
-            if group_intersection:
-                group_lines, possible_operators = self._has_grp_intersection(
-                    group_intersection
-                    )
-                self.OP_CACHE[(start_uic, end_uic)]  = possible_operators
-                self.LINE_CACHE[(start_uic, end_uic)] = group_lines
-            else:
-                self.OP_CACHE[(start_uic, end_uic)]  = []
-                self.LINE_CACHE[(start_uic, end_uic)] = []
-        else:
-            possible_operators, possible_lines = self._has_line_intersection(
-                start_uic, line_intersection
-                )
+#     def __init__(self, *lines: str) -> None:
+#         """
+#         Class used to find the operators at stations and the
+#         interoperability at stations
 
-            self.OP_CACHE[(start_uic, end_uic)] = possible_operators
-            self.LINE_CACHE[(start_uic, end_uic)] = possible_lines
+#         :param *lines: the physical rail lines to include
+#             options: any combination of:
+#                         'kystbanen',
+#                         'local',
+#                         'metro',
+#                         'suburban',
+#                         'fjernregional'
 
-        if format == 'operator':
-            return self.OP_CACHE[(start_uic, end_uic)]
-        return self.LINE_CACHE[(start_uic, end_uic)]
+#         :type *lines: str
+#         :return: ''
+#         :rtype: None
 
-    def _has_grp_intersection(self, group_intersection):
-
-        if len(group_intersection) == 1:
-            group = group_intersection.pop()
-            group_lines = set(self._settings['config'][group])
-            possible_operators = {self._settings['config'][x] for x in group_lines}
-
-        else:
-            group_lines = set()
-            possible_operators = set()
-
-        return list(group_lines), list(possible_operators)
+#         """
 
 
-    def _has_line_intersection(self, start_uic, line_intersection):
+#         self.lines = lines
+#         self._settings = _load_operator_settings(*self.lines)
+#         stop_lookup, line_lookup = self._pas_station_dict()
+#         self._stop_lookup = stop_lookup
+#         self._line_lookup = line_lookup
+#         self._stop_zone_map = TakstZones().stop_zone_map()
+#         self._group_lines = _grouped_lines_dict(self._settings['config'])
+
+#         self._alternates = set(chain(*ALTERNATE_STATIONS.values()))
+
+#     def _pas_station_dict(self) -> Dict[Tuple[str, ...], List[int]]:
+#         """
+#         create the station dictionary from the underlying
+#         dataset
+#         """
+#         lines = self._settings['lines']
+#         pas_stations = _load_default_passenger_stations()
+
+#         line_lookup = defaultdict(set)
+#         for line in lines:
+#             for frame in pas_stations:
+#                 s = frame[line]
+#                 good = set(s[s > 0].index)
+#                 line_lookup[line].update(good)
+
+#         stop_lookup = defaultdict(set)
+#         for k, v in line_lookup.items():
+#             for stopid in v:
+#                 stop_lookup[stopid].add(k)
+
+#         return stop_lookup, line_lookup
+
+#     def get_ops(
+#         self, stop_number: int,
+#         format: Optional[str] = 'operator_id'
+#         ) -> Tuple[Union[int, str], ...]:
+#         """
+#         Returns a tuple of the operators at the given station id
+
+#         :param stop_number: uic number of the station
+#         :type stop_number: int
+#         :param format: 'operator_id', 'operator' or 'line', defaults to 'operator_id'
+#             'operator' - returns str values representing the operators at the stop
+#             'line' - returns line names of the stop
+
+#         :type format: Optional[str], optional
+#         :raises ValueError: if incorrect format is given
+#         :return: the operators or lines serving the given station
+#         :rtype: Tuple[Union[int, str], ...]
+
+#         :Example:
+
+#         to return the operators at Copenhagen central station:
+#             the uic number is 8600626
+
+#         >>> op_getter = StationOperators()
+#         >>> cph_operator_ids = op_getter.get_ops(8600626, format='operator_id')
+#         >>> cph_operator_ids
+#         >>> (4, 8, 5, 6)
+#         >>> cph_operators = op_getter.get_ops(8600626, format='operator')
+#         >>> cph_operators
+#         >>> ('first', 's-tog', 'dsb', 'metro')
+
+#         Copenhagen central also has an s-tog platform that has
+#         the uic number 8690626
+
+#         in this case:
+
+#         >>> cph_stog_operators = op_getter.get_ops(8690626, format='operator')
+#         >>> cph_stog_operators
+#         >>> ('s-tog', 'first', 'dsb', 'metro')
+
+#         """
+
+#         if format not in {'operator', 'operator_id', 'line'}:
+#             raise ValueError(
+#         "format must be one of 'operator', 'operator_id', 'line'"
+#         )
+
+#         fdict: Dict[str,  Union[Tuple[int, ...], Tuple[str, ...]]]
+#         fdict = {
+#             'operator_id': self._get_operator_id(stop_number),
+#             'operator': self._get_operator(stop_number),
+#             'line': self._get_line(stop_number)
+#             }
+#         return fdict[format]
 
 
-        if len(line_intersection) == 1:
-            line = list(line_intersection)
-            possible_operators = [self._settings['config'][line[0]]]
-            return possible_operators, line
+#     def _check_bus_location(self, bus_stop_id: int) -> int:
+#         """map a bus id to a station if possible, else 0
 
-        suburban_option = any(
-            x in self._settings['config']['suburban'] for
-            x in line_intersection
-            )
+#         :param bus_stop_id: the stop number
+#         :type bus_stop_id: int
+#         :return: the mapped station number or 0 if no mapping exists
+#         :rtype: int
+#         """
 
-        metro_option = any(
-            x in self._settings['config']['metro'] for
-            x in line_intersection
-            )
+#         return self.BUS_ID_MAP.get(bus_stop_id, 0)
 
-        if start_uic in mappers['s_uic'] and suburban_option:
-            possible_lines = {x for x in line_intersection if
-                              x in self._settings['config']['suburban']}
-            possible_operators = {
-                self._settings['config'][x] for x in possible_lines
-                }
+#     def station_pair(
+#         self,
+#         start_uic: int,
+#         end_uic: int,
+#         format: Optional[str] = 'operator'
+#         ) -> Union[Tuple[int, ...], Tuple[str, ...]]:
+#         """
+#         Returns the possible operators that can perform
+#         the journey between a given station pair
 
-        elif start_uic in mappers['m_uic'] and metro_option:
-            possible_lines = {
-                x for x in line_intersection if
-                x in self._settings['config']['metro']
-                }
-            possible_operators = {
-                self._settings['config'][x] for x in possible_lines
-                }
+#         :param start_uic: the uic number of the start station
+#         :type start_uic: int
+#         :param end_uic: the uic number of the end station
+#         :type end_uic: int
+#         :param format:  the way in which you desire the output, defaults to 'operator_id'
+#             'operator_id' - returns values as integer ids representing operators
+#             'operator' - returns values as strings of the operator name
 
-        elif start_uic in self._alternates:
-            possible_lines = {
-                x for x in line_intersection if
-                x in self._settings['config']['sjællandlocal']
-                }
-            possible_operators = {
-                self._settings['config'][x] for x in possible_lines
-                }
-        else:
-            possible_lines = {
-                x for x in line_intersection if
-                x not in self._settings['config']['suburban'] and
-                x not in self._settings['config']['metro'] and
-                x not in self._settings['config']['sjællandlocal']
-                }
-            possible_operators = {
-                self._settings['config'][x] for x in possible_lines
-                }
-        return list(possible_operators), list(possible_lines)
+#         :type format: Optional[str], optional
+#         :raises ValueError: if the end stopid is not mappable to a station
+#         :return: the operators serving the given station pair
+#         :rtype: Tuple[int, ...]
+
+#         :Example:
+
+#         to return the possbible operators servicing a leg from copenhagen central
+#         station to helsingør station
+
+#         >>> op_getter = StationOperators(
+#                 'kystkastrup', 'suburban',
+#                 'sjællandfjernregional',
+#                 'sjællandlocal', 'metro'
+#                 )
+#         >>> op_getter.station_pair(8600626, 8600669, format='line')
+#             ['kystbanen']
+#         >>> opgetter.station_pair(8600626, 8600669, format='operator')
+#             ['first']
+#         """
+#         if format == 'operator':
+#             try:
+#                 return self.OP_CACHE[(start_uic, end_uic)]
+#             except KeyError:
+#                 pass
+#         elif format == 'line':
+#             try:
+#                 return self.LINE_CACHE[(start_uic, end_uic)]
+#             except KeyError:
+#                 pass
+#         else:
+#             raise ValueError(f"format={format} not available")
+
+#         start_bus = start_uic > MAX_RAIL_UIC or start_uic < MIN_RAIL_UIC
+#         end_bus = end_uic > MAX_RAIL_UIC or end_uic < MIN_RAIL_UIC
+
+#         if start_bus:
+#             startzone = self._stop_zone_map.get(start_uic)
+#             if not startzone:
+#                 raise ValueError(f"Unknown bus stop id={start_uic}")
+#             region = determine_takst_region(startzone)
+#             line = {f'{region}_bus'}
+#             operator = {self._settings['config']['bus'][region]}
+
+#             self.OP_CACHE[(start_uic, end_uic)] = list(operator)
+#             self.LINE_CACHE[(start_uic, end_uic)] = list(line)
+#             if format == 'operator':
+#                 return self.OP_CACHE[(start_uic, end_uic)]
+#             return self.LINE_CACHE[(start_uic, end_uic)]
+
+
+#         if not start_bus:
+#             start_lines = self._stop_lookup[start_uic]
+#         if not end_bus:
+#             end_lines = self._stop_lookup[end_uic]
+#         else:
+#             bus_loc_check = self._check_bus_location(end_uic)
+#             if not bus_loc_check:
+#                  raise ValueError(f"Unknown bus stop id={end_uic}")
+#             end_lines = self._stop_lookup[bus_loc_check]
+
+#         line_intersection = start_lines.intersection(end_lines)
+
+#         if not line_intersection:
+#             # find missing stop point
+#             start_groups = {self._group_lines.get(x) for x in start_lines}
+#             start_groups = {x for x in start_groups if x}
+#             end_groups = {self._group_lines.get(x) for x in end_lines}
+#             end_groups = {x for x in end_groups if x}
+#             group_intersection = start_groups.intersection(end_groups)
+
+#             if group_intersection:
+#                 group_lines, possible_operators = self._has_grp_intersection(
+#                     group_intersection
+#                     )
+#                 self.OP_CACHE[(start_uic, end_uic)]  = possible_operators
+#                 self.LINE_CACHE[(start_uic, end_uic)] = group_lines
+#             else:
+#                 self.OP_CACHE[(start_uic, end_uic)]  = []
+#                 self.LINE_CACHE[(start_uic, end_uic)] = []
+#         else:
+#             possible_operators, possible_lines = self._has_line_intersection(
+#                 start_uic, line_intersection
+#                 )
+
+#             self.OP_CACHE[(start_uic, end_uic)] = possible_operators
+#             self.LINE_CACHE[(start_uic, end_uic)] = possible_lines
+
+#         if format == 'operator':
+#             return self.OP_CACHE[(start_uic, end_uic)]
+#         return self.LINE_CACHE[(start_uic, end_uic)]
+
+#     def _has_grp_intersection(self, group_intersection):
+
+#         if len(group_intersection) == 1:
+#             group = group_intersection.pop()
+#             group_lines = set(self._settings['config'][group])
+#             possible_operators = {self._settings['config'][x] for x in group_lines}
+
+#         else:
+#             group_lines = set()
+#             possible_operators = set()
+
+#         return list(group_lines), list(possible_operators)
+
+
+#     def _has_line_intersection(self, start_uic, line_intersection):
+
+
+#         if len(line_intersection) == 1:
+#             line = list(line_intersection)
+#             possible_operators = [self._settings['config'][line[0]]]
+#             return possible_operators, line
+
+#         suburban_option = any(
+#             x in self._settings['config']['suburban'] for
+#             x in line_intersection
+#             )
+
+#         metro_option = any(
+#             x in self._settings['config']['metro'] for
+#             x in line_intersection
+#             )
+
+#         if start_uic in mappers['s_uic'] and suburban_option:
+#             possible_lines = {x for x in line_intersection if
+#                               x in self._settings['config']['suburban']}
+#             possible_operators = {
+#                 self._settings['config'][x] for x in possible_lines
+#                 }
+
+#         elif start_uic in mappers['m_uic'] and metro_option:
+#             possible_lines = {
+#                 x for x in line_intersection if
+#                 x in self._settings['config']['metro']
+#                 }
+#             possible_operators = {
+#                 self._settings['config'][x] for x in possible_lines
+#                 }
+
+#         elif start_uic in self._alternates:
+#             possible_lines = {
+#                 x for x in line_intersection if
+#                 x in self._settings['config']['sjællandlocal']
+#                 }
+#             possible_operators = {
+#                 self._settings['config'][x] for x in possible_lines
+#                 }
+#         else:
+#             possible_lines = {
+#                 x for x in line_intersection if
+#                 x not in self._settings['config']['suburban'] and
+#                 x not in self._settings['config']['metro'] and
+#                 x not in self._settings['config']['sjællandlocal']
+#                 }
+#             possible_operators = {
+#                 self._settings['config'][x] for x in possible_lines
+#                 }
+#         return list(possible_operators), list(possible_lines)
+# """
