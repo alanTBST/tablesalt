@@ -275,7 +275,7 @@ class TimeRecord(Record):
         """
         return self.first_check_in.weekday()
 
-    def trip_duration(self) -> float:
+    def trip_duration(self, unit: str = 's') -> float:
         """
         Return the total trip duration in minutes
 
@@ -287,8 +287,10 @@ class TimeRecord(Record):
         final_check_out = datetime.fromisoformat(
             self.data[max(self.data)]
             )
+        divisor = 1 if unit == 'm' else 60
 
-        return (final_check_out - self.first_check_in).seconds / 60
+
+        return (final_check_out - self.first_check_in).seconds / divisor
 
     def _order_times(self) -> Tuple[datetime, ...]:
 
@@ -318,7 +320,7 @@ class TimeRecord(Record):
         times = self._order_times()
         return _legify(times)
 
-    def leg_durations(self) -> Dict[int, float]:
+    def leg_durations(self, unit: str = 's') -> Dict[int, float]:
         """
         Return the duration of each leg on the trip
 
@@ -329,7 +331,9 @@ class TimeRecord(Record):
 
         """
 
-        return {i: (j[1] - j[0]).seconds / 60 for
+        divisor = 1 if unit == 'm' else 60
+
+        return {i: (j[1] - j[0]).seconds / divisor for
                 i, j in  enumerate(self.legs())}
 
 fp = HERE / 'passengertypes.json'
@@ -604,23 +608,23 @@ class TripRecord:
 
         """
         assert len({x.tripkey for x in record}) == 1, "tripkeys must be equal"
-        self._records = {x.__class__.__name__: x for x in record}  
+        self._records = {x.__class__.__name__: x for x in record}
         self._records = SimpleNamespace(**self._records)
-    
+
     def __repr__(self):
 
-        
+
         return f'{self.__class__.__name__}({int(self.tripkey)}, {self._records.StopRecord.data})'
-    
+
     def __contains__(self, val):
-        return ((val in self._records.OperatorRecord) or 
-                (val in self._records.StopRecord) or 
+        return ((val in self._records.OperatorRecord) or
+                (val in self._records.StopRecord) or
                 (val in self._records.PassengerRecord))
 
     @property
     def tripkey(self):
         return self._records.StopRecord.tripkey
-    
+
     @property
     def origin(self):
 
@@ -629,29 +633,32 @@ class TripRecord:
     @property
     def destination(self):
         return self._records.StopRecord.destination
-    
+
     @property
     def stop_ids(self):
         return self._records.StopRecord.stop_ids
-    
+
     @property
     def transfers(self):
         return self._records.StopRecord.transfers
-    
+
     def stop_legs(self):
         return self._records.StopRecord.legs()
-    
+
     def time_legs(self):
         return self._records.TimeRecord.legs()
-    
+
     def operator_legs(self):
         return self._records.OperatorRecord.legs()
 
     def trip_date(self):
         return self._records.TimeRecord.trip_date()
-    
+
     def trip_duration(self):
-        return self._records.TimeRecord.trip_duration()    
-    
+        return self._records.TimeRecord.trip_duration()
+
+    def leg_durations(self):
+        return self._records.TimeRecord.trip_duration()
+
     def price(self):
         return self._records.PriceRecord.paid
