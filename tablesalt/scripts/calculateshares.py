@@ -339,9 +339,9 @@ def main():
     # for archive in tqdm(year_archives[-2:], f'merging transit feeds for {year}'):
     #     archive_feed = transitfeed.archived_transitfeed(archive)
     #     feed = feed + archive_feed
-
     opgetter = StationOperators(
-        feed, bus_distance_cutoff=bus_distance,
+        feed,
+        bus_distance_cutoff=bus_distance,
         allow_operator_legs=True    # allow for revenue
         )
 
