@@ -289,7 +289,6 @@ class TimeRecord(Record):
             )
         divisor = 1 if unit == 'm' else 60
 
-
         return (final_check_out - self.first_check_in).seconds / divisor
 
     def _order_times(self) -> Tuple[datetime, ...]:
