@@ -485,7 +485,8 @@ class ZoneSharer(ZoneProperties):
             stop_sequence: Tuple[int, ...],
             # operator_sequence: Tuple[int, ...],
             usage_sequence: Tuple[int, ...],
-            takst_suffix: str = False
+            takst_suffix: str = False,
+            allow_operator_legs: bool = False
             ) -> None:
         """Main class to determine the zone shares for each operator
         on a trip.
@@ -517,6 +518,7 @@ class ZoneSharer(ZoneProperties):
         self._operator_legs = None # to_legs(self.operator_sequence)
 
         self._takst_suffix = takst_suffix
+        self._allow_operator_legs = allow_operator_legs
 
     @property
     def operator_sequence(self) -> Tuple[int, ...]:
@@ -533,6 +535,7 @@ class ZoneSharer(ZoneProperties):
                 raise
             op = random.choice(ops)
             if self._takst_suffix:
+                # this needs to be in the
                 takst = determine_takst_region(self.zone_sequence)
                 op += '_' + takst
             opsequence += (op, )

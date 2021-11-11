@@ -37,7 +37,6 @@ b'((float, operator), (float, operatr), ...)'
 
 """
 
-import gc
 import os
 import pickle
 from functools import partial
@@ -60,10 +59,9 @@ from tablesalt.topology import ZoneGraph, ZoneSharer
 from tablesalt.topology.stationoperators import StationOperators
 from tablesalt.topology.tools import TakstZones
 
-
 THIS_DIR = Path(__file__).parent
 
-CPU_USAGE = 0.4 # % of processors
+CPU_USAGE = 0.6 # % of processors
 DB_START_SIZE = 8 # gb
 
 # this should be in common.io as contractor_to_array
@@ -151,7 +149,6 @@ def _load_store_data(
     :return: a tuple of the stop, zone, usage and operator dictionaries
     :rtype: Tuple[TripDict, TripDict, TripDict, TripDict]
     """
-
 
     reader = StoreReader(store)
     stops = reader.get_data('stops')
@@ -262,7 +259,7 @@ def chunk_shares(
     model_two_shares = {} # solo_zone_price
     model_three_shares = {} # bumped
     model_four_shares = {}
-    errs = {}
+    # errs = {}
 
     for k, zones, stops, operators, usage in tqdm(gen):
         # k, zones, stops, operators, usage = next(gen)
@@ -271,9 +268,9 @@ def chunk_shares(
             trip_shares = sharer.share()
         except KeyError:
             continue
-        except Exception as e:
-            errs[k] = str(e)
-            continue
+        # except Exception as e:
+        #     errs[k] = str(e)
+        #     continue
 
         if sharer.border_trip:
             initial_zone_sequence = sharer.zone_sequence
@@ -318,35 +315,35 @@ def main():
 
     parser = TableArgParser('year', 'bus_stop_distance')
     args = parser.parse()
-
     year = args['year']
-
     store_loc = find_datastores()
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
     bus_distance = args['bus_stop_distance']
-
     zones = TakstZones()
     zonemap = zones.stop_zone_map()
-
     # TODO into config
+    # this is for passing to the StoreReader
+    # change for future DelrejserStore
     region_contractors = {
         'hovedstaden': ['Movia_H', 'DSB', 'First', 'Stog', 'Metro'],
         'sjælland': ['Movia_H', 'Movia_S', 'Movia_V', 'DSB', 'First', 'Stog', 'Metro']
         }
 
     region = 'sjælland'
-
     graph = ZoneGraph(region=region)
-
     # allfeeds = transitfeed.available_archives()
     # year_archives = [x for x in allfeeds if str(year) in x]
-    feed = transitfeed.archived_transitfeed('20190911_20191204')
+    feed = transitfeed.archived_transitfeed('20211108_20220202')
     # for archive in tqdm(year_archives[-2:], f'merging transit feeds for {year}'):
     #     archive_feed = transitfeed.archived_transitfeed(archive)
     #     feed = feed + archive_feed
-    opgetter = StationOperators(feed, bus_distance_cutoff=bus_distance)
+
+    opgetter = StationOperators(
+        feed, bus_distance_cutoff=bus_distance,
+        allow_operator_legs=True    # allow for revenue
+        )
 
     pfunc = partial(chunk_shares,
                     year=year,
@@ -363,7 +360,6 @@ def main():
             make_store(model_two, db_path + '_model_2', start_size=DB_START_SIZE)
             make_store(model_three, db_path + '_model_3', start_size=DB_START_SIZE)
             make_store(model_four, db_path + '_model_4', start_size=DB_START_SIZE)
-            gc.collect()
 
 if __name__ == "__main__":
     if os.name == 'nt':
