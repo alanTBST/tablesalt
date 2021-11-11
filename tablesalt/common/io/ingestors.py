@@ -12,7 +12,10 @@ from typing import (IO, Any, ClassVar, Dict, Generator, List, Optional,
                     Sequence, Set, Tuple, Union)
 
 import pandas as pd  # type: ignore
-from pandas.io.parsers import CParserWrapper  # type: ignore
+try:
+    from pandas.io.parsers import CParserWrapper  # type: ignore
+except ImportError:
+    from pandas.io.parsers.readers import CParserWrapper
 # from pandas.io.parsers import TextFileReader
 from tablesalt.common.io import mappers  # type: ignore
 from tablesalt.common.io.datastores import make_store
@@ -202,7 +205,7 @@ class DataGenerator(_DelrejserInspector):
     def _reader(
             self,
             file_handle: Union[IO[bytes], IO[str]]
-            ) -> pd.io.parsers.CParserWrapper:
+            ) -> pd.io.parsers.readers.CParserWrapper:
 
         return CParserWrapper(
             file_handle,
@@ -678,7 +681,7 @@ def delrejser_setup(input_path: str, output_path: str, chunksize: int) -> None:
 
     the_queue = Queue()
     # producers
-    
+
     producers = []
     for gen in generators:
         gener = gen(input_path)
