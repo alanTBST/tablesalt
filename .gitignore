@@ -23,26 +23,9 @@ mtype*
 #testing anything
 /testing*
 
-#pyreverse 
+#pyreverse
 *.dot
 *.png
-
-tablesalt/transitfeed/temp_gtfs_data/
-tablesalt/transitfeed/gtfs_archive
+/temp_gtfs_data/
+/gtfs_archive
 *.msgpack
-
-tablesalt/transitfeed/__gtfs_archive__/20210913_20211208.zip
-20210913_20211208.zip.zip
-20210913_20211208.zip.zip
-20210913_20211208.zip.zip
-*.zip
-tablesalt/transitfeed/__gtfs_archive__/20210928_20211222/_is_composite
-tablesalt/transitfeed/__gtfs_archive__/20210928_20211222/agency
-tablesalt/transitfeed/__gtfs_archive__/20210928_20211222/calendar
-tablesalt/transitfeed/__gtfs_archive__/20210928_20211222/calendar_dates
-tablesalt/transitfeed/__gtfs_archive__/20210928_20211222/routes
-tablesalt/transitfeed/__gtfs_archive__/20210928_20211222/shapes
-tablesalt/transitfeed/__gtfs_archive__/20210928_20211222/stop_times
-tablesalt/transitfeed/__gtfs_archive__/20210928_20211222/stops
-tablesalt/transitfeed/__gtfs_archive__/20210928_20211222/transfers
-tablesalt/transitfeed/__gtfs_archive__/20210928_20211222/trips
