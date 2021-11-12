@@ -12,7 +12,6 @@ __pycache__
 *.sqlite3
 *.pyi
 docs/build/
-tablesalt/topology/route_shapes.geojson
 tablesalt/scripts/__result_cache__/
 tablesalt/resources/networktopodk/gtfs/
 environment.yml
@@ -27,5 +26,5 @@ mtype*
 *.dot
 *.png
 /temp_gtfs_data/
-/gtfs_archive
+/gtfs_archive/
 *.msgpack
