@@ -725,17 +725,17 @@ def main():
         final.to_csv(fp, index=False, encoding='iso-8859-1')
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
-#     st = datetime.now()
+    st = datetime.now()
 
-#     INHIBITOR = None
-#     if os.name == 'nt':
-#         INHIBITOR = WindowsInhibitor()
-#         INHIBITOR.inhibit()
-#     main()
+    INHIBITOR = None
+    if os.name == 'nt':
+        INHIBITOR = WindowsInhibitor()
+        INHIBITOR.inhibit()
+    main()
 
-#     if INHIBITOR:
-#         INHIBITOR.uninhibit()
+    if INHIBITOR:
+        INHIBITOR.uninhibit()
 
-#     print(datetime.now() - st)
+    print(datetime.now() - st)
