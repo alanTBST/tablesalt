@@ -655,14 +655,6 @@ def n_operators(share_tuple):
     return len({x[1] for x in share_tuple})
 
 
-def pendler_reshare(share_tuple):
-
-    if not isinstance(share_tuple[0], tuple):
-        share_tuple = share_tuple,
-    n_ops = n_operators(share_tuple)
-
-    return tuple((1/n_ops, x[1]) for x in share_tuple)
-
 def fetch_trip_results(db_path, tofetch):
 
     with lmdb.open(db_path) as env:
