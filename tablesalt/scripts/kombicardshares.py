@@ -156,17 +156,6 @@ def load_valid(valid_kombi_store: str):
 
     return valid_kombi
 
-def _make_date(x):
-    x = x.decode('utf-8')
-    return datetime(*(int(y.lstrip('0')) for y in x.split('-'))).date()
-
-def _date_in_window(test_period, test_date):
-    """test that a date is in a validity period"""
-    return min(test_period) <= test_date <= max(test_period)
-
-
-
-
 def _process_for_merge(pendler_product_zones):
 
     pendler_product_zones = {k:str(v) for k, v in pendler_product_zones.items()}
