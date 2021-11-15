@@ -127,11 +127,13 @@ def _aggregate_zones(shares):
 
     test_out = sorted(shares, key=itemgetter(1))
     totalzones = sum(x[0] for x in test_out)
-    # rev = {v:k for k, v in mappers['operator_id'].items()}
-    t = {key:sum(x[0] for x in group) for
-         key, group in groupby(test_out, key=itemgetter(1))}
-    t = {k:v/totalzones for k, v in t.items()}
 
+    t = {key: sum(x[0] for x in group) for
+         key, group in groupby(test_out, key=itemgetter(1))}
+    try:
+        t = {k: v/totalzones for k, v in t.items()}
+    except ZeroDivisionError:
+        return {}
     return t
 
 
