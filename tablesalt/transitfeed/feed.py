@@ -76,17 +76,17 @@ def download_latest_feed() -> Dict[str, DataFrame]:
         log.critical(f"GTFS download failed - error {resp.code}")
         raise URLError("Could not download GTFS data")
 
-    gtfs_data = _load_gtfs_response_zip(REQD_FILES, resp)
+    gtfs_data = _load_gtfs_response_zip(resp)
 
     return gtfs_data
 
-def _load_gtfs_response_zip(required: Set[str], resp: HTTPResponse) -> Dict[str, DataFrame]:
+def _load_gtfs_response_zip(resp: HTTPResponse) -> Dict[str, DataFrame]:
 
     gtfs_data: Dict[str, pd.core.frame.DataFrame] = {}
 
     with zipfile.ZipFile(BytesIO(resp.read())) as zfile:
         names = zfile.namelist()
-        missing = {x for x in required if x not in names}
+        missing = {x for x in REQD_FILES if x not in names}
         if missing:
             raise TransitFeedError(
                 f"Mandatory dataset/s [{', '.join(missing)}] are missing from the feed."
