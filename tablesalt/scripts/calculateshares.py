@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """
+
 This script uses the zone work model to calculate the zone work
 for each operator for each trip in sjælland and writes them to and lmdb key-value store.
-
-
 
 
 USAGE
@@ -23,6 +22,9 @@ Resultant directory tree structure
 |         |---rejsekortstores/
 |                   |------dbs/
 |                           |-----**calculated_shares**
+|                           |-----calculated_shares_model_2
+|                           |-----calculated_shares_model_3
+|                           |-----calculated_shares_model_4
 |                   |------hdfstores/
 |                   |------packs/
 
@@ -335,7 +337,7 @@ def main():
     graph = ZoneGraph(region=region)
     # allfeeds = transitfeed.available_archives()
     # year_archives = [x for x in allfeeds if str(year) in x]
-    feed = transitfeed.archived_transitfeed('20211108_20220202')
+    feed = transitfeed.latest_transitfeed()
     # for archive in tqdm(year_archives[-2:], f'merging transit feeds for {year}'):
     #     archive_feed = transitfeed.archived_transitfeed(archive)
     #     feed = feed + archive_feed
