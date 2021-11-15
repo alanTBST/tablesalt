@@ -467,8 +467,14 @@ def aggregated_zone_operators(v):
 
     out_list = sorted(out_list, key=lambda x: x[1])
 
-    return tuple(((sum(x[0] for x in grp), key)) for
+    aggregated = tuple(((sum(x[0] for x in grp), key)) for
                  key, grp in groupby(out_list, key=lambda x: x[1]))
+
+    total_zones = sum(x[0] for x in aggregated)
+    # minimum ticket must be two zones
+    if total_zones < 2:
+        aggregated = tuple((x[0]*2, x[1]) for x in aggregated)
+    return aggregated
 
 
 STOPS = StopsList.default_denmark().stops_dict
@@ -534,10 +540,10 @@ class ZoneSharer(ZoneProperties):
             except KeyError:
                 raise
             op = random.choice(ops)
-            if self._takst_suffix:
-                # this needs to be in the
-                takst = determine_takst_region(self.zone_sequence)
-                op += '_' + takst
+            # if self._takst_suffix:
+            #     # this needs to be in the sharing
+            #     takst = determine_takst_region(self.zone_sequence)
+            #     op += '_' + takst
             opsequence += (op, )
 
         return opsequence
