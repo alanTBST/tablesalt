@@ -33,9 +33,7 @@ from pendlerkeys import find_no_pay
 
 THIS_DIR = Path(__file__).parent
 
-
 USER_SHARES = Dict[Tuple[str, int], Dict[str, Union[int, float]]]
-
 
 def sort_df_by_colums(df):
 
@@ -708,6 +706,8 @@ def main():
     for model in [1, 2, 3, 4]:
         if model > 1:
             path = db_path + f'_model_{model}'
+        else:
+            path = db_path
         results = fetch_trip_results(path, valid)
 
         final = make_output(results,
