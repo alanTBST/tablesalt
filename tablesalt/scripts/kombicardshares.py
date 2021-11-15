@@ -35,6 +35,12 @@ THIS_DIR = Path(__file__).parent
 
 USER_SHARES = Dict[Tuple[str, int], Dict[str, Union[int, float]]]
 
+TRIP_ERRORS = {
+    'operator_error',
+    'station_map_error',
+    'rk_operator_error',
+    'no_available_trip'
+    }
 def sort_df_by_colums(df):
 
     priority = {
@@ -663,7 +669,7 @@ def fetch_trip_results(db_path, tofetch):
                         all_trips.append(t.decode('utf-8'))
                 all_trips = tuple(
                     ast.literal_eval(x) for x in all_trips
-                    if x not in ('station_map_error', 'operator_error', 'rk_operator_error')
+                    if x not in TRIP_ERRORS
                     )
                 card_season = ast.literal_eval(card_season)
                 final[card_season] = get_user_shares(all_trips)
@@ -719,17 +725,17 @@ def main():
         final.to_csv(fp, index=False, encoding='iso-8859-1')
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    st = datetime.now()
+#     st = datetime.now()
 
-    INHIBITOR = None
-    if os.name == 'nt':
-        INHIBITOR = WindowsInhibitor()
-        INHIBITOR.inhibit()
-    main()
+#     INHIBITOR = None
+#     if os.name == 'nt':
+#         INHIBITOR = WindowsInhibitor()
+#         INHIBITOR.inhibit()
+#     main()
 
-    if INHIBITOR:
-        INHIBITOR.uninhibit()
+#     if INHIBITOR:
+#         INHIBITOR.uninhibit()
 
-    print(datetime.now() - st)
+#     print(datetime.now() - st)
