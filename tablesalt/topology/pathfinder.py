@@ -691,6 +691,36 @@ class ZoneSharer(ZoneProperties):
             out.append((val, operator))
         return aggregated_zone_operators(tuple(out))
 
+    @staticmethod
+    def _weight_spend(out_standard, out_spend, min_zones):
+
+        outstandard = list(chain(*out_standard.values()))
+        sum_standard = sum(x[0] for x in outstandard)
+        # bumping must be minimum min_zones in total (this affects kombi trips)
+        sum_standard = sum_standard if sum_standard >= min_zones else min_zones
+        sum_spend = sum(x[0] for x in out_spend)
+
+        final_bump = [(x[0] / sum_spend * sum_standard, x[1])
+                      for x in out_spend]
+
+        return final_bump
+
+    @staticmethod
+    def _weight_spend_solo(out_spend, out_spend_solo):
+
+        out_bumped_solo = [x[0] for x in out_spend_solo]
+        combined = list(zip(out_spend, out_bumped_solo))
+
+        total_zones = round(sum(x[0][0] for x in combined))
+        total_price = sum(x[0][0]*x[1] for x in combined)
+
+        out = []
+        for zone_operator, soloprice in combined:
+            zone, operator = zone_operator
+            val = ((zone * soloprice) / total_price) * total_zones
+            out.append((val, operator))
+        return aggregated_zone_operators(tuple(out))
+
     def share_calculation(
         self,
         properties: Dict[str, Any],
@@ -718,21 +748,23 @@ class ZoneSharer(ZoneProperties):
         out_bumped = []
         out_bumped_solo = []
 
+        out_spend = []
+        out_spend_solo = []
+
         current_op_sum = 0
+        current_spend_sum = 0
         previous_op_id = None
 
         operatorshift_flag = False
 
         seen_zone_opid = set()
         for legnum, imputed_leg in enumerate(imputed_zone_legs):
-
             leg_region = zone_leg_regions[legnum]
             op_id = self.operator_sequence[legnum]
             leg_solo_price = self.leg_solo_price(leg_region, op_id)
-
             if not op_id == previous_op_id and previous_op_id is not None:
                 current_op_sum = 0
-
+                current_spend_sum = 0
             for zone in imputed_leg:
                 if (zone, op_id) not in seen_zone_opid:
                     res = self._single_zone_share(
@@ -743,8 +775,8 @@ class ZoneSharer(ZoneProperties):
                     out_standard[zone].append(res)
                     out_solo[zone].append(leg_solo_price)
                     current_op_sum += res[0]
+                    current_spend_sum +=1
                     seen_zone_opid.add((zone, op_id))
-
             try:
                 next_op_id = self.operator_sequence[legnum+1]
                 if op_id != next_op_id:
@@ -755,38 +787,46 @@ class ZoneSharer(ZoneProperties):
                 if current_op_sum < min_zones:
                     current_op_sum = min_zones
                 operatorshift_flag = True
-
             if operatorshift_flag:
                 out_bumped.append((current_op_sum, op_id))
                 out_bumped_solo.append((leg_solo_price, op_id))
+                out_spend.append((current_spend_sum, op_id))
+                out_spend_solo.append((leg_solo_price, op_id))
 
             previous_op_id = op_id
 
         out_standard = {k: tuple(v) for k, v in out_standard.items()}
+
         standard = aggregated_zone_operators(tuple(out_standard.values()))
 
         if self.is_single:
             solo_price = standard
-        else:
-            solo_price = self._weight_solo(out_standard.values(), out_solo.values())
-
-        if self.is_single:
             bumped = out_bumped
             bumped_solo = out_bumped
+            spend = out_spend
+            spend_solo = out_spend
+
         else:
+            solo_price = self._weight_solo(out_standard.values(), out_solo.values())
             bumped = self._weight_bumped_zones(out_standard, out_bumped, min_zones)
             bumped_solo = self._weight_solo_bumped(bumped, out_bumped_solo)
+            spend = self._weight_spend(out_standard, out_spend, min_zones)
+            spend_solo = self._weight_spend_solo(spend, out_spend_solo)
 
         bumped_out = aggregated_zone_operators(tuple(bumped))
+        spend_out = aggregated_zone_operators(tuple(spend))
         try:
             bumped_solo = aggregated_zone_operators(tuple(bumped_solo))
+            spend_solo = aggregated_zone_operators(tuple(spend_solo))
         except KeyError:
             pass
 
         return {'standard': standard,
                 'solo_price': solo_price,
                 'bumped': bumped_out,
-                'bumped_solo': bumped_solo}
+                'bumped_solo': bumped_solo,
+                'spend': spend_out,
+                'spend_solo': spend_solo}
 
     @staticmethod
     def _error_shares(error_name: str) -> Dict[str, str]:
@@ -802,7 +842,9 @@ class ZoneSharer(ZoneProperties):
         return {'standard': error_name,
                 'solo_price': error_name,
                 'bumped': error_name,
-                'bumped_solo': error_name}
+                'bumped_solo': error_name,
+                'spend': error_name,
+                'spend_solo': error_name}
 
     def share(
         self,
@@ -817,24 +859,32 @@ class ZoneSharer(ZoneProperties):
         :rtype: Dict[str, Tuple[Tuple[Union[int, float], str], ...]]
         """
 
+        try:
+            val = (self.stop_sequence, self.usage_sequence)
+            return self.SHARE_CACHE[val]
+        except KeyError:
+            pass
+
         self._remove_cotr()
 
         try:
             self._remove_susu()
             if self.stop_legs == ():
                 shares = self._error_shares('no_available_trip')
+                try:
+                    val = (self.stop_sequence, self.operator_sequence, self.usage_sequence)
+                    self.SHARE_CACHE[val] = shares
+                except KeyError:
+                    pass
                 return shares
         except KeyError:
             shares = self._error_shares('station_map_error')
+            try:
+                val = (self.stop_sequence, self.operator_sequence, self.usage_sequence)
+                self.SHARE_CACHE[val] = shares
+            except KeyError:
+                pass
             return shares
-        try:
-            val = (self.stop_sequence,
-                self.operator_sequence,
-                self.usage_sequence)
-
-            return self.SHARE_CACHE[val]
-        except KeyError:
-            pass
 
         properties = self.property_dict()
 
@@ -847,15 +897,16 @@ class ZoneSharer(ZoneProperties):
         except KeyError:
             shares = self._error_shares('operator_error')
             return shares
-
         try:
             shares = self.share_calculation(properties, minimum_operator_zones)
         except KeyError:
             shares = self._error_shares('rk_operator_error')
+            try:
+                val = (self.stop_sequence, self.operator_sequence, self.usage_sequence)
+                self.SHARE_CACHE[val] = shares
+            except KeyError:
+                pass
             return shares
-
-        val = (self.stop_sequence,
-            self.operator_sequence,
-            self.usage_sequence)
+        val = (self.stop_sequence, self.operator_sequence, self.usage_sequence)
         self.SHARE_CACHE[val] = shares
         return shares

@@ -41,6 +41,7 @@ b'((float, operator), (float, operatr), ...)'
 
 import os
 import pickle
+from collections import defaultdict
 from functools import partial
 from itertools import chain, groupby
 from multiprocessing import Pool
@@ -84,8 +85,6 @@ def proc_contractors(contrpack) -> np.ndarray:
 # should be place in common.io
 def _load_contractor_pack(
     store: str,
-    region: str,
-    region_contractors: Dict[str, List[str]]
     ) -> Dict[int, Tuple[int, ...]]:
     """Load and process the contractor/operator information
 
@@ -101,18 +100,8 @@ def _load_contractor_pack(
     reader = StoreReader(store)
     contractors = reader.get_data('contractors')
 
-    operator_ids = mappers['operator_id']
-
-    contractor_filters = [
-        operator_ids[x] for x in region_contractors[region]
-        ]
-
     contractors = proc_contractors(contractors)
-    bad_ops = contractors[:, 0][
-        ~np.isin(contractors[:, 2], contractor_filters)
-        ]
 
-    contractors = contractors[~np.isin(contractors[:, 0], bad_ops)]
     contractors = contractors[
         np.lexsort((contractors[:, 1], contractors[:, 0]))
         ]
@@ -132,9 +121,7 @@ class TripDict(TypedDict):
 # should be able to return these dictionaries from StoreReader
 def _load_store_data(
     store: str,
-    region: str,
     zonemap: Dict[int, int],
-    region_contractors: Dict[str, List[str]]
     ) -> Tuple[TripDict, TripDict, TripDict, TripDict]:
     """
     Load the stop data from the h5 file and create
@@ -177,7 +164,7 @@ def _load_store_data(
         all(x for x in v) and all(1000 < y < 1300 for y in v)
         }
 
-    op_dict = _load_contractor_pack(store, region, region_contractors)
+    op_dict = _load_contractor_pack(store)
 
     op_dict = {k:v for k, v in op_dict.items() if k in zone_dict}
     stop_dict = {k:v for k, v in stop_dict.items() if k in op_dict}
@@ -228,14 +215,12 @@ def chunk_shares(
     year: int,
     graph: ZoneGraph,
     opgetter: StationOperators,
-    region: str,
     zonemap: Dict[int, int],
-    region_contractors: Dict[str, List[str]]
     ) -> Tuple[Dict[int, Tuple[Tuple[float, str], ...]], Dict[int, Tuple[Tuple[float, str], ...]]]:
     """For all trips in an h5 file, calculate the zone work shares
 
     :param store: the path to the h5 file
-    :type store: str
+    :type store: strS
     :param year: the year of analysis
     :type year: int
     :param graph: a ZoneGraph instance of tariff zones and route edges
@@ -250,46 +235,31 @@ def chunk_shares(
     :rtype: Tuple[Dict[int, Tuple[Tuple[float, str], ...]], Dict[int, Tuple[Tuple[float, str], ...]]]
     """
 
-    stopsd, zonesd, usaged, operatorsd = _load_store_data(
-        store, region, zonemap, region_contractors
-        )
+    stopsd, zonesd, usaged, operatorsd = _load_store_data(store, zonemap)
 
     gen = _get_input(stopsd, zonesd, usaged, operatorsd)
-
     border_changes = {}
-    model_one_shares = {}
-    model_two_shares = {} # solo_zone_price
-    model_three_shares = {} # bumped
-    model_four_shares = {}
-    # errs = {}
-
+    model_results = defaultdict(dict)
+    errs = {}
     for k, zones, stops, operators, usage in tqdm(gen):
         # k, zones, stops, operators, usage = next(gen)
         try:
             sharer = ZoneSharer(graph, opgetter, zones, stops, usage, takst_suffix=False)
             trip_shares = sharer.share()
-        except KeyError:
+        except Exception as e:
+            errs[k] = str(e)
             continue
-        # except Exception as e:
-        #     errs[k] = str(e)
-        #     continue
-
         if sharer.border_trip:
             initial_zone_sequence = sharer.zone_sequence
             final_zone_sequence = sharer.zone_sequence
             if initial_zone_sequence != final_zone_sequence:
                 border_changes[k] = final_zone_sequence
-
-            model_one_shares[k] = trip_shares['standard']
-            model_two_shares[k] = trip_shares['solo_price']
-            model_three_shares[k] = trip_shares['bumped']
-            model_four_shares[k] = trip_shares['bumped_solo']
-
-        else:
-            model_one_shares[k] = trip_shares['standard']
-            model_two_shares[k] = trip_shares['solo_price']
-            model_three_shares[k] = trip_shares['bumped']
-            model_four_shares[k] = trip_shares['bumped_solo']
+        model_results[1][k] = trip_shares['standard']
+        model_results[2][k] = trip_shares['solo_price']
+        model_results[3][k] = trip_shares['bumped']
+        model_results[4][k] = trip_shares['bumped_solo']
+        model_results[5][k] = trip_shares['spend']
+        model_results[6][k] = trip_shares['spend_solo']
 
     num = _get_store_num(store)
 
@@ -301,12 +271,7 @@ def chunk_shares(
     with open(fp, 'wb') as f:
         pickle.dump(border_changes, f)
 
-    return (
-        model_one_shares,
-        model_two_shares,
-        model_three_shares,
-        model_four_shares
-        )
+    return model_results
 
 def main():
     """
@@ -325,19 +290,18 @@ def main():
     bus_distance = args['bus_stop_distance']
     zones = TakstZones()
     zonemap = zones.stop_zone_map()
-    # TODO into config
-    # this is for passing to the StoreReader
-    # change for future DelrejserStore
-    region_contractors = {
-        'hovedstaden': ['Movia_H', 'DSB', 'First', 'Stog', 'Metro'],
-        'sjælland': ['Movia_H', 'Movia_S', 'Movia_V', 'DSB', 'First', 'Stog', 'Metro']
-        }
 
     region = 'sjælland'
     graph = ZoneGraph(region=region)
     # allfeeds = transitfeed.available_archives()
     # year_archives = [x for x in allfeeds if str(year) in x]
-    feed = transitfeed.latest_transitfeed()
+    feed = transitfeed.transitfeed_from_zip(
+        r'C:\Users\b087115\Desktop\gtfs2019\sept11.zip'
+        )
+    f2 = transitfeed.transitfeed_from_zip(
+        r'C:\Users\b087115\Desktop\gtfs2019\may23_2019.zip'
+        )
+    feed = feed + f2
     # for archive in tqdm(year_archives[-2:], f'merging transit feeds for {year}'):
     #     archive_feed = transitfeed.archived_transitfeed(archive)
     #     feed = feed + archive_feed
@@ -351,23 +315,29 @@ def main():
                     year=year,
                     graph=graph,
                     opgetter=opgetter,
-                    region=region,
-                    zonemap=zonemap,
-                    region_contractors=region_contractors)
+                    zonemap=zonemap)
 
     with Pool(round(os.cpu_count() * CPU_USAGE)) as pool:
         results = pool.imap(pfunc, stores)
-        for model_one, model_two, model_three, model_four in tqdm(results, total=len(stores)):
-            make_store(model_one, db_path, start_size=DB_START_SIZE)
-            make_store(model_two, db_path + '_model_2', start_size=DB_START_SIZE)
-            make_store(model_three, db_path + '_model_3', start_size=DB_START_SIZE)
-            make_store(model_four, db_path + '_model_4', start_size=DB_START_SIZE)
+        for result in tqdm(results, total=len(stores)):
+            for i in [1, 2, 3, 4, 5, 6]:
+                make_store(
+                    result[i],
+                    db_path + f'_model_{i}',
+                    start_size=DB_START_SIZE
+                    )
 
 if __name__ == "__main__":
+    from datetime import datetime
+    st = datetime.now()
+
+    INHIBITOR = None
     if os.name == 'nt':
         INHIBITOR = WindowsInhibitor()
         INHIBITOR.inhibit()
-        main()
+    main()
+
+    if INHIBITOR:
         INHIBITOR.uninhibit()
-    else:
-        main()
+
+    print(datetime.now() - st)
