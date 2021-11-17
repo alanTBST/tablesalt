@@ -8,7 +8,7 @@ import json
 from collections import defaultdict
 from itertools import groupby, permutations, product
 from operator import itemgetter
-from typing import Any, AnyStr, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, AnyStr, DefaultDict, Dict, List, Optional, Set, Tuple, Union
 
 import pandas as pd  # type: ignore
 import pkg_resources
@@ -278,8 +278,8 @@ class StationOperators:
             self.bus_mapper.get_bus_map(bus_distance_cutoff=bus_distance_cutoff)
 
         self.station_to_bus_map = self._reverse_bus_map()
+        self._transfer_cache: DefaultDict[int, Set[int]] = defaultdict(set)
         self._lookup = self._process_stop_times()
-
         self._allow_operator_legs = allow_operator_legs
 
     def _reverse_bus_map(self):
@@ -305,20 +305,18 @@ class StationOperators:
         suburban_trip = None
         metro_trip = None
         kastrup_trip = None
-        local_trip = None  # NOTE. only one local operator for sjælland (must fix this)
+        local_trip = None  # TODO NOTE. only one local operator for sjælland (must fix this)
 
         for tripid, stoptime in stoptimes:
             stopids = set(x['stop_id'] for x in stoptime)
             if stopids.intersection(SUBURBAN_TEST_STOPS):
                 suburban_trip = tripid
-
             elif stopids.intersection(METRO_TEST_STOPS):
                 metro_trip = tripid
             elif stopids.intersection(KASTRUP_TEST_STOPS):
                 kastrup_trip = tripid
             elif stopids.intersection(LOCAL_TEST_STOPS):
                 local_trip = tripid
-
             if (suburban_trip is not None and
                 metro_trip is not None and
                 kastrup_trip is not None and
@@ -418,7 +416,6 @@ class StationOperators:
             new = {x: v for x in new_legs}
             st_to_bus.update(new)
 
-
         bus_to_st = {}
         for k, v in buses_start.items():
             leg = (k[0], self.bus_to_station_map[k[1]])
@@ -464,6 +461,17 @@ class StationOperators:
 
         return {**new_suburban, **new_local, **new_metro}
 
+    def _chain_bus_permutations(self, perms: Tuple[Tuple[int, int]]):
+
+        output = []
+        for start_id, end_id in perms:
+            end_bus_ids = self.station_to_bus_map.get(end_id, end_id)
+            if end_id != end_bus_ids:
+                new = [(start_id, x) for x in end_bus_ids]
+                output.extend(new)
+
+        return set(output)
+
     def _process_stop_times(self) -> Dict[int, Tuple[Tuple[int, int]]]:
         """
         This method creates the dictionary in self._lookup
@@ -477,6 +485,12 @@ class StationOperators:
             if stopids in seen:
                 continue
             perms = set(permutations(stopids, 2))
+            bus_perms = self._chain_bus_permutations(perms)
+            all_perms = perms | bus_perms
+            all_perms = sorted(all_perms, key=lambda x: x[0])
+            tfers = {k: set(x[1] for x in v) for k, v in groupby(all_perms, lambda x: x[0])}
+            for k, v in tfers.items():
+                self._transfer_cache[k].update(v)
             seen.add(stopids)
             agency = self.feed.get_agency_name_for_trip(trip_id)
             for stop_relation in perms:
@@ -527,15 +541,13 @@ class StationOperators:
 
     def _same_operator_leg(self, start_stop_id, end_stop_id):
 
-        start_transfer_options = {
-            k[1] for k, v in self._lookup.items() if k[0] == start_stop_id
-            }
-        end_transfer_options = {
-            k[0]  for k, v in self._lookup.items() if k[1] == end_stop_id
-            }
+        start_transfer_options = self._transfer_cache.get(start_stop_id, set())
+        end_transfer_options = self._transfer_cache.get(end_stop_id, set())
 
         transfer_options = start_transfer_options.intersection(end_transfer_options)
 
+        if not transfer_options:
+            raise KeyError
         for transfer in transfer_options:
             start_op = set(self._lookup[(start_stop_id, transfer)])
             end_op = set(self._lookup[(transfer, end_stop_id)])
