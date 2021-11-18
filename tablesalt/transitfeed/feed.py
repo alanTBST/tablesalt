@@ -39,6 +39,7 @@ from shapely.geometry import LineString
 
 from tablesalt.resources.config.config import load_config
 
+
 log = logging.getLogger(__name__)
 
 THIS_DIR = Path(__file__).parent
@@ -264,6 +265,24 @@ class Stops(TransitFeedBase):
 
         return cls(stops_data)
     from_dataframe = latest
+
+    def to_geodataframe(self, crs: Optional[int] = 4326) -> gpd.GeoDataFrame:
+
+        stops_df = pd.DataFrame.from_dict(self.data, orient='index')
+        stops_df.index.name = 'stop_id'
+        stops_df = stops_df.reset_index()
+
+        stops_gdf = gpd.GeoDataFrame(
+            stops_df,
+            geometry=gpd.points_from_xy(
+                stops_df.loc[:, 'stop_lon'], stops_df.loc[:, 'stop_lat']
+                ),
+            crs=4326
+            )
+        stops_gdf= stops_gdf.to_crs(crs)
+
+        return stops_gdf
+
 
 class Routes(TransitFeedBase):
 
@@ -515,7 +534,7 @@ class Transfers(TransitFeedBase):
 
         return cls(transfers_data)
 
-class Calendar(AbstractFeedObject):
+class Calendar(TransitFeedBase):
 
     ALL_CALENDARS: ClassVar[List['Calendar']]
     ALL_CALENDARS = []
@@ -577,7 +596,7 @@ class MultiCalendar:
 
 
 
-class CalendarDates(AbstractFeedObject):
+class CalendarDates(TransitFeedBase):
 
     ALL_CALENDAR_DATES: ClassVar[List['CalendarDates']]
     ALL_CALENDAR_DATES = []
@@ -625,10 +644,9 @@ class MultiCalendarDates:
         self.calendar_dates = list(calendar_dates)
 
 
-class Shapes(AbstractFeedObject):
+class Shapes(TransitFeedBase):
 
-    ALL_SHAPES: ClassVar[List['Shapes']]
-    ALL_SHAPES = []
+    ALL_SHAPES: ClassVar[List['Shapes']] = []
 
     def __init__(self, shapes_data: Dict[int, LineString]) -> None:
         self._data = shapes_data
@@ -718,10 +736,47 @@ class Shapes(AbstractFeedObject):
 
         return cls(shapes_data)
 
+    def to_geodataframe(self, crs: Optional[int] = 4326) -> gpd.GeoDataFrame:
+        """return the Shapes data as a geopandas GeoDataFrame
+
+        :return: a GeoDataFrame with columns ['shape_id', 'geometry']
+        :rtype: gpd.GeoDataFrame
+        """
+
+        df = gpd.GeoDataFrame.from_dict(self.data, orient='index')
+        df.index.name = 'shape_id'
+        df.columns = ['geometry']
+        df.crs = crs
+        df = df.reset_index()
+
+        return df
+
 
 class MultiShapes:
+
     def __init__(self, *shapes: Shapes) -> None:
         self.shapes = list(shapes)
+
+    def __getitem__(self, item: int) -> LineString:
+
+        for shape in self.shapes:
+            try:
+                return shape._data.__getitem__(item)
+            except KeyError:
+                pass
+        raise KeyError
+
+    def to_geodataframe(self, crs: Optional[int] = 4326):
+
+        gdfs = []
+        maxid = 0
+        for shape in self.shapes:
+            shape.data = {k + maxid: v for k, v in shape.data.items()}
+            maxid = max(shape.data)
+            gdf = shape.to_geodataframe(crs=crs)
+            gdfs.append(gdf)
+
+        return pd.concat(gdfs)
 
 
 
@@ -910,7 +965,7 @@ class TransitFeed:
         return self.calendar.period()
 
     def to_archive(self) -> None:
-        """Add the transitfeed to the package archive
+        """Add the transitfeed to the tablesalt package archive
         """
 
         period = self.feed_period()
@@ -934,6 +989,80 @@ class TransitFeed:
         shutil.make_archive(str(path), 'zip', path)
         shutil.rmtree(path)
 
+    @staticmethod
+    def _set_stog_location(
+        stops_df: pd.core.frame.DataFrame
+        ) -> pd.core.frame.DataFrame:
+        """create the data for stog stations ie UIC = 869xxxx
+
+        :param stops_df: dataframe
+        :type stops_df: pd.core.frame.DataFrame
+        :return: stops data
+        :rtype: pd.core.frame.DataFrame
+        """
+
+
+        s_stops = dict(CONFIG['suburban_platform_numbers'])
+        s_stops = {int(k): int(v) for k, v in s_stops.items()}
+        corr_stops = stops_df.query("stop_id in @s_stops").copy(deep=True)
+
+        corr_stops.loc[:, 'stop_id'] = corr_stops.loc[:, 'stop_id'].replace(s_stops)
+        out_frame = pd.concat([stops_df, corr_stops])
+
+        return out_frame
+    @staticmethod
+    def _set_local_location(stops_df):
+
+        l1_stops = dict(CONFIG['local_platform_numbers_1'])
+        l1_stops = {int(k): int(v) for k, v in l1_stops.items()}
+        corr_stops = stops_df.query("stop_id in @l1_stops").copy(deep=True)
+
+        corr_stops.loc[:, 'stop_id'] = corr_stops.loc[:, 'stop_id'].replace(l1_stops)
+        out_frame = pd.concat([stops_df, corr_stops])
+
+        l2_stops = dict(CONFIG['local_platform_numbers_1'])
+        l2_stops = {int(k): int(v) for k, v in l2_stops.items()}
+        corr_stops = out_frame.query("stop_id in @l2_stops").copy(deep=True)
+
+        corr_stops.loc[:, 'stop_id'] = corr_stops.loc[:, 'stop_id'].replace(l2_stops)
+        out_frame = pd.concat([out_frame, corr_stops])
+
+        return out_frame
+    @staticmethod
+    def _set_alt_location(stops_df):
+
+        alt_stops = dict(CONFIG['alternate_numbers'])
+        alt_stops = {int(k): ast.literal_eval(v) for k, v in alt_stops.items()}
+        direct_map = {k: v for k, v in alt_stops.items() if isinstance(v, int)}
+
+        corr_stops = stops_df.query("stop_id in @direct_map").copy(deep=True)
+
+        corr_stops.loc[:, 'stop_id'] = corr_stops.loc[:, 'stop_id'].replace(direct_map)
+        out_frame = pd.concat([stops_df, corr_stops])
+
+        multi_map = {k: v for k, v in alt_stops.items() if not isinstance(v, int)}
+
+        return out_frame
+
+    def stop_zone_map(self) -> Dict[int, int]:
+        """return a dictionary mapping all stop_ids to national zone numbers
+
+        :return: a dictionary of the stop -> zone mapping
+        :rtype: Dict[int, int]
+        """
+        from tablesalt.topology.tools import TakstZones
+        zones_frame = TakstZones().load_tariffzones()
+
+        stop_frame = self.stops.to_geodataframe()
+        stop_frame = self._set_stog_location(stop_frame)
+        stop_frame = self._set_local_location(stop_frame)
+        stop_frame = self._set_alt_location(stop_frame)
+
+        joined = gpd.sjoin(stop_frame, zones_frame)
+        # NOTE: decide on whether border stations should be added here
+        return dict(
+            zip(joined.loc[:, 'stop_id'],  joined.loc[:, 'natzonenum'])
+            )
 
 class BusMapper:
 
@@ -946,7 +1075,7 @@ class BusMapper:
 
         :param transit_feed: a rejseplan GTFS feed instance
         :type transit_feed: TransitFeed
-        :param crs: the coordinate reference system (ESPG) the transit feed area,
+        :param crs: the projected coordinate reference system (EPSG) the transit feed area,
             defaults to 25832 (UTM 32N) for Denmark
         :type crs: int, optional
         """
@@ -958,7 +1087,7 @@ class BusMapper:
     @property
     def bus_station_frame(self):
         if self._bus_station_frame is None:
-            self._bus_station_frame = self._make_bus_to_station_frame(self._crs)
+            self._bus_station_frame = self._make_bus_to_station_frame()
         return self._bus_station_frame
 
     def get_bus_map(self, bus_distance_cutoff: int = 500) -> Dict[int, int]:
@@ -976,26 +1105,8 @@ class BusMapper:
 
         return dict(zip(gdf.loc[:, 'stop_id'], gdf.loc[:, 'station_id']))
 
-    def _stops_to_geoframe(self, stop_ids, crs):
 
-        data = {
-            k: v for k, v in self.transit_feed.stops.data.items() if k in stop_ids
-            }
-        frame = pd.DataFrame.from_dict(data, orient='index')
-        frame.index.name = 'stop_id'
-        frame = frame.reset_index()
-
-        gdf = gpd.GeoDataFrame(
-            frame,
-            geometry=gpd.points_from_xy(frame.stop_lon, frame.stop_lat),
-            crs = 4326
-            )
-
-        gdf = gdf.to_crs(crs)
-
-        return gdf
-
-    def _make_bus_to_station_frame(self, crs) -> gpd.GeoDataFrame:
+    def _make_bus_to_station_frame(self) -> gpd.GeoDataFrame:
         """use a k-d tree to find the nearest station to a bus stop
 
         :return: a geodataframe of bus stops and close rail stops
@@ -1010,8 +1121,13 @@ class BusMapper:
         # what about letbane stops?
         rail_stops = {k for k in rail_stops if len(str(k)) == 7}
 
-        bus_gdf = self._stops_to_geoframe(bus_stops, crs)
-        rail_gdf = self._stops_to_geoframe(rail_stops, crs)
+        stops_gdf = self.transit_feed.stops.to_geodataframe(crs=self._crs)
+
+        bus_gdf = stops_gdf.query("stop_id in @bus_stops")
+        bus_gdf = bus_gdf.reset_index(drop=True)
+        rail_gdf = stops_gdf.query("stop_id in @rail_stops")
+        rail_gdf = rail_gdf.reset_index(drop=True)
+
         rail_gdf = rail_gdf.rename(columns={'stop_id': 'station_id'})
 
         A = np.concatenate(
@@ -1025,6 +1141,7 @@ class BusMapper:
         ckd_tree = cKDTree(B)
         dist, idx = ckd_tree.query(A, k=1)
         idx = itemgetter(*idx)(B_ix)
+
         gdf = pd.concat(
             [bus_gdf, rail_gdf.loc[idx, ['station_id']].reset_index(drop=True),
             pd.Series(dist, name='dist')], axis=1
