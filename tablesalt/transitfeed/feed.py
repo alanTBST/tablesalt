@@ -648,10 +648,9 @@ class Shapes(TransitFeedBase):
 
     ALL_SHAPES: ClassVar[List['Shapes']] = []
 
-
     def __init__(self, shapes_data: Dict[int, LineString]) -> None:
         self._data = shapes_data
-        # Shapes.ALL_SHAPES.append(self)
+        Shapes.ALL_SHAPES.append(self)
 
 
     def __getitem__(self, item: int) -> LineString:
@@ -754,8 +753,30 @@ class Shapes(TransitFeedBase):
 
 
 class MultiShapes:
+
     def __init__(self, *shapes: Shapes) -> None:
         self.shapes = list(shapes)
+
+    def __getitem__(self, item: int) -> LineString:
+
+        for shape in self.shapes:
+            try:
+                return shape._data.__getitem__(item)
+            except KeyError:
+                pass
+        raise KeyError
+
+    def to_geodataframe(self, crs: Optional[int] = 4326):
+
+        gdfs = []
+        maxid = 0
+        for shape in self.shapes:
+            shape.data = {k + maxid: v for k, v in shape.data.items()}
+            maxid = max(shape.data)
+            gdf = shape.to_geodataframe(crs=crs)
+            gdfs.append(gdf)
+
+        return pd.concat(gdfs)
 
 
 
