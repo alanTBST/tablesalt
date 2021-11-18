@@ -793,12 +793,8 @@ def main() -> None:
     wanted_operators = [
         'Metro', 'D**', 'Movia_S', 'Movia_V', 'Movia_H'
         ]
-    for model in [1, 2, 3, 4]:
-        if model > 1:
-            results_path = db_path + f'_model_{model}'
-        else:
-            results_path = db_path
-
+    for model in [1, 2, 3, 4, 5, 6]:
+        results_path = db_path + f'_model_{model}'
         for rabat_level in [0, 1, 2]:
             _rabat_results(
                 year,

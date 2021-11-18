@@ -304,11 +304,8 @@ def main():
                 else:
                     pass
             """
-    for model in [1, 2, 3, 4]:
-        if model > 1:
-            result_path = db_path + f'_model_{model}'
-        else:
-            result_path = db_path
+    for model in [1, 2, 3, 4, 5, 6]:
+        result_path = db_path + f'_model_{model}'
 
         out = {}
         for k1, v1 in trips.items():

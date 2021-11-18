@@ -530,11 +530,8 @@ def main():
         min_valid_days=14
         )
 
-    for model in [1, 2, 3, 4]:
-        if model > 1:
-            result_path = db_path + f'_model_{model}'
-        else:
-            result_path = db_path
+    for model in [1, 2, 3, 4, 5, 6]:
+        result_path = db_path + f'_model_{model}'
 
         _chosen_zones(
             userdict,
