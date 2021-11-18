@@ -26,6 +26,7 @@ from shapely.geometry.point import Point  # type: ignore
 from shapely.geometry.polygon import Polygon  # type: ignore
 from tablesalt.common.io import mappers
 from tablesalt.topology.stopnetwork import StopsList
+from tablesalt.transitfeed.feed import TransitFeed
 
 FILE_PATH = Union[str, bytes, 'os.PathLike[Any]']
 
@@ -733,9 +734,9 @@ class RejseplanLoader(_GTFSloader):
         return
 
 
-class EdgeMaker():
+class EdgeMaker:
 
-    def __init__(self) -> None:
+    def __init__(self, feed: TransitFeed) -> None:
         """
         Class to create edges for a network graph from GTFS data
 
@@ -743,30 +744,34 @@ class EdgeMaker():
         :rtype: None
 
         """
-
-        super().__init__()
+        self.feed = feed
         self.zones = TakstZones()
-        self.loader = _GTFSloader()
 
     def _shape_proc(
             self,
             mode: Optional[str] = None
             ) -> Tuple[Dict[int, Tuple[int, ...]], Dict[int, Polygon]]:
-        """[summary]
-
-        :param mode: [description], defaults to None
-        :type mode: Optional[str], optional
-        :return: [description]
-        :rtype: Tuple[Dict[int, Tuple[int, ...]], Dict[int, Polygon]]
-        """
-
-        zones = self.zones.load_tariffzones()
-        shape_frame = self.loader.shapes_to_gdf()
 
         if mode is not None:
-            wanted_routes = self.loader.route_types(str)
-            wanted_routes = {k for k, v in wanted_routes.items() if mode in v}
-            shape_frame = shape_frame.query("route_id in @wanted_routes")
+            if mode == 'bus':
+                wanted_routes = self.feed.bus_routes()
+            elif mode == 'rail':
+                wanted_routes = self.feed.rail_routes()
+            else:
+                raise ValueError("mode can be one of ['bus', 'rail']")
+            wanted_routes = set(wanted_routes)
+        else:
+            wanted_routes = set(self.feed.routes.data)
+
+        valid_trips = filter(
+            lambda x: x['route_id'] in wanted_routes,
+            self.feed.trips.data.values()
+            )
+        wanted_shapes =  {int(x['shape_id']) for x in valid_trips}
+
+        zones = self.zones.load_tariffzones()
+        shape_frame = self.feed.shapes.to_geodataframe()
+        shape_frame = shape_frame.query("shape_id in @wanted_shapes")
 
         joined = gpd.sjoin(zones, shape_frame)
 
