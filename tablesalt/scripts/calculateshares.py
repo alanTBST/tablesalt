@@ -289,8 +289,6 @@ def main():
     db_path = paths['calculated_stores']
     bus_distance = args['bus_stop_distance']
 
-    region = 'sjælland'
-    graph = ZoneGraph(region=region)
     # allfeeds = transitfeed.available_archives()
     # year_archives = [x for x in allfeeds if str(year) in x]
     feed = transitfeed.transitfeed_from_zip(
@@ -300,8 +298,9 @@ def main():
         r'C:\Users\b087115\Desktop\gtfs2019\may23_2019.zip'
         )
     feed = feed + f2
-    zones = TakstZones()
-    zonemap = feed.stop_zone_map(zones)
+
+    zonemap = feed.stop_zone_map()
+    graph = ZoneGraph(feed, region='sjælland')
     # for archive in tqdm(year_archives[-2:], f'merging transit feeds for {year}'):
     #     archive_feed = transitfeed.archived_transitfeed(archive)
     #     feed = feed + archive_feed
