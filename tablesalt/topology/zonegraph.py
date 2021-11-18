@@ -80,6 +80,7 @@ class ZoneGraph():
         :param region: the region to create a graph for, defaults to 'sjælland'
         :type region: Optional[str], optional
         :param mode: the mode ['rail', 'bus', None], defaults to None
+            None will produce a composite graph of rail and bus
         :type mode: Optional[str], optional
         :return: ''
         :rtype: None
