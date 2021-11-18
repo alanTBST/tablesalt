@@ -265,6 +265,22 @@ class Stops(TransitFeedBase):
         return cls(stops_data)
     from_dataframe = latest
 
+    def to_geodataframe(self, crs: Optional[int] = 4326) -> gpd.GeoDataFrame:
+        stops_df = pd.DataFrame.from_dict(self.data, orient='index')
+        stops_df.index.name = 'stop_id'
+        stops_df = stops_df.reset_index()
+
+        stops_gdf = gpd.GeoDataFrame(
+            stops_df,
+            geometry=gpd.points_from_xy(
+                stops_df.loc[:, 'stop_lon'], stops_df.loc[:, 'stop_lat']
+                )
+            )
+        stops_gdf.crs = crs  #set projection WGS84
+
+        return stops_gdf
+
+
 class Routes(TransitFeedBase):
 
     OLD_ROUTE_MAP: ClassVar[Dict[int, int]]
