@@ -515,7 +515,7 @@ class Transfers(TransitFeedBase):
 
         return cls(transfers_data)
 
-class Calendar(AbstractFeedObject):
+class Calendar(TransitFeedBase):
 
     ALL_CALENDARS: ClassVar[List['Calendar']]
     ALL_CALENDARS = []
@@ -577,7 +577,7 @@ class MultiCalendar:
 
 
 
-class CalendarDates(AbstractFeedObject):
+class CalendarDates(TransitFeedBase):
 
     ALL_CALENDAR_DATES: ClassVar[List['CalendarDates']]
     ALL_CALENDAR_DATES = []
@@ -625,14 +625,14 @@ class MultiCalendarDates:
         self.calendar_dates = list(calendar_dates)
 
 
-class Shapes(AbstractFeedObject):
+class Shapes(TransitFeedBase):
 
-    ALL_SHAPES: ClassVar[List['Shapes']]
-    ALL_SHAPES = []
+    ALL_SHAPES: ClassVar[List['Shapes']] = []
+
 
     def __init__(self, shapes_data: Dict[int, LineString]) -> None:
         self._data = shapes_data
-        Shapes.ALL_SHAPES.append(self)
+        # Shapes.ALL_SHAPES.append(self)
 
 
     def __getitem__(self, item: int) -> LineString:
