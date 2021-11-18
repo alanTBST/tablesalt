@@ -717,6 +717,14 @@ class Shapes(TransitFeedBase):
             shapes_data[shape_id] = line
 
         return cls(shapes_data)
+    def to_geodataframe(self) -> gpd.GeoDataFrame:
+
+        df = gpd.GeoDataFrame.from_dict(self.data, orient='index')
+        df.index.name = 'shape_id'
+        df.columns = ['geometry']
+        df = df.reset_index
+
+        return df
 
 
 class MultiShapes:
