@@ -718,7 +718,7 @@ class Shapes(TransitFeedBase):
 
         return cls(shapes_data)
 
-    def to_geodataframe(self) -> gpd.GeoDataFrame:
+    def to_geodataframe(self, crs: Optional[int] = 4326) -> gpd.GeoDataFrame:
         """return the Shapes data as a geopandas GeoDataFrame
 
         :return: a GeoDataFrame with columns ['shape_id', 'geometry']
@@ -728,6 +728,7 @@ class Shapes(TransitFeedBase):
         df = gpd.GeoDataFrame.from_dict(self.data, orient='index')
         df.index.name = 'shape_id'
         df.columns = ['geometry']
+        df.crs = crs
         df = df.reset_index()
 
         return df
