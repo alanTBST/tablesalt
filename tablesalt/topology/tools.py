@@ -547,7 +547,6 @@ class TakstZones:
         """
         self._list_of_stops = StopsList().from_json()
 
-
     def stop_zone_map(
         self,
         ) -> Dict[int, int]:
