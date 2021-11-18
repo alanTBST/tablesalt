@@ -912,13 +912,19 @@ class EdgeMaker:
         shape_zones, zone_polys = self._shape_proc(mode)
 
         all_shape_edges = {}
+        seen_lines = set()
         for shape_id in shape_zones:
-
+            try:
+                lstring = self.feed.shapes[shape_id]
+            except KeyError:
+                continue
+            coords = lstring.coords
+            if coords in seen_lines:
+                continue
+            seen_lines.add(coords)
             zone_ids = set(shape_zones[shape_id]) # v
             zone_id_poly = {k: v for k, v in zone_polys.items() if k in zone_ids}
-            lstring = self.loader.shape_lines[shape_id]
-            as_points = [Point(x) for x in lstring.coords]
-
+            as_points = [Point(x) for x in coords]
             init_point = as_points[0]
             try:
                 start_zone = self._get_start_zone(
@@ -934,7 +940,6 @@ class EdgeMaker:
                 neigh_dict
                 )
             all_shape_edges[shape_id] = shape_edges
-
         all_edges = set.union(*all_shape_edges.values())
 
         return self._edges_to_array(all_edges)
