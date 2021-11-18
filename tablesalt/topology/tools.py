@@ -767,7 +767,9 @@ class EdgeMaker:
             lambda x: x['route_id'] in wanted_routes,
             self.feed.trips.data.values()
             )
-        wanted_shapes =  {int(x['shape_id']) for x in valid_trips}
+        wanted_shapes = {
+            int(x['shape_id']) for x in valid_trips if x['shape_id'] > 0
+            }
 
         zones = self.zones.load_tariffzones()
         shape_frame = self.feed.shapes.to_geodataframe()
