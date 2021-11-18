@@ -11,6 +11,7 @@ import pandas as pd #type: ignore
 import pkg_resources
 
 from tablesalt.topology.tools import EdgeMaker
+from tablesalt.transitfeed.feed import TransitFeed
 
 REGION_ZONES = {
     'hovedstaden': (1000, 1100), # 200
@@ -70,6 +71,7 @@ class ZoneGraph():
 
     def __init__(
             self,
+            transit_feed: TransitFeed,
             region: Optional[str] = 'sjælland',
             mode: Optional[str] = None
             ) -> None:
@@ -86,10 +88,10 @@ class ZoneGraph():
         :rtype: None
 
         """
-
+        self.feed = transit_feed
         self.region = region
         self.mode = mode
-        self.data = EdgeMaker().make_edges(self.mode)
+        self.data = EdgeMaker(self.feed).make_edges(self.mode)
         self.columns = self.rows = self.data['idx']
         self.rev_columns = self.rev_rows = self.data['rev_idx']
         self.graph = nx.from_numpy_matrix(self.data['adj_array'])
