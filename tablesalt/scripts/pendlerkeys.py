@@ -190,7 +190,7 @@ def proc(store):
 
     return get_zeros(price)
 
-def find_no_pay(stores, year):
+def find_no_pay(stores, year, n_procs):
 
     fp = os.path.join(
         THIS_DIR,
@@ -205,7 +205,7 @@ def find_no_pay(stores, year):
             out = pickle.load(file)
     except FileNotFoundError:
         out = set()
-        with Pool(os.cpu_count() - 2) as pool:
+        with Pool(n_procs) as pool:
             results = pool.imap(proc, stores)
             for res in tqdm(results,
                             'finding trips inside zones',
@@ -378,7 +378,6 @@ def _chosen_zones(
         userdict,
         db_path,
         kombi_valid_db,
-        kombi_dates_db,
         zero_travel_price,
         year,
         model
@@ -510,7 +509,7 @@ def _zonerelations(year: int, model: int):
 def main():
 
     parser = TableArgParser(
-        'year', 'products', 'zones',
+        'year', 'products', 'zones', 'cpu_usage'
         )
 
     args = parser.parse()
@@ -521,7 +520,11 @@ def main():
     db_path = paths['calculated_stores']
     zone_path = args['zones']
     product_path = args['products']
-    zero_travel_price = find_no_pay(stores, year)
+    cpu_usage = args['cpu_usage']
+
+    processors = int(round(os.cpu_count()*cpu_usage))
+
+    zero_travel_price = find_no_pay(stores, year, processors)
 
     userdict = PendlerKombiUsers(
         year,
@@ -537,7 +540,6 @@ def main():
             userdict,
             result_path,
             paths['kombi_valid_trips'],
-            paths['kombi_dates_db'],
             zero_travel_price,
             year,
             model
