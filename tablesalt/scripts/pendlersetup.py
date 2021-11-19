@@ -271,7 +271,8 @@ def load_store_dates(store: str, pendler_trip_keys: List[int]) -> Dict[bytes, by
 def thread_dates(
     lst_of_stores: List[str],
     pendler_trip_keys: List[int],
-    dbpath: str
+    dbpath: str,
+    n_procs: int
     ) -> None:
     """Load all of the stores in parallel, filter pendler trips and write
     to key-value store
@@ -285,7 +286,7 @@ def thread_dates(
     """
     func = partial(load_store_dates, pendler_trip_keys=pendler_trip_keys)
     print("Loading travel dates...")
-    with Pool(os.cpu_count() - 2) as pool:
+    with Pool(n_procs) as pool:
         results = pool.imap(func, lst_of_stores)
         for res in results:
             make_store(res, dbpath, start_size=5)
@@ -360,12 +361,15 @@ def main():
     """main script function
     """
 
-    parser = TableArgParser('year', 'products', 'zones')
+    parser = TableArgParser('year', 'products', 'zones', 'cpu_usage')
 
     args = parser.parse()
 
     paths = db_paths(find_datastores(), args['year'])
     stores = paths['store_paths']
+    cpu_usage = args['cpu_usage']
+
+    processors = int(round(os.cpu_count()*cpu_usage))
 
     pendler_cards = users._PendlerInput(
         args['year'],
@@ -385,7 +389,8 @@ def main():
     thread_dates(
         stores,
         pendler_trip_keys,
-        paths['kombi_dates_db']
+        paths['kombi_dates_db'],
+        processors
         )
 
     print("validating travel dates")
