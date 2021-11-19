@@ -52,7 +52,7 @@ def sort_df_by_colums(df):
         'EncryptedCardEngravedID': 1,
         'SeasonPassID': 2,
         'SeasonPassTemplateID': 3,
-        'SeasonPassName': 4,
+        'ProductName': 4,
         'Fareset': 5,
         'PsedoFareset': 6,
         'takstsæt': 6,
@@ -62,9 +62,9 @@ def sort_df_by_colums(df):
         'ValidityStartDT': 10,
         'ValidityEndDT': 11,
         'ValidDays': 12,
-        'FromZoneNr': 13,
+        'ZoneNrLow': 13,
         'startzone': 14,
-        'ToZoneNr': 15,
+        'ZoneNrHigh': 15,
         'slutzone': 16,
         'ViaZoneNr': 17,
         'SeasonPassZones': 18,
@@ -551,7 +551,7 @@ def _process_pendler_df(period_products, zone_path):
     period_products.loc[:, 'valgtezoner'] = period_products.loc[:, 'valgtezoner'].astype(str)
     period_products.loc[:, 'betaltezoner'] = period_products.loc[:, 'valgtezoner'].map(paid_map)
     period_products.loc[:, 'betaltezoner'] = period_products.loc[:, 'betaltezoner'].fillna(0)
-    period_products.rename(columns={'FromZoneNr': 'startzone', 'ToZoneNr': 'slutzone', 'PsedoFareset': 'takstsæt'}, inplace=True)
+    period_products.rename(columns={'ZoneNrLow': 'startzone', 'ZoneNrHigh': 'slutzone', 'PsedoFareset': 'takstsæt'}, inplace=True)
 
     period_products.takstsæt = period_products.takstsæt.str.lower()
     takst_map = {'hovedstaden': 'th', 'sjælland': 'dsb', 'sydsjælland': 'ts', 'vestsjælland': 'tv'}
@@ -589,7 +589,7 @@ def make_output(usershares, product_path, zone_path, model, year):
     initial_columns = list(period_products.columns)
 
     kombi_products = period_products.loc[
-        period_products.loc[:, 'SeasonPassName'].str.lower().str.contains('kombi')
+        period_products.loc[:, 'ProductName'].str.lower().str.contains('kombi')
         ]
 
     kombi_match, missed = _match_user_specific_results(
@@ -599,7 +599,7 @@ def make_output(usershares, product_path, zone_path, model, year):
     # end of direct card match
     # =============================================================================
     pendler = period_products.loc[~
-        period_products.loc[:, 'SeasonPassName'].str.lower().str.contains('kombi')
+        period_products.loc[:, 'ProductName'].str.lower().str.contains('kombi')
         ].copy()
 
     pendler_results = _match_pendler(pendler, year, model)
