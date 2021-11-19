@@ -358,7 +358,7 @@ def validate_travel_dates(
 
 
 def main():
-    """main script function
+    """main script function to setup all the required pendler data
     """
 
     parser = TableArgParser('year', 'products', 'zones', 'cpu_usage')
@@ -369,7 +369,7 @@ def main():
     stores = paths['store_paths']
     cpu_usage = args['cpu_usage']
 
-    processors = int(round(os.cpu_count()*cpu_usage))
+    processors = int(round(os.cpu_count() * cpu_usage))
 
     pendler_cards = users._PendlerInput(
         args['year'],
