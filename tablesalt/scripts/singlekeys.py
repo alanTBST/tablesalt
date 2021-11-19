@@ -774,6 +774,21 @@ def _rabat_results(
     with open(fp, 'wb') as f:
         pickle.dump(operator_results_, f)
 
+def model_results(year, model: int, db_path, stores, stopzone_map, ringzones, wanted_operators):
+
+    results_path = db_path + f'_model_{model}'
+    for rabat_level in [0, 1, 2]:
+        _rabat_results(
+            year,
+            model,
+            rabat_level,
+            results_path,
+            stores,
+            stopzone_map,
+            ringzones,
+            wanted_operators
+            )
+
 
 def main() -> None:
 
@@ -790,6 +805,7 @@ def main() -> None:
     ringzones = ZoneGraph.ring_dict('sjælland')
     stopzone_map = TakstZones().stop_zone_map()
 
+    # This is for the starting at specific operators
     wanted_operators = [
         'Metro', 'D**', 'Movia_S', 'Movia_V', 'Movia_H'
         ]
