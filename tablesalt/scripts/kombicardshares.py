@@ -3,7 +3,12 @@
 What does it do?
 ================
 
-This script calculates the shares
+This script calculates the shares for the individual Rejsekort Kombi products
+Each kombi card/seasonpass uses the exact valid trips made by the user and shares the price
+between the operators.
+
+For the non-kombi products, the shares are matched using the same methods as for other pendler
+products
 """
 
 import ast
