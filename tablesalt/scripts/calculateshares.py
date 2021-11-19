@@ -21,7 +21,7 @@ Resultant directory tree structure
 | given_output_directory/
 |         |---rejsekortstores/
 |                   |------dbs/
-|                           |-----**calculated_shares**
+|                           |-----calculated_shares_model_1
 |                           |-----calculated_shares_model_2
 |                           |-----calculated_shares_model_3
 |                           |-----calculated_shares_model_4
