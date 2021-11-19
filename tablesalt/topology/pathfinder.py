@@ -907,6 +907,6 @@ class ZoneSharer(ZoneProperties):
             except KeyError:
                 pass
             return shares
-        val = (self.stop_sequence, self.operator_sequence, self.usage_sequence)
-        self.SHARE_CACHE[val] = shares
+        # val = (self.stop_sequence, self.operator_sequence, self.usage_sequence)
+        # self.SHARE_CACHE[val] = shares
         return shares
