@@ -107,7 +107,7 @@ def _is_bus(stopid: int) -> bool:
     return (stopid > stationoperators.MAX_RAIL_UIC or
             stopid < stationoperators.MIN_RAIL_UIC)
 
-@lru_cache(2**16)
+@lru_cache(2**8)
 def impute_leg(g: Graph, zone_leg: Tuple[int, int]) -> Tuple[int, ...]:
     """fill in the total zone path of a zone leg
 
@@ -121,7 +121,7 @@ def impute_leg(g: Graph, zone_leg: Tuple[int, int]) -> Tuple[int, ...]:
 
     return g.shortest_path(*zone_leg)[0]
 
-@lru_cache(2**16)
+@lru_cache(2**8)
 def impute_zone_legs(
     g: Graph,
     trip_zone_legs: Tuple[Tuple[int, int], ...]
@@ -138,7 +138,7 @@ def impute_zone_legs(
     return tuple(impute_leg(g, leg)
                  for leg in trip_zone_legs)
 
-@lru_cache(2**16)
+@lru_cache(2**8)
 def get_touched_zones(zone_sequence: Tuple[int, ...]) -> Tuple[int, ...]:
     """
     get the zones in which the card has been checked,
@@ -156,7 +156,7 @@ def get_touched_zones(zone_sequence: Tuple[int, ...]) -> Tuple[int, ...]:
             seen.add(j)
     return tuple(touched)
 
-@lru_cache(2**16)
+@lru_cache(2**8)
 def to_legs(sequence: Tuple[int, ...]) ->Tuple[int, ...]:
     """convert a tuple to leg form
 
