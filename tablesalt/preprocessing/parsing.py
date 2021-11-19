@@ -27,7 +27,7 @@ class TableArgParser:
         'products': ArgTuple(
             '-p',
             '--products',
-            'path to input pendler products csv files',
+            'path to input pendler products csv file',
             True,
             pathlib.Path,
             None
@@ -35,7 +35,7 @@ class TableArgParser:
         'zones': ArgTuple(
             '-z',
             '--zones',
-            'path to input zones csv files',
+            'path to input zones csv file',
             True,
             pathlib.Path,
             None
@@ -103,8 +103,15 @@ class TableArgParser:
            False,
            int,
            500
+           ),
+        'cpu_usage': ArgTuple(
+           '-u',
+           '--cpu_usage',
+           r'the processors to use for multiprocessing as a float eg 0.5 = 50 percent',
+           False,
+           float,
+           0.5
            )
-
         }
 
     def __init__(self, *args: str, description: Optional[str] = None) -> None:
@@ -140,7 +147,8 @@ class TableArgParser:
         for arg in self.arglist:
             opt = self.ARGUMENTS[arg]
             self.parser.add_argument(
-                opt.short, opt.long,
+                opt.short,
+                opt.long,
                 help=opt.help_,
                 type=opt.type_,
                 required=opt.required,
