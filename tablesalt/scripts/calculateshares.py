@@ -54,17 +54,15 @@ from tqdm import tqdm
 
 from tablesalt import StoreReader, transitfeed
 from tablesalt.common import make_store
-from tablesalt.common.io import mappers
 from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.preprocessing.tools import db_paths, find_datastores
 from tablesalt.running import WindowsInhibitor
 from tablesalt.topology import ZoneGraph, ZoneSharer
 from tablesalt.topology.stationoperators import StationOperators
-from tablesalt.topology.tools import TakstZones
+
 
 THIS_DIR = Path(__file__).parent
 
-CPU_USAGE = 0.6 # % of processors
 DB_START_SIZE = 8 # gb
 
 # this should be in common.io as contractor_to_array
@@ -280,7 +278,7 @@ def main():
     using CPU_USAGE % processing power
     """
 
-    parser = TableArgParser('year', 'bus_stop_distance')
+    parser = TableArgParser('year', 'bus_stop_distance', 'cpu_usage')
     args = parser.parse()
     year = args['year']
     store_loc = find_datastores()
@@ -316,7 +314,10 @@ def main():
                     opgetter=opgetter,
                     zonemap=zonemap)
 
-    with Pool(round(os.cpu_count() * CPU_USAGE)) as pool:
+    cpu_usage = args['cpu_usage']
+    processors = int(round(os.cpu_count() * cpu_usage))
+
+    with Pool(processors) as pool:
         results = pool.imap(pfunc, stores)
         for result in tqdm(results, total=len(stores)):
             for i in [1, 2, 3, 4, 5, 6]:
