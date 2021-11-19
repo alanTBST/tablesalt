@@ -159,13 +159,15 @@ def _process_cards(prodzones,
     return _process_dynamic_cards(dates)
 
 
-class _PendlerInput():
+class _PendlerInput:
 
-    def __init__(self,
-                 year: int,
-                 products_path: str,
-                 product_zones_path: str,
-                 min_valid_days: Optional[int] = 14) -> None:
+    def __init__(
+        self,
+        year: int,
+        products_path: str,
+        product_zones_path: str,
+        min_valid_days: Optional[int] = 14
+        ) -> None:
         """Class that loads and processes the input pendlerkombi data
         for the pendler revenue distribution models
 
@@ -197,51 +199,54 @@ class _PendlerInput():
         :rtype: pd.core.frame.DataFrame
         """
 
-        col1 = ['EncryptedCardEngravedID', 'SeasonPassID',
-                'Fareset', 'PsedoFareset',
-                'SeasonPassName', 'SeasonPassZones',
-                'ValidityStartDT', 'ValidityEndDT',
-                'ValidDays', 'FromZoneNr',
-                'ToZoneNr', 'PassagerType']
+        col1 = [
+            'EncryptedCardEngravedID',
+            'SeasonPassID',
+            'PsedoFareset',
+            'ProductName',
+            'ValidityZones',
+            'ValidityStartDT_Cal',
+            'ValidityEndDT_Cal',
+            'NumberOfPeriods_Cal',
+            'ZoneNrLow',
+            'ZoneNrHigh',
+            'PassengerGroupType1'
+            ]
 
         try:
             pendler_product = pd.read_csv(
                 self.products_path,
-                encoding='iso-8859-1',
                 sep=';',
-                usecols= col1,
-                dtype={'EncryptedCardEngravedID': str, 'SeasonPassID':int},
+                usecols=col1,
+                dtype={'EncryptedCardEngravedID': str, 'SeasonPassID': int},
                 on_bad_lines='skip'
                 )
         except ValueError:
             pendler_product = pd.read_csv(
                 self.products_path,
-                encoding='utf-8',
                 sep=',',
-                usecols= col1,
-                dtype={'EncryptedCardEngravedID':str, 'SeasonPassID':int},
+                usecols=col1,
+                dtype={'EncryptedCardEngravedID': str, 'SeasonPassID': int},
                 on_bad_lines='skip'
                 )
 
         pendler_product = pendler_product.fillna(0)
-        pendler_product.loc[:, ('FromZoneNr', 'ToZoneNr')] = \
-        pendler_product.loc[:, ('FromZoneNr', 'ToZoneNr')].astype(int)
+        pendler_product.loc[:, ('ZoneNrLow', 'ZoneNrHigh')] = \
+        pendler_product.loc[:, ('ZoneNrLow', 'ZoneNrHigh')].astype(int)
 
         pendler_product = pendler_product.query(
-            "ValidDays >= @self.min_valid_days"
+            "NumberOfPeriods_Cal >= @self.min_valid_days"
             )
 
-        pendler_product = \
-            pendler_product.query(
-                "ValidityEndDT != '.' and ValidityStartDT != '.'"
+        pendler_product = pendler_product.query(
+                "ValidityEndDT_Cal != '.' and ValidityStartDT_Cal != '.'"
                 )
-        pendler_product = \
-            pendler_product.loc[
-                pendler_product.loc[:, 'SeasonPassName'].str.lower().str.contains('kombi')
-            ]
+        pendler_product = pendler_product.loc[
+                pendler_product.loc[:, 'ProductName'].str.lower().str.contains('kombi')
+                ]
 
         return pendler_product.loc[
-            pendler_product.loc[:, 'ValidityEndDT'].str.contains(str(self.year))
+            pendler_product.loc[:, 'ValidityEndDT_Cal'].str.contains(str(self.year))
             ]
 
     def _get_product_zones(
@@ -255,11 +260,19 @@ class _PendlerInput():
         :return: a mapping of cardnum-seasonpass -> valid zones
         :rtype: Dict
         """
-        pendler_zones = pd.read_csv(
-            self.product_zones_path,
-            sep=';',
-            on_bad_lines='skip'
-            )
+        try:
+            pendler_zones = pd.read_csv(
+                self.product_zones_path,
+                sep=';',
+                on_bad_lines='skip'
+                )
+        except ValueError:
+            pendler_zones = pd.read_csv(
+                self.product_zones_path,
+                sep=',',
+                on_bad_lines='skip'
+                )
+
         pendler_zones['key'] = list(zip(
             pendler_zones['EncryptedCardEngravedID'],
             pendler_zones['SeasonPassID']
@@ -285,7 +298,7 @@ class _PendlerInput():
 
     @staticmethod
     def _get_product_dates(valid_pendler: pd.core.frame.DataFrame): # -> Dict[Tuple[str, int], Tuple[]]:
-        """transform the 'ValidityStartDT' and 'ValidityEndDT'
+        """transform the 'ValidityStartDT_Cal' and 'ValidityEndDT_Cal'
         to a dictionary for each season pass
 
         :param valid_pendler: [description]
@@ -295,7 +308,7 @@ class _PendlerInput():
         """
         product_dates = valid_pendler.loc[
             :, ('EncryptedCardEngravedID', 'SeasonPassID',
-                'ValidityStartDT', 'ValidityEndDT')
+                'ValidityStartDT_Cal', 'ValidityEndDT_Cal')
                 ]
         product_dates = product_dates.sort_values(
             ['EncryptedCardEngravedID', 'SeasonPassID']
@@ -409,10 +422,11 @@ class PendlerKombiUsers():
         :type user_group: str, optional
         """
         self.input_data = _PendlerInput(
-            year, products_path=products_path,
-            product_zones_path=product_zones_path,
-            min_valid_days=min_valid_days
-            )
+                            year,
+                            products_path=products_path,
+                            product_zones_path=product_zones_path,
+                            min_valid_days=min_valid_days
+                            )
 
         self.users = self.input_data.get_user_data(users=user_group)
 
@@ -420,7 +434,7 @@ class PendlerKombiUsers():
     def _valid_season_zones(pprod):
         """return all unique combinations of valid zones
         """
-        return set(pprod.loc[:, 'SeasonPassZones'].unique())
+        return set(pprod.loc[:, 'ValidityZones'].unique())
 
 
     def _paid_filter(self, nzones: int) -> Set[Tuple[int, ...]]:
@@ -458,7 +472,7 @@ class PendlerKombiUsers():
         :return: a set of season passes
         :rtype: Set[Tuple[str, int]]
         """
-        valid_ptype = set(self.input_data.products['PassagerType'])
+        valid_ptype = set(self.input_data.products['PassengerGroupType1'])
 
         if not ptype in valid_ptype:
             raise ValueError(
@@ -467,7 +481,7 @@ class PendlerKombiUsers():
                 )
 
         passenger_type_keys = set(self.input_data.products.query(
-            "PassagerType == @ptype"
+            "PassengerGroupType1 == @ptype"
             )['key'])
 
         return passenger_type_keys
