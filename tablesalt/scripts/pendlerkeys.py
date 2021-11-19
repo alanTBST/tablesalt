@@ -19,7 +19,7 @@ USAGE
 To run the script for the year 2019 using model 1 (standard zonework model)
 
     python ./path/to/tablesalt/tablesalt/scripts/pendlerkeys.py -y 2019
-    -p /path/to/PeriodeProdukt.csv -z /path/to/Zoner.csv -m 1
+    -p /path/to/PeriodeProdukt.csv -z /path/to/Zoner.csv
 
 where -p is the path to the period product data provided by rejsekort,
 -z is the path to the product zones data provided by rejsekort
@@ -30,7 +30,6 @@ and -m is the model to run (1 --> standard zonework model,
 import ast
 import os
 import pickle
-from collections import defaultdict
 from datetime import datetime
 from functools import lru_cache
 from itertools import chain, groupby
