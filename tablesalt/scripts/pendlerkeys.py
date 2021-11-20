@@ -504,6 +504,30 @@ def _zonerelations(year: int, model: int):
 
     df.to_csv(fp, index=False)
 
+def model_results(model: int, db_path, userdict, paths, zero_travel_price, year):
+
+    result_path = db_path + f'_model_{model}'
+
+    _chosen_zones(
+        userdict,
+        result_path,
+        paths['kombi_valid_trips'],
+        zero_travel_price,
+        year,
+        model
+        )
+
+    _npaid_zones(
+        userdict,
+        paths['kombi_valid_trips'],
+        zero_travel_price,
+        result_path,
+        year,
+        model
+        )
+
+    _zonerelations(year, model)
+
 
 def main():
 
@@ -522,7 +546,6 @@ def main():
     cpu_usage = args['cpu_usage']
 
     processors = int(round(os.cpu_count()*cpu_usage))
-
     zero_travel_price = find_no_pay(stores, year, processors)
 
     userdict = PendlerKombiUsers(
