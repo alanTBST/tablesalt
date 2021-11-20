@@ -71,7 +71,7 @@ def sort_df_by_colums(df):
         'PassagerType': 19,
         'TpurseRequired': 20,
         'SeasonPassCategory': 21,
-        'Pris': 22,
+        'Price': 22,
         'RefundType': 23,
         'productdate': 24,
         'valgtezoner': 25,
@@ -113,16 +113,6 @@ def sort_df_by_colums(df):
 
     return df[column_order]
 
-
-def determine_takst_region(zone_sequence: tuple) -> str:
-
-    if all(x < 1100 for x in zone_sequence):
-        return "th"
-    if all(1100 < x <= 1200 for x in zone_sequence):
-        return "tv"
-    if all(1200 < x < 1300 for x in zone_sequence):
-        return "ts"
-    return "dsb"
 
 def _aggregate_zones(shares):
     """
@@ -219,7 +209,7 @@ def _load_zone_relations():
 def _load_process_zones(zone_path):
     # load zones
     pendler_product_zones = pd.read_csv(
-        zone_path, sep=';', encoding='iso-8859-1'
+        zone_path, sep=';', encoding='utf8'
         )
 
     pendler_product_zones = pendler_product_zones.sort_values(
@@ -420,7 +410,10 @@ def _match_pendler_record(
     """
 
     chosen_zones = ast.literal_eval(record.valgtezoner)
-    takst = record.takstsæt.lower()
+    try:
+        takst = record.takstsæt.lower()
+    except AttributeError:
+        takst = determine_takst_region(chosen_zones)
     try:
         start = int(record.startzone)
     except ValueError:
@@ -506,7 +499,8 @@ def _match_pendler(pendler_df, year, model):
     for record in sub_tuples:
         try:
             result =  _match_pendler_record(
-                record, kombi_results,
+                record,
+                kombi_results,
                 zone_relation_results,
                 paid_zones_results,
                 1
@@ -530,10 +524,12 @@ def _match_pendler(pendler_df, year, model):
 
 
 def _process_pendler_df(period_products, zone_path):
-
-    period_products.Pris = \
-    period_products.Pris.str.replace(',','', regex=False
-    ).str.replace('.','', regex=False).astype(float) / 100
+    try:
+        period_products.Price = \
+        period_products.Price.str.replace(',','', regex=False
+        ).str.replace('.','', regex=False).astype(float) / 100
+    except AttributeError:
+        pass
 
     pendler_product_zones = _load_process_zones(zone_path)
 
@@ -580,7 +576,7 @@ def make_output(usershares, product_path, zone_path, model, year):
     """
     # this might need to change based on input data structure
     period_products = pd.read_csv(
-        product_path, sep=';', encoding='iso-8859-1'
+        product_path, sep=';', encoding='utf8'
         )
 
     period_products = _process_pendler_df(period_products, zone_path)
@@ -618,7 +614,7 @@ def make_output(usershares, product_path, zone_path, model, year):
         new_col = f'{col}_andel'
         andel_columns.append(new_col)
         final.loc[:, f'{col}_andel'] = \
-            final.loc[:, 'Pris'] * final.loc[:, col]
+            final.loc[:, 'Price'] * final.loc[:, col]
 
     final = sort_df_by_colums(final)
     return final
@@ -696,17 +692,14 @@ def main():
 
     userdata = process_user_data(userdata)
     kombi_trips = load_valid(valid_kombi_store)
-    zero_travel_price = find_no_pay(stores, year)
+    zero_travel_price = find_no_pay(stores, year, 4)
 
     valid = {
         k: set(v).intersection(zero_travel_price) for
         k, v in kombi_trips.items()
         }
-    for model in [1, 2, 3, 4]:
-        if model > 1:
-            path = db_path + f'_model_{model}'
-        else:
-            path = db_path
+    for model in [1, 2, 3, 4, 5, 6]:
+        path = db_path + f'_model_{model}'
         results = fetch_trip_results(path, valid)
 
         final = make_output(results,
@@ -714,8 +707,8 @@ def main():
                     zones,
                     model,
                     year)
-        fp = THIS_DIR / '__result_cache__'/ f'{year}' / f'rejsekort_shares_model{model}.csv'
-        final.to_csv(fp, index=False, encoding='iso-8859-1')
+        fp = THIS_DIR / '__result_cache__'/ f'{year}' / 'output' /f'rejsekort_shares_model{model}.csv'
+        final.to_csv(fp, index=False, encoding='utf8')
 
 
 if __name__ == "__main__":
