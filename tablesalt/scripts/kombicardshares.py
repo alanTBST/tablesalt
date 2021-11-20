@@ -710,7 +710,8 @@ def main():
                     zones,
                     model,
                     year)
-        fp = THIS_DIR / '__result_cache__'/ f'{year}' / 'output' /f'rejsekort_shares_model{model}.csv'
+        fp = THIS_DIR / '__result_cache__'/ f'{year}' /f'rejsekort_shares_model{model}.csv'
+
         final.to_csv(fp, index=False, encoding='utf8')
 
 
