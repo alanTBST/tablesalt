@@ -105,7 +105,10 @@ def sort_df_by_colums(df):
 
     cols = df.columns
     for col in cols:
-        q.put((priority[col], col))
+        try:
+            q.put((priority[col], col))
+        except KeyError:
+            pass
 
     column_order = []
     while not q.empty():
