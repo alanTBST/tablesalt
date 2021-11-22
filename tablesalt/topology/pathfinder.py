@@ -19,7 +19,6 @@ import pkg_resources
 from networkx.classes.graph import Graph  # type: ignore
 
 from tablesalt.common import triptools
-from tablesalt.common.io import mappers
 from tablesalt.topology import stationoperators
 from tablesalt.topology.stopnetwork import StopsList
 from tablesalt.topology.tools import determine_takst_region
@@ -32,6 +31,14 @@ CONFIG = load_config()
 
 MODELS = CONFIG['rejsekort_touches']
 METRO = CONFIG['metro_platform_numbers']
+SUBURBAN = CONFIG['suburban_platform_numbers']
+
+LOCAL_1 =  dict(CONFIG['local_platform_numbers_1'])
+LOCAL_1 = {int(k): int(v) for k, v in LOCAL_1.items()}
+LOCAL_2 =  dict(CONFIG['local_platform_numbers_2'])
+LOCAL_2 = {int(k): int(v) for k, v in LOCAL_2.items()}
+LOCAL = {**LOCAL_1, **LOCAL_2}
+
 
 CO_TR = (int(MODELS['Co']), int(MODELS['Tr']))
 SU_SU = (int(MODELS['Su']), int(MODELS['Su']))
@@ -39,6 +46,10 @@ SU_SU = (int(MODELS['Su']), int(MODELS['Su']))
 
 METRO_MAP = {int(v): int(k) for k, v in METRO.items()}
 REV_METRO_MAP = {int(k): int(v) for k, v in METRO.items()}
+
+SUBURBAN_MAP = {int(k): int(v) for k, v in SUBURBAN.items()}
+LOCAL_MAP_1 = {int(k): int(v) for k, v in LOCAL_1.items()}
+LOCAL_MAP_2 = {int(k): int(v) for k, v in LOCAL_2.items()}
 
 SOLO_ZONE_PRIS = {
     'th':  {k: float(v) for k, v in CONFIG_REVENUE['solo_zone_price_th'].items()},
@@ -63,11 +74,18 @@ def load_border_stations() -> Dict[int, Tuple[int, ...]]: # put this in TBSTtopo
         for k, v in border_frame.set_index('UIC')['Zones'].to_dict().items()
         }
 
-    s_dsb = [x - 90000 for x in mappers['s_uic']]
-    inborder = set(s_dsb).intersection(border_dict)
-    inborder_added = {k + 90000: border_dict[k] for k in inborder}
+    updated = {SUBURBAN_MAP.get(k, k): v for k, v in border_dict.items()}
 
-    return {**border_dict, **inborder_added}
+    border_dict.update(updated)
+
+    updated = {LOCAL_MAP_1.get(k, k): v for k, v in border_dict.items()}
+    border_dict.update(updated)
+
+    updated = {LOCAL_MAP_2.get(k, k): v for k, v in border_dict.items()}
+
+    border_dict.update(updated)
+
+    return border_dict
 
 BORDER_STATIONS = load_border_stations()
 
