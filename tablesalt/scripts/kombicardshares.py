@@ -44,6 +44,7 @@ TRIP_ERRORS = {
     'rk_operator_error',
     'no_available_trip'
     }
+
 def sort_df_by_colums(df):
 
     priority = {
