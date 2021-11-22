@@ -14,7 +14,6 @@ products
 import ast
 import glob
 import os
-from collections import defaultdict
 from datetime import datetime
 from itertools import chain, groupby
 from operator import itemgetter
@@ -24,7 +23,6 @@ from typing import Any, Dict, List, Tuple, Union
 
 import lmdb
 import msgpack
-import numpy as np
 import pandas as pd
 import pkg_resources
 from tablesalt.preprocessing.parsing import TableArgParser
