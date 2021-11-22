@@ -24,57 +24,27 @@ from tablesalt.topology import stationoperators
 from tablesalt.topology.stopnetwork import StopsList
 from tablesalt.topology.tools import determine_takst_region
 from tablesalt.topology.zonegraph import ZoneGraph
-
-# get this stuff from config
-# OP_MAP = {v: k.lower() for k, v in mappers['operator_id'].items()}
-# REV_OP_MAP = {v: k for k, v in OP_MAP.items()}
-
-rev_model_dict = {v:k for k, v in mappers['model_dict'].items()}
-CO_TR = (rev_model_dict['Co'], rev_model_dict['Tr'])
-SU_SU = (rev_model_dict['Su'], rev_model_dict['Su'])
+from tablesalt.resources.config.config import load_config, load_revenue_config
 
 
-METRO_MAP = mappers['metro_map']
-REV_METRO_MAP = mappers['metro_map_rev']
+CONFIG_REVENUE = load_revenue_config()
+CONFIG = load_config()
 
-#TODO load from config with year
+MODELS = CONFIG['rejsekort_touches']
+METRO = CONFIG['metro_platform_numbers']
+
+CO_TR = (int(MODELS['Co']), int(MODELS['Tr']))
+SU_SU = (int(MODELS['Su']), int(MODELS['Su']))
+
+
+METRO_MAP = {int(v): int(k) for k, v in METRO.items()}
+REV_METRO_MAP = {int(k): int(v) for k, v in METRO.items()}
+
 SOLO_ZONE_PRIS = {
-    'th': {
-        'dsb': 6.38,
-        'DSB': 6.38,
-        'movia_h': 9.18,
-        'Movia':  9.18,
-        'first': 6.42,
-        'DSB Øresund': 6.42,
-        'Öresundståg':  6.42,
-        'stog': 7.12,
-        's-tog': 7.12,
-        'metro': 9.44,
-        'Metroselskabet': 9.44,
-        'DSB S-tog_th': 7.12,
-        'DSB S-tog': 7.12
-        },
-    'ts': {
-        'dsb': 6.55,
-        'DSB': 6.55,
-        'movia_s': 7.94,
-        'Movia': 7.94,
-        'movia_s': 7.94,
-        },
-    'tv': {
-        'dsb': 6.74,
-        'DSB': 6.74,
-        'movia_v': 8.43,
-        'Movia': 8.43
-        },
-    'dsb': {
-        'dsb': 6.57,
-        'DSB': 6.57,
-        'Movia': 6.36,
-        'movia_h': 6.36,
-        'movia_s': 6.36,
-        'movia_v': 6.36,
-        }
+    'th':  {k: float(v) for k, v in CONFIG_REVENUE['solo_zone_price_th'].items()},
+    'ts': {k: float(v) for k, v in CONFIG_REVENUE['solo_zone_price_ts'].items()},
+    'tv':{k: float(v) for k, v in CONFIG_REVENUE['solo_zone_price_tv'].items()},
+    'dsb': {k: float(v) for k, v in CONFIG_REVENUE['solo_zone_price_sj'].items()}
     }
 
 def load_border_stations() -> Dict[int, Tuple[int, ...]]: # put this in TBSTtopology
@@ -489,7 +459,6 @@ class ZoneSharer(ZoneProperties):
             station_operators: stationoperators.StationOperators,
             zone_sequence: Tuple[int, ...],
             stop_sequence: Tuple[int, ...],
-            # operator_sequence: Tuple[int, ...],
             usage_sequence: Tuple[int, ...],
             takst_suffix: str = False,
             allow_operator_legs: bool = False
