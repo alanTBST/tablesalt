@@ -12,8 +12,6 @@ from typing import Any, AnyStr, DefaultDict, Dict, List, Optional, Set, Tuple, U
 
 import pandas as pd  # type: ignore
 import pkg_resources
-from tablesalt import transitfeed
-from tablesalt.common.io import mappers
 from tablesalt.resources.config.config import load_config
 from tablesalt.topology.stopnetwork import ALTERNATE_STATIONS
 from tablesalt.topology.tools import TakstZones, determine_takst_region
@@ -72,182 +70,6 @@ def _load_default_config() -> Dict[str, str]:
     with open(fp, 'r', encoding='utf-8') as f:
         config_dict = json.load(f)
     return config_dict
-
-
-def _load_operator_configuration(
-    config_file: Optional[AnyStr] = None
-    ) -> Dict[str, str]:
-    """load the operator configuration from the package
-
-    :return: a dictionary of network lines and operators servicing them
-    :rtype: Dict[str, str]
-    """
-
-    if config_file is None:
-        config_dict = _load_default_config()
-    else:
-        with open(config_file, 'r') as f:
-            config_dict = json.load(f)
-    return config_dict
-
-def _load_operator_settings(
-    *lines: str,
-    config_file: Optional[AnyStr] = None
-    ) -> Dict[str, str]:
-    """
-    load the operator config file and process it for the given network lines
-
-    :param *lines: a line or lines to load
-    :type *lines: str
-    :param config_file: path to a config file if not using default, defaults to None
-    :type config_file: Optional[AnyStr], optional
-    :return: the operator settings
-    :rtype: Dict[str, str]
-
-    """
-
-    config_dict = _load_operator_configuration(config_file)
-
-    chosen_lines = {x.lower() for x in lines}
-
-    use_groups = False # if a group of lines is input
-    chosen_operators = set()
-    for k, v in config_dict.items():
-        if k in chosen_lines:
-            try:
-                chosen_operators.add(v)
-            except TypeError:
-                use_groups = True
-                for line in v:
-                    chosen_operators.add(config_dict[line])
-                    chosen_lines.add(line.lower())
-                chosen_lines.remove(k) # remove the group name...local, suburban etc
-    operator_ids = {
-        k.lower(): v for k, v in  mappers['operator_id'].items()
-        }
-
-    operator_ids = {
-        k: v for k, v in operator_ids.items() if
-        k in chosen_operators
-        }
-
-    operators = tuple(operator_ids)
-
-    return {
-        'operator_ids': operator_ids,
-        'operators': operators,
-        'config': config_dict,
-        'lines': chosen_lines,
-        'use_groups': use_groups
-        }
-
-
-def _load_bus_station_map() -> Dict[int, int]:
-    filepath = pkg_resources.resource_filename(
-        'tablesalt', 'resources/bus_closest_station.json')
-
-    with open(filepath, 'r') as f:
-        bus_map = json.load(f)
-
-    return {int(bstop): station for bstop, station in bus_map.items()}
-
-
-def _alternate_stop_map():
-
-    max_alternates = max(len(x) for x in ALTERNATE_STATIONS.values())
-    alternate_dicts = {x: {} for x in range(max_alternates)}
-    for k, v in ALTERNATE_STATIONS.items():
-        for i, stopid in enumerate(v):
-            alternate_dicts[i][k] = stopid
-
-    metromap = mappers['metro_map']
-    revmetromap = mappers['metro_map_rev']
-
-    sstops = mappers['s_uic']
-    mstops = mappers['m_uic']
-
-    sstopsdict = {}
-    for stopid in sstops:
-        normalid = stopid - 90000
-        ms = revmetromap.get(normalid)
-        alts = [d.get(normalid) for d in alternate_dicts.values()]
-        alts = [x for x in alts if x and x != stopid]
-        if ms:
-            alts = alts + [ms]
-        for x in alts:
-            sstopsdict[x] = stopid
-
-    mstopsdict = {}
-    for stopid in mstops:
-        ss = metromap.get(stopid)
-        alts = [d.get(ss) for d in alternate_dicts.values()]
-        alts = [x for x in alts if x and x != stopid]
-        for x in alts:
-            mstopsdict[x] = stopid
-
-    alternate_dicts[max_alternates] = metromap
-    alternate_dicts[max_alternates+1] = revmetromap
-
-    return alternate_dicts, sstopsdict, mstopsdict
-
-def _load_default_passenger_stations() -> List[pd.core.frame.DataFrame]:
-
-    """load the passenger stations data
-
-    :return: a dataframe of stations and operators used to query
-    :rtype: pd.core.frame.DataFrame
-    """
-    fp = pkg_resources.resource_filename(
-            'tablesalt',
-            'resources/networktopodk/operator_stations.csv'
-            )
-
-    pas_stations = pd.read_csv(
-        fp, encoding='iso-8859-1'
-        )
-    pas_stations.columns = [x.lower() for x in pas_stations.columns]
-
-    alternate_dicts, sstopsdict, mstopsdict = _alternate_stop_map()
-
-    frames = []
-    for i, d in alternate_dicts.items():
-
-        new_frame = pas_stations.copy()
-        new_frame = new_frame.query("stop_id in @d")
-        new_frame.loc[:, 'stop_id'] = new_frame.loc[:, 'stop_id'].map(d)
-
-        sframe = new_frame.query("stop_id in @sstopsdict").copy()
-        sframe.loc[:, 'stop_id'] = sframe.loc[:, 'stop_id'].map(sstopsdict)
-
-        mframe = new_frame.query("stop_id in @mstopsdict").copy()
-        mframe.loc[:, 'stop_id'] = mframe.loc[:, 'stop_id'].map(mstopsdict)
-
-        new_frame = new_frame.set_index('stop_id')
-        sframe = sframe.set_index('stop_id')
-        mframe = mframe.set_index('stop_id')
-
-        frames.append(new_frame)
-        frames.append(sframe)
-        frames.append(mframe)
-
-
-
-    pas_stations = pas_stations.query("stop_id > @MIN_RAIL_UIC ")
-    pas_stations = pas_stations.set_index('stop_id')
-    frames.append(pas_stations)
-
-    return frames
-
-
-def _grouped_lines_dict(config_dict):
-
-    groupdict = {}
-    for line, info in config_dict.items():
-        if isinstance(info, list):
-            for l in info:
-                groupdict[l] = line
-    return groupdict
-
 
 class StationOperators:
 
@@ -493,6 +315,10 @@ class StationOperators:
                 self._transfer_cache[k].update(v)
             seen.add(stopids)
             agency = self.feed.get_agency_name_for_trip(trip_id)
+            try:
+                agency = agency.lower()
+            except AttributeError:
+                pass
             for stop_relation in perms:
                 relation_operators[stop_relation].add(agency)
             # this deals only with sjælland correctly
