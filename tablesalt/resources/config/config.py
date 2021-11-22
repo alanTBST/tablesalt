@@ -15,4 +15,14 @@ def load_config() -> configparser.ConfigParser:
     return config
 
 
+def load_revenue_config() -> configparser.ConfigParser:
+
+    config = configparser.ConfigParser()
+    ini_file = pkg_resources.resource_filename(
+        'tablesalt', r'resources/config/config_revenue.ini'
+    )
+    config.read(ini_file)
+
+
+    return config
 
