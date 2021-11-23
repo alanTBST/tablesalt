@@ -153,7 +153,7 @@ def load_valid(valid_kombi_store: str) -> Dict:
         with env.begin() as txn:
             cursor = txn.cursor()
             for k, v in cursor:
-                valid_kombi[k.decode('utf-8')] = ast.literal_eval(v.decode('utf-8'))
+                valid_kombi[pickle.loads(k)] = pickle.loads(v)
 
     return {ast.literal_eval(k): v for k, v in valid_kombi.items()}
 
@@ -274,14 +274,13 @@ def get_zone_combination_shares(tofetch, db_path: str, model: int):
                                      ):
                 all_trips = {}
                 for trip in trips:
-                    t = bytes(str(trip), 'utf-8')
+                    t = pickle.dumps(trip)
                     res = txn.get(t)
                     if not res:
                         continue
-                    res = res.decode('utf-8')
+                    res = pickle.loads(res)
                     if res not in TRIP_ERRORS:
-                        val = ast.literal_eval(res)
-                        all_trips[trip] = val
+                        all_trips[trip] = res
                 combo_result = get_user_shares(all_trips.values())
                 final[combo] = combo_result
 
@@ -306,14 +305,13 @@ def _kombi_by_seasonpass(pendler_kombi, userdict):
                 except KeyError:
                     continue
                 if v:
-                    v = v.decode('utf-8')
-                    v = set(ast.literal_eval(v))
+                    v = pickle.loads(v)
                     valid.update(v)
     return valid
 
 def _get_trips(db_path, tripkeys, model):
 
-    tripkeys_ = (bytes(str(x), 'utf-8') for x in tripkeys)
+    tripkeys_ = (pickle.dumps(x) for x in tripkeys)
 
     out = {}
     with lmdb.open(db_path) as env:
@@ -322,10 +320,9 @@ def _get_trips(db_path, tripkeys, model):
                 res = txn.get(k)
                 if not res:
                     continue
-                res = res.decode('utf-8')
+                res = pickle.loads(res)
                 if res not in TRIP_ERRORS:
-                    val = ast.literal_eval(res)
-                    out[int(k.decode('utf-8'))] = val
+                    out[pickle.loads(k)] = pickle.loads(res)
 
     return out
 

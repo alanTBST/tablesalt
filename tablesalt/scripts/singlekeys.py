@@ -418,7 +418,7 @@ def _store_operator_tripkeys(store: str, ticket_keys, operators):
 # put into revenue
 def _get_trips(db: str, tripkeys: Set[int]) -> Dict:
 
-    tripkeys_ = {bytes(str(x), 'utf-8') for x in tripkeys}
+    tripkeys_ = {pickle-dumps(x) for x in tripkeys}
 
     out = {}
     with lmdb.open(db) as env:
@@ -427,8 +427,8 @@ def _get_trips(db: str, tripkeys: Set[int]) -> Dict:
                 shares = txn.get(k)
                 if shares:
                     try:
-                        shares = shares.decode('utf-8')
-                        out[int(k.decode('utf-8'))] = ast.literal_eval(shares)
+                        shares = pickle.loads(shares)
+                        out[pickle.loads(k)] = shares
                     except ValueError:
                         continue
     return out

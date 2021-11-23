@@ -185,14 +185,14 @@ def _get_trips(calculated_stores, tripkeys):
         out = {}
         with env.begin() as txn:
             for trip in tqdm(tripkeys):
-                t = bytes(str(trip), 'utf-8')
+                t = pickle.dumps(trip)
                 res = txn.get(t)
 
                 if not res:
                     continue
-                res = res.decode('utf-8')
+                res = pickle.loads(res)
                 if res not in errs:
-                    out[trip] = ast.literal_eval(res)
+                    out[trip] = res
     return out
 
 def main():
