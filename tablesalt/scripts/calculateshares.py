@@ -281,11 +281,13 @@ def main():
     parser = TableArgParser('year', 'bus_stop_distance', 'cpu_usage')
     args = parser.parse()
     year = args['year']
+    bus_distance = args['bus_stop_distance']
+
     store_loc = find_datastores()
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
-    bus_distance = args['bus_stop_distance']
+
 
     # allfeeds = transitfeed.available_archives()
     # year_archives = [x for x in allfeeds if str(year) in x]
