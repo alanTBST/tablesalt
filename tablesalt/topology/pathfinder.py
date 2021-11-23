@@ -51,11 +51,15 @@ SUBURBAN_MAP = {int(k): int(v) for k, v in SUBURBAN.items()}
 LOCAL_MAP_1 = {int(k): int(v) for k, v in LOCAL_1.items()}
 LOCAL_MAP_2 = {int(k): int(v) for k, v in LOCAL_2.items()}
 
+
+todict = lambda x: {
+    int(k) if k.isdigit() else k: float(v) for k, v in CONFIG_REVENUE[x].items()
+    }
 SOLO_ZONE_PRIS = {
-    'th':  {k: float(v) for k, v in CONFIG_REVENUE['solo_zone_price_th'].items()},
-    'ts': {k: float(v) for k, v in CONFIG_REVENUE['solo_zone_price_ts'].items()},
-    'tv':{k: float(v) for k, v in CONFIG_REVENUE['solo_zone_price_tv'].items()},
-    'dsb': {k: float(v) for k, v in CONFIG_REVENUE['solo_zone_price_sj'].items()}
+    'th': todict('solo_zone_price_th'),
+    'ts': todict('solo_zone_price_ts'),
+    'tv': todict('solo_zone_price_tv'),
+    'dsb': todict('solo_zone_price_sj')
     }
 
 def load_border_stations() -> Dict[int, Tuple[int, ...]]: # put this in TBSTtopology
@@ -821,17 +825,17 @@ class ZoneSharer(ZoneProperties):
         self,
         minimum_operator_zones: Optional[int] = 2
         ) -> Dict[str, Tuple[Tuple[Union[int, float], str], ...]]:
-        """[summary]
+        """Get the shares for all models for the givem
 
         :param minimum_operator_zones: The number of zones in the
             minimum principle model, defaults to 2
         :type minimum_operator_zones: Optional[int], optional
-        :return: [description]
+        :return: a dictionary with the model results for the trip
         :rtype: Dict[str, Tuple[Tuple[Union[int, float], str], ...]]
         """
 
         try:
-            val = (self.stop_sequence, self.usage_sequence)
+            val = (self.stop_sequence, self.operator_sequence, self.usage_sequence)
             return self.SHARE_CACHE[val]
         except KeyError:
             pass
@@ -878,6 +882,4 @@ class ZoneSharer(ZoneProperties):
             except KeyError:
                 pass
             return shares
-        # val = (self.stop_sequence, self.operator_sequence, self.usage_sequence)
-        # self.SHARE_CACHE[val] = shares
         return shares
