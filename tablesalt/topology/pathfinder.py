@@ -75,14 +75,10 @@ def load_border_stations() -> Dict[int, Tuple[int, ...]]: # put this in TBSTtopo
         }
 
     updated = {SUBURBAN_MAP.get(k, k): v for k, v in border_dict.items()}
-
     border_dict.update(updated)
-
     updated = {LOCAL_MAP_1.get(k, k): v for k, v in border_dict.items()}
     border_dict.update(updated)
-
     updated = {LOCAL_MAP_2.get(k, k): v for k, v in border_dict.items()}
-
     border_dict.update(updated)
 
     return border_dict
@@ -156,15 +152,6 @@ def to_legs(sequence: Tuple[int, ...]) ->Tuple[int, ...]:
     return triptools.sep_legs(sequence)
 
 @lru_cache(2**8)
-def _to_legs_stops(stop_legs, opgetter):
-    """convert to legs and map the bus id to station if possible"""
-    return tuple(
-            (leg[0], opgetter.BUS_ID_MAP.get(leg[1])) if
-            (not _is_bus(leg[0]) and _is_bus(leg[1])) else leg
-            for leg in stop_legs
-            )
-
-@lru_cache(2**8)
 def _chain_vals(vals):
     """chain zones together for legs removing duplicates at end"""
     lvals = len(vals)
@@ -185,7 +172,6 @@ class ZoneProperties():
                  station_operators: stationoperators.StationOperators,
                  zone_sequence: Tuple[int, ...],
                  stop_sequence: Tuple[int, ...],
-                 region: Optional[str] = 'sjælland'
                  ) -> None:
         """
         Class to determine how many zones are travelled through,
@@ -198,8 +184,7 @@ class ZoneProperties():
         :type zone_sequence: Tuple[int, ...]
         :param stop_sequence:  a tuple of the stop sequence of a trip
         :type stop_sequence: Tuple[int, ...]
-        :param region: the region to use, defaults to 'sjælland'
-        :type region: Optional[str], optional
+
         :return: ''
         :rtype: None
 
@@ -212,7 +197,6 @@ class ZoneProperties():
         self.stop_sequence: Tuple[int, ...] = stop_sequence
 
         self.stop_legs: Tuple[Tuple[int, ...], ...] = to_legs(stop_sequence)
-        # self.stop_legs = _to_legs_stops(self.stop_legs, self.opgetter)
         self.zone_legs: Tuple[Tuple[int, ...], ...] = to_legs(zone_sequence)
 
 
