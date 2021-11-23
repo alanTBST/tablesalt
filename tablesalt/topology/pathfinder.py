@@ -515,10 +515,6 @@ class ZoneSharer(ZoneProperties):
             except KeyError:
                 raise
             op = random.choice(ops)
-            # if self._takst_suffix:
-            #     # this needs to be in the sharing
-            #     takst = determine_takst_region(self.zone_sequence)
-            #     op += '_' + takst
             opsequence += (op, )
 
         return opsequence
@@ -549,7 +545,6 @@ class ZoneSharer(ZoneProperties):
                 cotr_idxs += (i,)
 
         self.stop_legs = _remove_idxs(cotr_idxs, self.stop_legs)
-        # self.operator_legs = _remove_idxs(cotr_idxs, self.operator_legs)
         self.zone_legs = _remove_idxs(cotr_idxs, self.zone_legs)
         self.usage_legs = _remove_idxs(cotr_idxs, self.usage_legs)
 
@@ -572,7 +567,6 @@ class ZoneSharer(ZoneProperties):
                 susu_idxs += (i,)
         if susu_idxs:
             self.stop_legs = _remove_idxs(susu_idxs, self.stop_legs)
-            # self.operator_legs = _remove_idxs(susu_idxs, self.operator_legs)
             self.zone_legs = _remove_idxs(susu_idxs, self.zone_legs)
             self.usage_legs = _remove_idxs(susu_idxs, self.usage_legs)
 
@@ -736,6 +730,9 @@ class ZoneSharer(ZoneProperties):
         for legnum, imputed_leg in enumerate(imputed_zone_legs):
             leg_region = zone_leg_regions[legnum]
             op_id = self.operator_sequence[legnum]
+            # if self._takst_suffix:
+            #     op_id = str(op_id) + '_' + leg_region
+
             leg_solo_price = self.leg_solo_price(leg_region, op_id)
             if not op_id == previous_op_id and previous_op_id is not None:
                 current_op_sum = 0
@@ -750,10 +747,12 @@ class ZoneSharer(ZoneProperties):
                     out_standard[zone].append(res)
                     out_solo[zone].append(leg_solo_price)
                     current_op_sum += res[0]
-                    current_spend_sum +=1
+                    current_spend_sum += 1
                     seen_zone_opid.add((zone, op_id))
             try:
                 next_op_id = self.operator_sequence[legnum+1]
+                # if self._takst_suffix:
+                #     next_op_id = next_op_id + '_' + leg_region
                 if op_id != next_op_id:
                     if current_op_sum < min_zones:
                         current_op_sum = min_zones
