@@ -24,9 +24,14 @@ from shapely import wkt  # type: ignore
 from shapely.geometry.linestring import LineString  # type: ignore
 from shapely.geometry.point import Point  # type: ignore
 from shapely.geometry.polygon import Polygon  # type: ignore
-from tablesalt.common.io import mappers
 from tablesalt.topology.stopnetwork import StopsList
 from tablesalt.transitfeed.feed import TransitFeed
+from tablesalt.resources.config.config import load_config
+
+CONFIG = load_config()
+
+SUBURBAN = dict(CONFIG['suburban_platform_numbers'])
+SUBURBAN_MAP = {int(k): v for k, v in SUBURBAN.items()}
 
 FILE_PATH = Union[str, bytes, 'os.PathLike[Any]']
 
@@ -625,11 +630,8 @@ class TakstZones:
         :return: stops data
         :rtype: pd.core.frame.DataFrame
         """
-
-        s_stops = mappers['s_uic']
-        corr_s_stops = [x - 90000 for x in s_stops]
-        corr_stops = stops_df.query("stop_id in @corr_s_stops").copy(deep=True)
-        corr_stops.loc[:, 'stop_id'] = corr_stops.loc[:, 'stop_id'] + 90_000
+        corr_stops = stops_df.query("stop_id in @SUBURBAN_MAP").copy(deep=True)
+        corr_stops.loc[:, 'stop_id'] = corr_stops.loc[:, 'stop_id'].replace(SUBURBAN_MAP)
         out_frame = pd.concat([stops_df, corr_stops])
 
         return out_frame
