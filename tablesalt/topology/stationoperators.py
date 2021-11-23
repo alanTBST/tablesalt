@@ -4,17 +4,14 @@ Classes to interact with passenger stations and the operators that serve them
 """
 #standard imports
 import ast
-import json
 from collections import defaultdict
 from itertools import groupby, permutations, product
 from operator import itemgetter
 from typing import Any, AnyStr, DefaultDict, Dict, List, Optional, Set, Tuple, Union
 
-import pandas as pd  # type: ignore
-import pkg_resources
+
 from tablesalt.resources.config.config import load_config
 from tablesalt.topology.stopnetwork import ALTERNATE_STATIONS
-from tablesalt.topology.tools import TakstZones, determine_takst_region
 from tablesalt.transitfeed.feed import TransitFeed, BusMapper
 
 CONFIG = load_config()
@@ -55,30 +52,14 @@ S_RANGE: Set[int] = set(range(8690000, 8699999))
 MAX_RAIL_UIC: int = 9999999
 MIN_RAIL_UIC: int = 7400000
 
-def _load_default_config() -> Dict[str, str]:
-    """load the operator configuration from the package
-
-    :return: a dictionary of network names and operators servicing them
-    :rtype: Dict[str, str]
-    """
-    fp = pkg_resources.resource_filename(
-    'tablesalt', 'resources/config/operator_config.json'
-    )
-
-    config_dict: Dict[str, str]
-
-    with open(fp, 'r', encoding='utf-8') as f:
-        config_dict = json.load(f)
-    return config_dict
-
 class StationOperators:
 
     def __init__(
         self,
         feed: TransitFeed,
-        bus_distance_cutoff: int = 500,
-        allow_operator_legs: bool = False,
-        crs: int = 25832
+        bus_distance_cutoff: Optional[int] = 500,
+        allow_operator_legs: Optional[bool] = False,
+        crs: Optional[int] = 25832
         ) -> None:
         """[summary]
 
@@ -374,9 +355,13 @@ class StationOperators:
 
         if not transfer_options:
             raise KeyError
+
         for transfer in transfer_options:
-            start_op = set(self._lookup[(start_stop_id, transfer)])
-            end_op = set(self._lookup[(transfer, end_stop_id)])
+            try:
+                start_op = set(self._lookup[(start_stop_id, transfer)])
+                end_op = set(self._lookup[(transfer, end_stop_id)])
+            except KeyError:
+                continue
             inter = start_op.intersection(end_op)
             if inter:
                 return tuple(inter)
