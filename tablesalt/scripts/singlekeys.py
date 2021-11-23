@@ -54,8 +54,7 @@ where -y is the analysis year
 
 """
 
-import ast
-import glob
+
 import os
 import pickle
 from functools import partial
@@ -418,7 +417,7 @@ def _store_operator_tripkeys(store: str, ticket_keys, operators):
 # put into revenue
 def _get_trips(db: str, tripkeys: Set[int]) -> Dict:
 
-    tripkeys_ = {pickle-dumps(x) for x in tripkeys}
+    tripkeys_ = {pickle.dumps(x) for x in tripkeys}
 
     out = {}
     with lmdb.open(db) as env:
