@@ -8,9 +8,9 @@ from collections import Counter
 from itertools import groupby
 from operator import itemgetter
 from pathlib import Path
-from typing import (Any, Dict, Iterable, Iterator,
+from typing import (Any, Dict, Iterable,
                     List, Optional, Sequence,
-                    Set, Tuple, TypeVar, Union)
+                    Set, Tuple, Union)
 
 import msgpack  # type: ignore
 import pandas as pd  # type: ignore
