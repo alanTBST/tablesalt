@@ -19,8 +19,13 @@ except ImportError:
 # from pandas.io.parsers import TextFileReader
 from tablesalt.common.io import mappers  # type: ignore
 from tablesalt.common.io.datastores import make_store
+from tablesalt.resources.config.config import load_config
 
-MODEL_MAP = {v:k for k, v in mappers['model_dict'].items()}
+CONFIG = load_config()
+
+MODELS = CONFIG['rejsekort_touches']
+
+MODEL_MAP = {v: k for k, v in mappers['model_dict'].items()}
 CARD_MAP = mappers['card_id']
 
 
