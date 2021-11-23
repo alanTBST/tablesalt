@@ -21,7 +21,6 @@ To run this script for 2019 rabattrin 0 and model 1:
 
 
 """
-import ast
 import os
 import pickle
 from collections import defaultdict
