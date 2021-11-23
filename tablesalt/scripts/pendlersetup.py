@@ -179,6 +179,7 @@ Zoner
 """
 import ast
 import os
+import pickle
 from collections import defaultdict
 from datetime import datetime
 from functools import partial
@@ -328,8 +329,7 @@ def validate_travel_dates(
         with env.begin() as txn:
             cursor = txn.cursor()
             for k, v in cursor:
-                usertrips[k.decode('utf-8')] = \
-                    ast.literal_eval(v.decode('utf-8'))
+                pickle.loads(k) = pickle.loads(v)
     # =========================================================================
     # validate the user trips using the kombi dates lmdb store
     # =========================================================================
@@ -342,10 +342,11 @@ def validate_travel_dates(
                 except KeyError:
                     continue
                 for trip in v:
-                    trip_date = txn.get(str(trip).encode('utf-8'))
+                    trip = pickle.dumps(trip)
+                    trip_date = txn.get(trip)
                     if not trip_date:
                         continue
-                    trip_date = trip_date.decode('utf-8')
+                    trip_date = pickle.loads(trip_date)
                     trip_date = datetime.strptime(trip_date, '%Y-%m-%d').date()
                     for season_id, valid_dates in userdates.items():
                         if _date_in_window(valid_dates, trip_date):
