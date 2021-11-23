@@ -947,13 +947,28 @@ class TransitFeed:
 
         return stop_modes
 
-    def get_agency_name_for_trip(self, tripid: int) -> str:
+    def get_agency_id_for_trip(self, tripid: int) -> int:
+        """return the agency_id for a given trip_id
 
+        :param tripid: the tripid wanted
+        :type tripid: int
+        :return: the agency_id of the operator of the given trip
+        :rtype: int
+        """
         sub_route_id = self.trips.data[tripid]['route_id']
-        sub_agency_id = self.routes.data[sub_route_id]['agency_id']
-        sub_agency_name = self.agency.get(sub_agency_id)
+        return self.routes.data[sub_route_id]['agency_id']
+    def get_agency_name_for_trip(self, tripid: int) -> str:
+        """return the agency name for the given tripid
 
-        return sub_agency_name
+        :param tripid:  the tripid wanted
+        :type tripid: int
+        :return: the agency name of the operator of the given trip
+        :rtype: str
+        """
+
+        sub_agency_id = self.get_agency_id_for_trip(tripid)
+
+        return self.agency.get(sub_agency_id)
 
     def feed_period(self) -> Tuple[datetime, datetime]:
         """Return the time period that the feed is valid for
