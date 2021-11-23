@@ -177,7 +177,6 @@ Zoner
 
 
 """
-import ast
 import os
 import pickle
 from collections import defaultdict
@@ -226,7 +225,7 @@ def get_pendler_trips(
             cursor = txn.cursor()
             for k, v in cursor:
                 if v in user_card_nums:
-                    trip_card_dict[int(k.decode('utf-8'))] = v
+                    trip_card_dict[pickle.loads(k)] = v
 
     trip_card_list = sorted(zip(
         trip_card_dict.values(), trip_card_dict.keys()
@@ -346,7 +345,7 @@ def validate_travel_dates(
                     trip_date = txn.get(trip)
                     if not trip_date:
                         continue
-                    trip_date = pickle.loads(trip_date)
+                    trip_date = pickle.loads()
                     trip_date = datetime.strptime(trip_date, '%Y-%m-%d').date()
                     for season_id, valid_dates in userdates.items():
                         if _date_in_window(valid_dates, trip_date):
