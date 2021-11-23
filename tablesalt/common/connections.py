@@ -6,6 +6,7 @@ stores from dictionaries.
 import os
 import pkg_resources
 import json
+import pickle
 
 
 import lmdb
@@ -130,15 +131,9 @@ def _make_key_val(d, db_path, map_size=None):
     with lmdb.open(db_path, map_size=map_size) as env:# 18 gb.
         with env.begin(write=True) as txn:
             for k, v in d.items():
-                if not isinstance(v, bytes):
-                    if not isinstance(v, str):
-                        v = str(v)
-                    v = bytes(v, 'utf-8')
-                if not isinstance(k, bytes):
-                    if not isinstance(k, str):
-                        k = str(k)
-                    k = bytes(k, 'utf-8')
-                txn.put(k, v)
+                key = pickle.dumps(k)
+                val = pickle.dumps(v)
+                txn.put(key, val)
 
 def make_store(d, db_path, start_size: int = 1, size_limit: int = 30):
     """
