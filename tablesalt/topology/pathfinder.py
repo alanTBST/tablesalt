@@ -52,14 +52,24 @@ LOCAL_MAP_1 = {int(k): int(v) for k, v in LOCAL_1.items()}
 LOCAL_MAP_2 = {int(k): int(v) for k, v in LOCAL_2.items()}
 
 
-todict = lambda x: {
-    int(k) if k.isdigit() else k: float(v) for k, v in CONFIG_REVENUE[x].items()
+def _process_solo_zone_config(heading: str):
+
+    d = {
+    int(k) if k.isdigit() else k: float(v) for k, v in CONFIG_REVENUE[heading].items()
     }
+
+    takst = heading.split('_')[-1]
+
+    digits = {k:v for k, v in d.items() if isinstance(k, int)}
+    combined = {str(k) + '_' + takst: v for k, v in digits.items()}
+
+    return {**d, ** combined}
+
 SOLO_ZONE_PRIS = {
-    'th': todict('solo_zone_price_th'),
-    'ts': todict('solo_zone_price_ts'),
-    'tv': todict('solo_zone_price_tv'),
-    'dsb': todict('solo_zone_price_sj')
+    'th': _process_solo_zone_config('solo_zone_price_th'),
+    'ts': _process_solo_zone_config('solo_zone_price_ts'),
+    'tv': _process_solo_zone_config('solo_zone_price_tv'),
+    'dsb': _process_solo_zone_config('solo_zone_price_dsb')
     }
 
 def load_border_stations() -> Dict[int, Tuple[int, ...]]: # put this in TBSTtopology
@@ -89,11 +99,6 @@ def load_border_stations() -> Dict[int, Tuple[int, ...]]: # put this in TBSTtopo
 
 BORDER_STATIONS = load_border_stations()
 
-@lru_cache(2**8)
-def _is_bus(stopid: int) -> bool:
-
-    return (stopid > stationoperators.MAX_RAIL_UIC or
-            stopid < stationoperators.MIN_RAIL_UIC)
 
 @lru_cache(2**8)
 def impute_leg(g: Graph, zone_leg: Tuple[int, int]) -> Tuple[int, ...]:
@@ -320,8 +325,6 @@ class ZoneProperties():
         """
 
         zone_legs = self._zone_legs_for_border_stations()
-
-        # make properties setter
         self.zone_sequence = tuple(
             [x[0] for x in zone_legs] + [zone_legs[-1][1]]
             )
@@ -329,7 +332,6 @@ class ZoneProperties():
         self.zone_legs = to_legs(self.zone_sequence)
         self.touched_zones = get_touched_zones(self.zone_sequence)
         self.touched_zone_legs = to_legs(self.touched_zones)
-        #---------------
 
         return self._borderless_properties()
 
@@ -593,7 +595,7 @@ class ZoneSharer(ZoneProperties):
         touched_zone_leg_count,
         ops_in_touched_zones
         ):
-
+        """share a single zone that is travelled through"""
         zone_share = 1
         if zone in touched_zones:
             if touched_zone_leg_count[zone] == 1:
@@ -609,7 +611,6 @@ class ZoneSharer(ZoneProperties):
                     res = (zone_share, op_id)
         else:
             res = (zone_share, op_id)
-
         return res
 
     @staticmethod
@@ -631,7 +632,7 @@ class ZoneSharer(ZoneProperties):
 
     @staticmethod
     def _weight_bumped_zones(out_standard, out_bumped, min_zones):
-
+        """weight the shares by number of actual zones"""
         outstandard = list(chain(*out_standard.values()))
         sum_standard = sum(x[0] for x in outstandard)
         # bumping must be minimum min_zones in total (this affects kombi trips)
@@ -730,8 +731,8 @@ class ZoneSharer(ZoneProperties):
         for legnum, imputed_leg in enumerate(imputed_zone_legs):
             leg_region = zone_leg_regions[legnum]
             op_id = self.operator_sequence[legnum]
-            # if self._takst_suffix:
-            #     op_id = str(op_id) + '_' + leg_region
+            if self._takst_suffix:
+                op_id = str(op_id) + '_' + leg_region
 
             leg_solo_price = self.leg_solo_price(leg_region, op_id)
             if not op_id == previous_op_id and previous_op_id is not None:
@@ -751,8 +752,8 @@ class ZoneSharer(ZoneProperties):
                     seen_zone_opid.add((zone, op_id))
             try:
                 next_op_id = self.operator_sequence[legnum+1]
-                # if self._takst_suffix:
-                #     next_op_id = next_op_id + '_' + leg_region
+                if self._takst_suffix:
+                    next_op_id = next_op_id + '_' + leg_region
                 if op_id != next_op_id:
                     if current_op_sum < min_zones:
                         current_op_sum = min_zones
