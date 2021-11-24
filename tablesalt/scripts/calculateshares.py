@@ -162,14 +162,7 @@ def _load_store_data(
         all(x for x in v) and all(1000 < y < 1300 for y in v)
         }
 
-    op_dict = _load_contractor_pack(store)
-
-    op_dict = {k:v for k, v in op_dict.items() if k in zone_dict}
-    stop_dict = {k:v for k, v in stop_dict.items() if k in op_dict}
-    zone_dict = {k:v for k, v in zone_dict.items() if k in op_dict}
-    usage_dict = {k:v for k, v in usage_dict.items() if k in op_dict}
-
-    return stop_dict, zone_dict, usage_dict, op_dict
+    return stop_dict, zone_dict, usage_dict
 
 
 def _get_store_num(store: str) -> str:
@@ -189,7 +182,6 @@ def _get_input(
     stop_dict: TripDict,
     zone_dict: TripDict,
     usage_dict: TripDict,
-    op_dict: TripDict
     ) -> Iterator[Tuple[int, Tuple[int, ...], Tuple[int, ...], Tuple[int, ...], Tuple[int, ...]]]:
     """Generate trips and associated sequences to input into a ZoneSharer
 
@@ -205,7 +197,7 @@ def _get_input(
     :rtype: Iterator[Tuple[int, Tuple[int, ...], Tuple[int, ...], Tuple[int, ...], Tuple[int, ...]]]
     """
     for k, zone_sequence in zone_dict.items():
-        yield k, zone_sequence, stop_dict[k], op_dict[k], usage_dict[k]
+        yield k, zone_sequence, stop_dict[k], usage_dict[k]
 
 
 def chunk_shares(
@@ -233,16 +225,18 @@ def chunk_shares(
     :rtype: Tuple[Dict[int, Tuple[Tuple[float, str], ...]], Dict[int, Tuple[Tuple[float, str], ...]]]
     """
 
-    stopsd, zonesd, usaged, operatorsd = _load_store_data(store, zonemap)
+    stopsd, zonesd, usaged = _load_store_data(store, zonemap)
 
-    gen = _get_input(stopsd, zonesd, usaged, operatorsd)
+    gen = _get_input(stopsd, zonesd, usaged)
     border_changes = {}
     model_results = defaultdict(dict)
     errs = {}
-    for k, zones, stops, operators, usage in tqdm(gen):
-        # k, zones, stops, operators, usage = next(gen)
+    for k, zones, stops, usage in tqdm(gen):
+        # k, zones, stops, usage = next(gen)
         try:
-            sharer = ZoneSharer(graph, opgetter, zones, stops, usage, takst_suffix=False)
+            sharer = ZoneSharer(
+                graph, opgetter, zones, stops, usage, takst_suffix=True
+                )
             trip_shares = sharer.share()
         except Exception as e:
             errs[k] = str(e)
@@ -287,7 +281,6 @@ def main():
     paths = db_paths(store_loc, year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
-
 
     # allfeeds = transitfeed.available_archives()
     # year_archives = [x for x in allfeeds if str(year) in x]
