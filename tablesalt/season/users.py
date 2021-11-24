@@ -229,7 +229,7 @@ class _PendlerInput:
                 dtype={'EncryptedCardEngravedID': str, 'SeasonPassID': int},
                 on_bad_lines='skip'
                 )
-
+        pendler_product = pendler_product.drop_duplicates()
         pendler_product = pendler_product.fillna(0)
         pendler_product.loc[:, ('ZoneNrLow', 'ZoneNrHigh')] = \
         pendler_product.loc[:, ('ZoneNrLow', 'ZoneNrHigh')].astype(int)
@@ -273,6 +273,7 @@ class _PendlerInput:
                 on_bad_lines='skip'
                 )
 
+        pendler_zones = pendler_zones.drop_duplicates()
         pendler_zones['key'] = list(zip(
             pendler_zones['EncryptedCardEngravedID'],
             pendler_zones['SeasonPassID']
@@ -293,6 +294,7 @@ class _PendlerInput:
         pendler_zones = \
         pendler_zones.itertuples(name=None, index=False)
 
+        # change to operator attrgetter
         return {key: tuple(x[2] for x in group) for key, group in
                 groupby(pendler_zones, key=itemgetter(0, 1))}
 
