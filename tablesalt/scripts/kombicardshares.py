@@ -625,7 +625,7 @@ def make_output(usershares, product_path, zone_path, model, year):
     pendler_results = _match_pendler(pendler, year, model)
 
     pendler = pendler.drop('key', axis=1)
-    initial_columns = list(period_products.columns)
+    initial_columns = list(pendler.columns)
     kombi_match.columns = kombi_match.columns.astype(str)
     missed.columns = missed.columns.astype(str)
     pendler_results.columns = pendler_results.columns.astype(str)
@@ -648,7 +648,12 @@ def make_output(usershares, product_path, zone_path, model, year):
 
     col_order = initial_columns + operator_columns + andel_columns + stats_columns
     final = final[col_order]
+
     final = add_city_note(final)
+    try:
+        final = final.drop('key', axis=1)
+    except KeyError:
+        pass
 
     return final
 
