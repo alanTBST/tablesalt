@@ -558,6 +558,29 @@ def _process_pendler_df(period_products, zone_path):
 
     return period_products
 
+def _determine_city_note(chosen_zones):
+
+    city_zones = (1001, 1002, 1003, 1004)
+
+    try:
+        chosen_zones = ast.literal_eval(chosen_zones)
+    except ValueError:
+        pass
+
+
+    if not chosen_zones:
+        return ''
+
+    if all(x in city_zones for x in chosen_zones):
+        return 'all_city'
+    if any(x in city_zones for x in chosen_zones):
+        return 'with_city'
+
+    return 'no_city'
+
+def add_city_note(df):
+    df['city_note'] = df.loc[:, 'valgtezoner'].apply(lambda x: _determine_city_note(x))
+    return df
 
 def make_output(usershares, product_path, zone_path, model, year):
     """
@@ -583,9 +606,6 @@ def make_output(usershares, product_path, zone_path, model, year):
 
     period_products = _process_pendler_df(period_products, zone_path)
 
-    # this might need to change based on input data structure
-    initial_columns = list(period_products.columns)
-
     kombi_products = period_products.loc[
         period_products.loc[:, 'ProductName'].str.lower().str.contains('kombi')
         ]
@@ -593,17 +613,25 @@ def make_output(usershares, product_path, zone_path, model, year):
     kombi_match, missed = _match_user_specific_results(
         kombi_products, usershares, year, model
         )
-     # =============================================================================
+
+    # =============================================================================
     # end of direct card match
     # =============================================================================
     pendler = period_products.loc[~
         period_products.loc[:, 'ProductName'].str.lower().str.contains('kombi')
         ].copy()
 
+
     pendler_results = _match_pendler(pendler, year, model)
 
-    final = pd.concat([kombi_match, missed, pendler_results])
-    final = final.drop('key', axis=1)
+    pendler = pendler.drop('key', axis=1)
+    initial_columns = list(period_products.columns)
+    kombi_match.columns = kombi_match.columns.astype(str)
+    missed.columns = missed.columns.astype(str)
+    pendler_results.columns = pendler_results.columns.astype(str)
+
+
+    final = pd.concat([kombi_match, missed, pendler_results], axis=0)
 
     stats_columns = ['n_trips', 'n_users', 'n_period_cards', 'note']
     operator_columns = [
@@ -618,7 +646,10 @@ def make_output(usershares, product_path, zone_path, model, year):
         final.loc[:, f'{col}_andel'] = \
             final.loc[:, 'Price'] * final.loc[:, col]
 
-    final = sort_df_by_colums(final)
+    col_order = initial_columns + operator_columns + andel_columns + stats_columns
+    final = final[col_order]
+    final = add_city_note(final)
+
     return final
 
 def process_user_data(udata):

@@ -1188,6 +1188,30 @@ def single_ticket(
         stats.columns = ['attempts', 'percentage']
         stats.to_csv(f"H:/single_ticket_mintrips{i}_stats.csv", index=False)
 
+
+def _determine_city_note(chosen_zones):
+
+    city_zones = (1001, 1002, 1003, 1004)
+
+    try:
+        chosen_zones = ast.literal_eval(chosen_zones)
+    except ValueError:
+        pass
+
+
+    if not chosen_zones:
+        return ''
+
+    if all(x in city_zones for x in chosen_zones):
+        return 'all_city'
+    if any(x in city_zones for x in chosen_zones):
+        return 'with_city'
+
+    return 'no_city'
+
+def add_city_note(df):
+    df['city_note'] = df.loc[:, 'valgtezoner'].apply(lambda x: _determine_city_note(x))
+    return df
 def main(year: int, model: int) -> None:
     """create the merged sales and results csv file
 
@@ -1249,7 +1273,7 @@ def main(year: int, model: int) -> None:
 
     col_order = initial_columns + operator_columns + andel_columns + stats_columns
     output = output[col_order]
-
+    output = add_city_note(output)
     fp = (THIS_DIR / '__result_cache__' / f'{year}'/
           f'takst_sjælland{year}_model_{model}.csv')
 
