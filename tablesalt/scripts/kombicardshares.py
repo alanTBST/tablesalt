@@ -549,7 +549,12 @@ def _process_pendler_df(period_products, zone_path):
     period_products.loc[:, 'valgtezoner'] = period_products.loc[:, 'valgtezoner'].astype(str)
     period_products.loc[:, 'betaltezoner'] = period_products.loc[:, 'valgtezoner'].map(paid_map)
     period_products.loc[:, 'betaltezoner'] = period_products.loc[:, 'betaltezoner'].fillna(0)
-    period_products.rename(columns={'ZoneNrLow': 'startzone', 'ZoneNrHigh': 'slutzone', 'PsedoFareset': 'takstsæt'}, inplace=True)
+    period_products.rename(
+        columns={
+            'ZoneNrLow': 'startzone',
+            'ZoneNrHigh': 'slutzone',
+            'PsedoFareset': 'takstsæt'
+            }, inplace=True)
 
     period_products.takstsæt = period_products.takstsæt.str.lower()
     takst_map = {'hovedstaden': 'th', 'sjælland': 'dsb', 'sydsjælland': 'ts', 'vestsjælland': 'tv'}
@@ -567,7 +572,6 @@ def _determine_city_note(chosen_zones):
     except ValueError:
         pass
 
-
     if not chosen_zones:
         return ''
 
@@ -581,6 +585,18 @@ def _determine_city_note(chosen_zones):
 def add_city_note(df):
     df['city_note'] = df.loc[:, 'valgtezoner'].apply(lambda x: _determine_city_note(x))
     return df
+
+def _set_takst(valgtezoner):
+
+    chosen = ast.literal_eval(valgtezoner)
+
+    if all(x < 1100 for x in chosen):
+        return 'TH'
+    if all(1100 < x < 1200 for x in chosen):
+        return 'TV'
+    if all(1200 < x < 1300 for x in chosen):
+        return 'TS'
+    return 'DSB'
 
 def make_output(usershares, product_path, zone_path, model, year):
     """
@@ -654,6 +670,8 @@ def make_output(usershares, product_path, zone_path, model, year):
         final = final.drop('key', axis=1)
     except KeyError:
         pass
+
+    final['PsedoFareset'] = final.valgtezoner.apply(_set_takst)
 
     return final
 
