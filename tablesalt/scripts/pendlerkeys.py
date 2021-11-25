@@ -36,6 +36,7 @@ from itertools import chain, groupby
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
+from re import M
 from typing import AnyStr, Dict, Set, Tuple
 
 import lmdb
@@ -153,7 +154,7 @@ def load_valid(valid_kombi_store: str) -> Dict:
         with env.begin() as txn:
             cursor = txn.cursor()
             for k, v in cursor:
-                valid_kombi[pickle.loads(k)] = pickle.loads(v)
+                valid_kombi[k.decode('utf8')] = msgpack.unpackb(v)
 
     return {ast.literal_eval(k): v for k, v in valid_kombi.items()}
 
@@ -274,11 +275,11 @@ def get_zone_combination_shares(tofetch, db_path: str, model: int):
                                      ):
                 all_trips = {}
                 for trip in trips:
-                    t = pickle.dumps(trip)
+                    t = str(t).encode('utf8')
                     res = txn.get(t)
                     if not res:
                         continue
-                    res = pickle.loads(res)
+                    res = msgpack.unpackb(res)
                     if res not in TRIP_ERRORS:
                         all_trips[trip] = res
                 combo_result = get_user_shares(all_trips.values())
@@ -305,13 +306,13 @@ def _kombi_by_seasonpass(pendler_kombi, userdict):
                 except KeyError:
                     continue
                 if v:
-                    v = pickle.loads(v)
+                    v = msgpack.unpack(v)
                     valid.update(v)
     return valid
 
 def _get_trips(db_path, tripkeys, model):
 
-    tripkeys_ = (pickle.dumps(x) for x in tripkeys)
+    tripkeys_ = (str(x).encode('utf8') for x in tripkeys)
 
     out = {}
     with lmdb.open(db_path) as env:
@@ -320,9 +321,9 @@ def _get_trips(db_path, tripkeys, model):
                 res = txn.get(k)
                 if not res:
                     continue
-                res = pickle.loads(res)
+                res = msgpack.unpackb(res)
                 if res not in TRIP_ERRORS:
-                    out[pickle.loads(k)] = pickle.loads(res)
+                    out[int(k.decode('utf8'))] = res
 
     return out
 

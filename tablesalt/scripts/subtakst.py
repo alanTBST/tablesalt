@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import DefaultDict
 
 import lmdb
+import msgpack
 import numpy as np
 from tqdm import tqdm
 
@@ -180,18 +181,17 @@ def _get_trips(calculated_stores, tripkeys):
         'rk_operator_error'
         }
 
+    tripkeys = {str(x).encode('utf8') for x in tripkeys}
     with lmdb.open(calculated_stores, readahead=False) as env:
         out = {}
         with env.begin() as txn:
             for trip in tqdm(tripkeys):
-                t = pickle.dumps(trip)
-                res = txn.get(t)
-
+                res = txn.get(trip)
                 if not res:
                     continue
-                res = pickle.loads(res)
+                res = msgpack.unpackb(res)
                 if res not in errs:
-                    out[trip] = res
+                    out[int(trip.decode('utf8'))] = res
     return out
 
 def main():

@@ -53,7 +53,7 @@ import numpy as np
 from tqdm import tqdm
 
 from tablesalt import StoreReader, transitfeed
-from tablesalt.common import make_store
+from tablesalt.common.io.datastores import make_store
 from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.preprocessing.tools import db_paths, find_datastores
 from tablesalt.running import WindowsInhibitor

@@ -65,6 +65,7 @@ from pathlib import Path
 from typing import Set, Tuple, Dict, Union, List
 
 import lmdb
+import msgpack
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -417,7 +418,7 @@ def _store_operator_tripkeys(store: str, ticket_keys, operators):
 # put into revenue
 def _get_trips(db: str, tripkeys: Set[int]) -> Dict:
 
-    tripkeys_ = {pickle.dumps(x) for x in tripkeys}
+    tripkeys_ = {str(x).encode('utf8') for x in tripkeys}
 
     out = {}
     with lmdb.open(db) as env:
@@ -426,8 +427,8 @@ def _get_trips(db: str, tripkeys: Set[int]) -> Dict:
                 shares = txn.get(k)
                 if shares:
                     try:
-                        shares = pickle.loads(shares)
-                        out[pickle.loads(k)] = shares
+                        shares = msgpack.unpackb(shares)
+                        out[int(k.decode('utf8'))] = shares
                     except ValueError:
                         continue
     return out
