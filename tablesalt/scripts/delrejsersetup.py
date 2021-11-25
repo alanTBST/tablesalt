@@ -131,7 +131,7 @@ import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
 from tqdm import tqdm  # type: ignore
 
-from tablesalt.common import make_store
+from tablesalt.common.io.datastores import make_store
 from tablesalt.common.io import mappers
 from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.preprocessing.tools import (check_all_file_headers,
