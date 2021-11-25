@@ -190,18 +190,21 @@ from typing import Dict, List, Set, Union, Tuple
 
 import lmdb
 import numpy as np
+import msgpack
 from pandas import Timestamp
 
 from tablesalt import StoreReader
-from tablesalt.common import make_store
+from tablesalt.common.io.datastores import make_store
 from tablesalt.preprocessing import db_paths, find_datastores
 from tablesalt.preprocessing.parsing import TableArgParser
 from tablesalt.season import users
 from tablesalt.running import WindowsInhibitor
 # may refactor to accept just a sequence of cardnums
+
 def get_pendler_trips(
     userdata: Dict[str, Dict[int, Dict[str, Union[Timestamp, Tuple[int, ...]]]]],
-    tripcarddb: str, userdb: str
+    tripcarddb: str,
+    userdb: str
     ) -> List[str]:
     """create the user_trips_db from the season pass data and the trip_card kv store
         cardnum -> (tripkey1, tripkey2, tripkey3,....)
@@ -224,16 +227,17 @@ def get_pendler_trips(
         with env.begin() as txn:
             cursor = txn.cursor()
             for k, v in cursor:
-                if v in user_card_nums:
-                    trip_card_dict[pickle.loads(k)] = v
+                val = msgpack.unpackb(v)
+                if val in user_card_nums:
+                    trip_card_dict[k] = val
 
     trip_card_list = sorted(zip(
         trip_card_dict.values(), trip_card_dict.keys()
         ), key=itemgetter(0))
 
-
+    trip_card_list = [(x[0], int(x[1].decode('utf8'))) for x in trip_card_list]
     card_to_trips = {
-        key: bytes(str(tuple(x[1] for x in grp)), 'utf-8')
+        key: tuple(x[1] for x in grp)
         for key, grp in groupby(
             trip_card_list, key=itemgetter(0)
                 )
@@ -244,7 +248,10 @@ def get_pendler_trips(
     return [trip for card, trip in trip_card_list]
 
 
-def load_store_dates(store: str, pendler_trip_keys: List[int]) -> Dict[bytes, bytes]:
+def load_store_dates(
+    store: str,
+     pendler_trip_keys: List[int]
+     ) -> Dict[bytes, bytes]:
     """load the time/date data from the given store and get only pendler user
     tripkeys
 
@@ -264,7 +271,7 @@ def load_store_dates(store: str, pendler_trip_keys: List[int]) -> Dict[bytes, by
                       for x in set(date_info))
 
     return {
-        bytes(str(x[0]), 'utf-8'): bytes(x[1], 'utf-8')
+        bytes(str(x[0]), 'utf-8'): x[1]
         for x in date_info
         }
 
@@ -323,12 +330,13 @@ def validate_travel_dates(
     # =========================================================================
     # load the user trips from lmdb
     # =========================================================================
+
+    usertrips = {}
     with lmdb.open(userdbpath) as env:
-        usertrips = {}
         with env.begin() as txn:
             cursor = txn.cursor()
             for k, v in cursor:
-                pickle.loads(k) = pickle.loads(v)
+                usertrips[k] = v
     # =========================================================================
     # validate the user trips using the kombi dates lmdb store
     # =========================================================================
@@ -337,25 +345,21 @@ def validate_travel_dates(
         with env.begin() as txn:
             for k, v in usertrips.items():
                 try:
-                    userdates = _card_periods(userdata[k])
+                    userdates = _card_periods(userdata[k.decode('utf8')])
                 except KeyError:
                     continue
-                for trip in v:
-                    trip = pickle.dumps(trip)
-                    trip_date = txn.get(trip)
+                trips = msgpack.unpackb(v)
+                for trip in trips:
+                    trip_date = txn.get(str(trip).encode('utf8'))
                     if not trip_date:
                         continue
-                    trip_date = pickle.loads()
+                    trip_date = msgpack.unpackb(trip_date)
                     trip_date = datetime.strptime(trip_date, '%Y-%m-%d').date()
                     for season_id, valid_dates in userdates.items():
                         if _date_in_window(valid_dates, trip_date):
                             valid_user_season_dict[(k, season_id)].append(trip)
                             break
-
-    valid_user_season_dict = {k: tuple(v) for k, v in valid_user_season_dict.items()}
-
     make_store(valid_user_season_dict, kombivalidpath, start_size=5)
-
 
 def main():
     """main script function to setup all the required pendler data
@@ -364,17 +368,21 @@ def main():
     parser = TableArgParser('year', 'products', 'zones', 'cpu_usage')
 
     args = parser.parse()
-
-    paths = db_paths(find_datastores(), args['year'])
-    stores = paths['store_paths']
+    year = args['year']
+    products_path = args['products']
+    zones_path = args['zones']
     cpu_usage = args['cpu_usage']
+
+    paths = db_paths(find_datastores(), year)
+    stores = paths['store_paths']
+
 
     processors = int(round(os.cpu_count() * cpu_usage))
 
     pendler_cards = users._PendlerInput(
-        args['year'],
-        products_path=args['products'],
-        product_zones_path=args['zones']
+        year,
+        products_path=products_path,
+        product_zones_path=zones_path
         )
 
     print("loading user data")
