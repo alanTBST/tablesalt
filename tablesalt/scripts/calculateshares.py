@@ -285,7 +285,7 @@ def main():
     # allfeeds = transitfeed.available_archives()
     # year_archives = [x for x in allfeeds if str(year) in x]
     feed = transitfeed.transitfeed_from_zip(
-        r'C:\Users\b087115\Desktop\gtfs2019\sept11.zip'
+        r'H:\datastores\GTFSstores\20190911_20191204.zip'
         )
     zonemap = feed.stop_zone_map()
     graph = ZoneGraph(feed, region='sjælland')
