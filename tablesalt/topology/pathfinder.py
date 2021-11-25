@@ -399,7 +399,8 @@ def legops(new_legs):
 def operators_in_touched_(
         tzones: Tuple[int, ...],
         zonelegs: Tuple[Tuple[int, ...]],
-        oplegs: Tuple[Tuple[int, ...]]
+        oplegs: Tuple[Tuple[int, ...]],
+        zone_legs_regions=None
         ) -> Dict[int, Tuple[int, ...]]:
     """
     determine the operators in the zones that are touched by the user
@@ -421,6 +422,8 @@ def operators_in_touched_(
         for i, j in enumerate(zonelegs):
             if tzone in j:
                 l_ops = oplegs[i]
+                if zone_legs_regions:
+                    l_ops = str(l_ops) + '_' + zone_legs_regions[i]
                 ops.add(l_ops)
         ops_in_touched[tzone] = tuple(ops)
 
@@ -753,7 +756,7 @@ class ZoneSharer(ZoneProperties):
             try:
                 next_op_id = self.operator_sequence[legnum+1]
                 if self._takst_suffix:
-                    next_op_id = next_op_id + '_' + leg_region
+                    next_op_id = str(next_op_id) + '_' + leg_region
                 if op_id != next_op_id:
                     if current_op_sum < min_zones:
                         current_op_sum = min_zones
@@ -864,10 +867,15 @@ class ZoneSharer(ZoneProperties):
         properties = self.property_dict()
 
         try:
+            regionlegs = None
+            if self._takst_suffix:
+                regionlegs = properties['zone_legs_regions']
+
             properties['ops_in_touched'] = operators_in_touched_(
                 properties['touched_zones'],
                 properties['zone_legs'],
-                self.operator_sequence
+                self.operator_sequence,
+                regionlegs
                 )
         except KeyError:
             shares = self._error_shares('operator_error')
