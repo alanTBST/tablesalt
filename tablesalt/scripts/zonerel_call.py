@@ -18,10 +18,13 @@ import json
 import urllib
 from itertools import combinations
 from multiprocessing.pool import ThreadPool
+from pathlib import Path
 
 import msgpack
 from tqdm import tqdm
 
+
+THIS_DIR = Path(__file__).parent
 
 def call_api(szdz):
     """
@@ -100,8 +103,8 @@ def main():
 
         res_dict.update(new_missed)
 
-    # TODO: CHANGE LOCATION
-    with open(r'zone_relations.msgpack', 'wb') as f:
+    output_loc = THIS_DIR.parent / 'resources'/ 'revenue' / 'zone_relations.msgpack'
+    with open(output_loc, 'wb') as f:
         msgpack.pack(res_dict, f)
 
 
