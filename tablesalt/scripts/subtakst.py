@@ -16,8 +16,8 @@ These are:
 
 USAGE
 =====
-To run this script for 2019 rabattrin 0 and model 1:
-    python ./path/to/tablesalt/tablesalt/scripts/subtakst.py -y 2019 -r 0 -m 1
+To run this script for 2019 rabattrin 0:
+    python ./path/to/tablesalt/tablesalt/scripts/subtakst.py -y 2019 -r 0
 
 
 """
