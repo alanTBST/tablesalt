@@ -124,13 +124,6 @@ def make_store(
                 f"size {db_path} > {size_limit}gb limit"
                 )
 
-
-def _delrejser_query():
-
-    return
-
-
-
 class DelrejserStore:
     """DelrejserStore"""
 
