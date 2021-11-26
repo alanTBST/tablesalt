@@ -60,7 +60,7 @@ def _hdfstores(store_loc: str, year: int) -> List[Path]:
     :rtype: List[str]
     """
 
-    path = Path(store_loc) / 'rejsekortstores' / f'{year}Datastores' / 'hdfstores1'
+    path = Path(store_loc) / 'rejsekortstores' / f'{year}Datastores' / 'hdfstores2'
 
     return list(path.glob('*.h5'))
 
@@ -87,7 +87,7 @@ def setup_directories(
     else:
         dstores = dstores / 'rejsekortstores' / f'{year}DataStores'
 
-    substores = ('hdfstores1', 'dbs', 'packs')
+    substores = ('hdfstores2', 'dbs', 'packs')
     paths = [dstores / x for x in substores]
 
     result_subpaths = ('other', 'pendler', 'single', 'preprocessed')
