@@ -310,7 +310,7 @@ def _kombi_by_seasonpass(pendler_kombi, userdict):
                     valid.update(v)
     return valid
 
-def _get_trips(db_path, tripkeys, model):
+def _get_trips(db_path, tripkeys):
 
     tripkeys_ = (str(x).encode('utf8') for x in tripkeys)
 
