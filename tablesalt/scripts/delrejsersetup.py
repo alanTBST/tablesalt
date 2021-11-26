@@ -454,9 +454,7 @@ def update_collection(unseen_ids, key) -> None:
         with open(collection_loc, 'w') as fp:
             json.dump(old_collection, fp)
     except Exception as e:
-        print(str(e))
-        print("\n")
-        print("skipping mappers update")
+        pass
 
 
 CONTR_REC = Tuple[int, str, str, str, str, str]
