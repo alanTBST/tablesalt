@@ -706,7 +706,7 @@ def main() -> None:
     paths = setup_directories(year, output_dir)
 
     tc_store_path = paths['dbs']
-    hdf_path = paths['hdfstores']
+    hdf_path = paths['hdfstores2']
     cont_path = paths['packs']
 
     zips = get_zips(input_dir)
