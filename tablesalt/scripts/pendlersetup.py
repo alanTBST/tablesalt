@@ -336,7 +336,7 @@ def validate_travel_dates(
         with env.begin() as txn:
             cursor = txn.cursor()
             for k, v in cursor:
-                usertrips[k] = v
+                usertrips[k.decode('utf8')] = msgpack.unpackb(v)
     # =========================================================================
     # validate the user trips using the kombi dates lmdb store
     # =========================================================================
@@ -345,11 +345,10 @@ def validate_travel_dates(
         with env.begin() as txn:
             for k, v in usertrips.items():
                 try:
-                    userdates = _card_periods(userdata[k.decode('utf8')])
+                    userdates = _card_periods(userdata[k])
                 except KeyError:
                     continue
-                trips = msgpack.unpackb(v)
-                for trip in trips:
+                for trip in v:
                     trip_date = txn.get(str(trip).encode('utf8'))
                     if not trip_date:
                         continue
@@ -369,8 +368,8 @@ def main():
 
     args = parser.parse()
     year = args['year']
-    products_path = args['products']
-    zones_path = args['zones']
+    product_path = args['products']
+    zone_path = args['zones']
     cpu_usage = args['cpu_usage']
 
     paths = db_paths(find_datastores(), year)
@@ -381,8 +380,8 @@ def main():
 
     pendler_cards = users._PendlerInput(
         year,
-        products_path=products_path,
-        product_zones_path=zones_path
+        products_path=product_path,
+        product_zones_path=zone_path
         )
 
     print("loading user data")

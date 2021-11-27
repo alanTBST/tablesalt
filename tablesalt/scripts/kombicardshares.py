@@ -134,22 +134,24 @@ def _aggregate_zones(shares):
     return t
 
 
-def load_valid(valid_kombi_store: str):
+def load_valid(valid_kombi_store: str) -> Dict:
     """
+    Load the valid kombi user trips
 
-    :param valid_kombi_store: DESCRIPTION
-    :type valid_kombi_store: TYPE
-    :return: DESCRIPTION
-    :rtype: TYPE
+    Returns
+    -------
+    valid_kombi : dict
+        DESCRIPTION.
 
     """
-
-    with lmdb.open(valid_kombi_store) as env:
+    with lmdb.open(valid_kombi_store, readahead=False) as env:
         valid_kombi = {}
         with env.begin() as txn:
             cursor = txn.cursor()
             for k, v in cursor:
-                valid_kombi[k.decode('utf-8')] = ast.literal_eval(v.decode('utf-8'))
+                valid_kombi[k.decode('utf8')] = msgpack.unpackb(v)
+
+    valid_kombi = {ast.literal_eval(k): v for k, v in valid_kombi.items()}
 
     return valid_kombi
 
@@ -531,14 +533,14 @@ def _process_pendler_df(period_products, zone_path):
         period_products.Price.str.replace(',','', regex=False
         ).str.replace('.','', regex=False).astype(float) / 100
     except AttributeError:
-        pass
+        period_products.Price = period_products.Price.astype(float)
 
     pendler_product_zones = _load_process_zones(zone_path)
 
     keys = dict(zip(zip(pendler_product_zones.EncryptedCardEngravedID,
                pendler_product_zones.SeasonPassID), pendler_product_zones.valgtezoner))
 
-    period_products['key'] = period_products.loc[
+    period_products.loc[:, 'key'] = period_products.loc[
         :, ('EncryptedCardEngravedID', 'SeasonPassID')
         ].apply(tuple, axis=1)
 
@@ -640,15 +642,14 @@ def make_output(usershares, product_path, zone_path, model, year):
 
     pendler_results = _match_pendler(pendler, year, model)
 
-    pendler = pendler.drop('key', axis=1)
-    initial_columns = list(pendler.columns)
     kombi_match.columns = kombi_match.columns.astype(str)
     missed.columns = missed.columns.astype(str)
     pendler_results.columns = pendler_results.columns.astype(str)
 
 
     final = pd.concat([kombi_match, missed, pendler_results], axis=0)
-
+    final = final.drop('key', axis=1)
+    initial_columns = list(final.columns)
     stats_columns = ['n_trips', 'n_users', 'n_period_cards', 'note']
     operator_columns = [
         x for x in final.columns if x not in initial_columns
@@ -689,7 +690,7 @@ def get_user_shares(all_trips):
 
     n_trips = len(all_trips)
     single = [x for x in all_trips if isinstance(x[0], int)]
-    multi =  list(chain(*[x for x in all_trips if isinstance(x[0], tuple)]))
+    multi =  list(chain(*[x for x in all_trips if isinstance(x[0], list)]))
     all_trips = single + multi
     user_shares = _aggregate_zones(all_trips)
     user_shares['n_trips'] = n_trips
@@ -707,17 +708,18 @@ def fetch_trip_results(db_path, tofetch):
         final = {}
         with env.begin() as txn:
             for card_season, trips in tqdm(tofetch.items()):
-                all_trips = []
+
+                all_trips = {}
                 for trip in trips:
-                    t = txn.get(bytes(str(trip), 'utf-8'))
-                    if t is not None:
-                        all_trips.append(t.decode('utf-8'))
-                all_trips = tuple(
-                    ast.literal_eval(x) for x in all_trips
-                    if x not in TRIP_ERRORS
-                    )
-                card_season = ast.literal_eval(card_season)
-                final[card_season] = get_user_shares(all_trips)
+                    t = str(trip).encode('utf8')
+                    res = txn.get(t)
+                    if not res:
+                        continue
+                    res = msgpack.unpackb(res)
+                    if not isinstance(res, str): # means error
+                        all_trips[trip] = res
+                combo_result = get_user_shares(all_trips.values())
+                final[card_season] = combo_result
 
     return final
 

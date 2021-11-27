@@ -181,7 +181,7 @@ def _get_trips(calculated_stores, tripkeys):
         'rk_operator_error'
         }
 
-    tripkeys = {str(x).encode('utf8') for x in tripkeys}
+    tripkeys = (str(x).encode('utf8') for x in tripkeys)
     with lmdb.open(calculated_stores, readahead=False) as env:
         out = {}
         with env.begin() as txn:
@@ -190,9 +190,34 @@ def _get_trips(calculated_stores, tripkeys):
                 if not res:
                     continue
                 res = msgpack.unpackb(res)
-                if res not in errs:
+                if not isinstance(res, str):
                     out[int(trip.decode('utf8'))] = res
     return out
+
+def model_results(year, trips, model, result_path):
+    out = {}
+    for k1, v1 in trips.items():
+        sub = {}
+        for k2, v2 in v1.items():
+            sub[k2] = _get_trips(result_path, v2)
+        out[k1] = sub
+
+    test = {
+        k1: {
+            k2: get_user_shares(v2.values()) for k2, v2 in v1.items()
+            } for k1, v1 in out.items()
+        }
+    fp = os.path.join(
+        THIS_DIR,
+        '__result_cache__',
+        f'{year}',
+        'preprocessed',
+        f'subtakst_model_{model}.pickle'
+        )
+
+    with open(fp, 'wb') as f:
+        pickle.dump(test, f)
+
 
 def main():
 
@@ -306,28 +331,7 @@ def main():
     for model in [1, 2, 3, 4, 5, 6]:
         result_path = db_path + f'_model_{model}'
 
-        out = {}
-        for k1, v1 in trips.items():
-            sub = {}
-            for k2, v2 in v1.items():
-                sub[k2] = _get_trips(result_path, v2)
-            out[k1] = sub
-
-        test = {
-        k1: {
-            k2: get_user_shares(v2.values()) for k2, v2 in v1.items()
-            } for k1, v1 in out.items()
-        }
-        fp = os.path.join(
-        THIS_DIR,
-        '__result_cache__',
-        f'{year}',
-        'preprocessed',
-        f'subtakst_model_{model}.pickle'
-        )
-
-        with open(fp, 'wb') as f:
-            pickle.dump(test, f)
+        model_results(year, trips, model, result_path)
 
 if __name__ == "__main__":
     st = datetime.now()

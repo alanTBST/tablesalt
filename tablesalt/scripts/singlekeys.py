@@ -62,6 +62,7 @@ from collections import defaultdict
 from functools import partial
 from itertools import chain, groupby
 from multiprocessing import Pool
+from multiprocessing.pool import ThreadPool
 from operator import itemgetter
 from pathlib import Path
 from typing import Set, Tuple, Dict, Union, List
@@ -296,12 +297,8 @@ def _determine_keys(
 
     borders = {k: v for k, v in bordertrips.items() if k in zones}
     zones.update(borders)
-    region_trips = {
-        'th': set(),
-        'ts': set(),
-        'tv': set(),
-        'dsb': set()
-        }
+
+    region_trips = defaultdict(set)
 
     for k, v in zones.items():
         if all(x < 1100 for x in v):
@@ -317,8 +314,9 @@ def _determine_keys(
     short = {k: v for k, v in zones.items() if _max[k] <= 8}
     long = {k: v for k, v in zones.items() if _max[k] >= 9}
     tripkeys = _separate_keys(short, long, _max, ringzones)
+    tripkeys['regions'] = region_trips
 
-    return tripkeys, region_trips
+    return dict(tripkeys)
 
 def _add_dicts_of_sets(dict1, dict2):
 
@@ -329,78 +327,6 @@ def m_dicts(d1, d2):
 
     return {k: _add_dicts_of_sets(v, d2[k]) for k, v in d1.items()}
 
-def merge_dicts(d1, d2):
-
-    out = {}
-    for k, v in d2.items():
-        both_long = _add_dicts_of_sets(v['long'], d1[k]['long'])
-        both_long_ring = _add_dicts_of_sets(
-            v['long_ring'], d1[k]['long_ring']
-            )
-
-        both_short_dist = _add_dicts_of_sets(
-            v['short_ring'],
-            d1[k]['short_ring']
-            )
-        out[k] = {
-            'long': both_long,
-            'long_ring': both_long_ring,
-            'short_ring': both_short_dist
-            }
-
-    return out
-
-# put into revenue
-def _get_exception_stations(stops: np.ndarray, *uic: int) -> np.ndarray:
-
-    tripkeys = stops[
-        (np.isin(stops[:, 2], list(uic))) &
-        (stops[:, -1] == 1)
-        ][:, 0]
-
-    return tripkeys
-
-def _get_store_num(store: str) -> str:
-
-    st = store.split('.')[0]
-    st = st.split('rkfile')[1]
-
-    return st
-
-# put into revenue
-def _store_tripkeys(
-    store: str,
-    stopzone_map: Dict[int, int],
-    ringzones: RING_ZONES,
-    rabatkeys,
-    year,
-    bordertrips
-    ):
-
-    rabatkeys = list(rabatkeys)
-
-    reader = StoreReader(store)
-    all_stops = reader.get_data('stops')
-    all_stops = all_stops[np.isin(all_stops[:, 0], rabatkeys)]
-    all_stops = all_stops[
-        np.lexsort((all_stops[:, 1], all_stops[:, 0]))
-        ]
-    tick_keys, region_keys = _determine_keys(
-        all_stops, stopzone_map, ringzones, bordertrips
-        )
-
-    tick_keys['regions'] = region_keys
-
-    num = _get_store_num(str(store))
-
-    fp = os.path.join(
-        '__result_cache__',
-        f'{year}', 'single',
-        f'skeys{num}.pickle'
-        )
-    with open(fp, 'wb') as f:
-        pickle.dump(tick_keys, f)
-
 # put into revenue
 def _get_trips(db: str, tripkeys: Set[int]) -> Dict:
 
@@ -409,11 +335,10 @@ def _get_trips(db: str, tripkeys: Set[int]) -> Dict:
     out = {}
     with lmdb.open(db) as env:
         with env.begin() as txn:
-            for k in tqdm(tripkeys_, 'loading trip results'):
-                shares = txn.get(k)
-                if shares:
+            for k, v in txn.cursor():
+                if k in tripkeys_:
                     try:
-                        shares = msgpack.unpackb(shares)
+                        shares = msgpack.unpackb(v)
                         if isinstance(shares, str):
                             continue
                         out[int(k.decode('utf8'))] = shares
@@ -421,82 +346,6 @@ def _get_trips(db: str, tripkeys: Set[int]) -> Dict:
                         continue
     return out
 
-def _load_store_keys(filepath: str):
-
-    with open(filepath, 'rb') as f:
-        pack = pickle.load(f)
-    return pack
-
-def _gather_store_keys(lst_of_files, nparts: int):
-
-    initial = _load_store_keys(lst_of_files[0])
-
-    for p in tqdm(lst_of_files[1:], f'merging store keys {nparts} parts'):
-        keys = _load_store_keys(p)
-        out_all = m_dicts(initial, keys)
-
-    return out_all
-
-def _gather_all_store_keys(nparts: int, year: int):
-
-    lst_of_temp = THIS_DIR / '__result_cache__' / f'{year}' / 'single'
-    lst_of_temp = list(lst_of_temp.glob('*.pickle'))
-
-    lst_of_temp = [x for x in lst_of_temp if 'skeys' in x.name]
-    lst_of_lsts = split_list(lst_of_temp, wanted_parts=nparts)
-
-    all_vals = []
-
-    for lst in lst_of_lsts:
-        out_all = _gather_store_keys(lst, nparts)
-        all_vals.append(out_all)
-
-    out_all = all_vals[0]
-
-    for i in tqdm(range(len(all_vals)), 'merging subparts'):
-        if i == 0:
-            continue
-        out = all_vals[i]
-        out_all = m_dicts(out_all, out)
-
-    for p in lst_of_temp:
-        os.remove(p)
-
-    return out_all
-
-def _map_one_value(vals, result_dict):
-    t = (result_dict.get(x) for x in vals)
-    return list(x for x in t if x)
-
-def _map_all(singlekeys, result_dict):
-
-    new = {}
-    for k, v in singlekeys.items():
-        new[k] = {
-            k1: _map_one_value(v1, result_dict) for k1, v1 in v.items()
-            }
-
-    return new
-
-def agg_nested_dict(node):
-    if isinstance(node, list):
-        return _aggregate_zones(node)
-    else:
-        dupe_node = {}
-        for key, val in node.items():
-            cur_node = agg_nested_dict(val)
-            if cur_node:
-                dupe_node[key] = cur_node
-        return dupe_node or None
-
-
-def _nzone_merge(resultdict):
-
-    nzone = defaultdict(list)
-    for k, v in resultdict.items():
-        nzone[k[1]].extend(v)
-
-    return agg_nested_dict(nzone)
 
 def _get_rabatkeys(rabattrin: int, year: int) -> Set[int]:
 
@@ -520,33 +369,9 @@ def m_dicts(d1, d2):
 
     return {k: _add_dicts_of_sets(v, d2[k]) for k, v in d1.items()}
 
-def merge_dicts(d1, d2):
-
-    out = {}
-    for k, v in d2.items():
-        both_long = _add_dicts_of_sets(v['long'], d1[k]['long'])
-        both_long_ring = _add_dicts_of_sets(
-            v['long_ring'], d1[k]['long_ring']
-            )
-
-        both_short_dist = _add_dicts_of_sets(
-            v['short_ring'],
-            d1[k]['short_ring']
-            )
-        out[k] = {
-            'long': both_long,
-            'long_ring': both_long_ring,
-            'short_ring': both_short_dist
-            }
-
-    return out
-
 def _store_tripkeys(
     store: str,
-    stopzone_map: Dict[int, int],
-    ringzones: RING_ZONES,
     rabatkeys,
-    bordertrips
     ):
 
     rabatkeys = list(rabatkeys)
@@ -557,64 +382,71 @@ def _store_tripkeys(
     all_stops = all_stops[
         np.lexsort((all_stops[:, 1], all_stops[:, 0]))
         ]
-    tick_keys, region_keys = _determine_keys(
-        all_stops, stopzone_map, ringzones, bordertrips
-        )
+    return all_stops
 
-    tick_keys['regions'] = region_keys
-    return tick_keys
+def _get_store_keys(store, rabatkeys, stopzone_map, ringzones, borders):
 
-
-def get_all_stores_rabat(stores, ringzones, stopzone_map, borders, rabatkeys):
-    all_wanted_keys = set()
-    single = _store_tripkeys(
-                    stores[0],
+    data = _store_tripkeys(store, rabatkeys)
+    ticketkeys = _determine_keys(
+                    data,
                     stopzone_map,
                     ringzones,
-                    rabatkeys,
                     borders
                     )
-    for k, v in single.items():
-        for _, v1 in v.items():
-            all_wanted_keys.update(v1)
-    for store in tqdm(stores):
-        singlekeys = _store_tripkeys(
-                    store,
-                    stopzone_map,
-                    ringzones,
-                    rabatkeys,
-                    borders
-                    )
-        for k, v in singlekeys.items():
-            for _, v1 in v.items():
-                all_wanted_keys.update(v1)
-        single = m_dicts(single, singlekeys)
-    return all_wanted_keys,single
 
-def model_results(year, db_path, rabat, all_wanted_keys, single, model):
+    return ticketkeys
+
+def _nzone_merge(resultdict):
+
+    nzone = defaultdict(set)
+    for k, v in resultdict.items():
+        nzone[k[1]].update(v)
+
+    return nzone
+
+def _get_paid(ticketkeys):
+
+    short_all = _nzone_merge(ticketkeys['short_ring'])
+    long_all = _nzone_merge(ticketkeys['long_ring'])
+
+    return  {**short_all, **long_all}
+
+def calculate_ticket_type(results, ticket_type):
+    d = {}
+    for ticket, tripkeys in ticket_type.items():
+        r = (results.get(trip) for trip in tripkeys)
+        r = [x for x in r if x]
+        x = _aggregate_zones(r)
+        d[ticket] = x
+    return d
+
+
+def model_results(year, rabat, db_path, rabatkeys, ticketkeys, model):
     path = db_path + f'_model_{model}'
-    result_dict = _get_trips(path, all_wanted_keys)
+    results =  _get_trips(path, rabatkeys)
+    out = {}
+    for ticket_group, ticket_type in ticketkeys.items():
+        d = calculate_ticket_type(results, ticket_type)
+        out[ticket_group] = d
 
-    all_results = _map_all(single, result_dict)
-    short_all = _nzone_merge(all_results['short_ring'])
-    long_all = _nzone_merge(all_results['long_ring'])
-    all_results_ = agg_nested_dict(all_results)
-    all_results_['paid_zones'] = {**short_all, **long_all}
-    fp = (THIS_DIR / '__result_cache__' / f'{year}' / 'preprocessed' /
-                f'single_results_{year}_r{rabat}_model_{model}.pickle'
-                )
+    fp = os.path.join(
+            '__result_cache__',
+            f'{year}',
+            'single',
+            f'single_results_{year}_r{rabat}_model_{model}.pickle'
+            )
     with open(fp, 'wb') as f:
-        pickle.dump(all_results_, f)
+        pickle.dump(out, f)
 
 def main() -> None:
 
-    parser = TableArgParser('year', 'cpu_usage')
+    parser = TableArgParser('year', 'cpu_usage', 'rabattrin')
     args = parser.parse()
 
     year = args['year']
+    rabat = args['rabattrin']
     cpu_usage = args['cpu_usage']
     processors = int(round(os.cpu_count() * cpu_usage))
-    print(processors, 'procs')
 
     store_loc = find_datastores()
     paths = db_paths(store_loc, year)
@@ -623,24 +455,32 @@ def main() -> None:
 
     ringzones = ZoneGraph.ring_dict('sjælland')
     stopzone_map = TakstZones().stop_zone_map()
-
-    #check rabat keys exist
-    for rabat in [0, 1, 2]:
-        print(f"finding rabattrin {rabat} trips")
-        _get_rabatkeys(rabat, year)
-
-    #find single tripkeys for rabat level
     borders = _load_border_trips(year)
 
-    for rabat in [0, 1, 2]:
-        rabatkeys = _get_rabatkeys(rabat, year)
-        all_wanted_keys, single = get_all_stores_rabat(
-            stores, ringzones, stopzone_map, borders, rabatkeys
-            )
-        for model in [1, 2, 3, 4, 5, 6]:
-            model_results(
-                year, db_path, rabat, all_wanted_keys, single, model
-                )
+    rabatkeys = _get_rabatkeys(rabat, year)
+
+    ticketkeys = _get_store_keys(
+        stores[0], rabatkeys, stopzone_map, ringzones, borders
+        )
+
+    pfunc = partial(_get_store_keys,
+                    rabatkeys=rabatkeys,
+                    stopzone_map=stopzone_map,
+                    ringzones=ringzones,
+                    borders=borders
+                    )
+
+    with Pool(processors) as pool:
+        res = pool.imap(pfunc, stores[1:])
+        for r in tqdm(res, 'loading data'):
+            ticketkeys = m_dicts(ticketkeys, r)
+
+    ticketkeys['paid_zones'] = _get_paid(ticketkeys)
+
+    models = [1, 2, 3, 4, 5, 6]
+    for model in tqdm(models):
+        model_results(year, rabat, db_path, rabatkeys, ticketkeys, model)
+
 
 if __name__ == "__main__":
     from datetime import datetime

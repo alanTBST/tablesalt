@@ -216,7 +216,7 @@ def _load_sales_data(year: int) -> pd.core.frame.DataFrame:
 
 def _get_single_results(year: int,  model: int) -> SINGLE_DICT:
     """load the single tickets results from the result cache"""
-    fp = THIS_DIR / '__result_cache__'/ f'{year}' / 'preprocessed'
+    fp = THIS_DIR / '__result_cache__'/ f'{year}' / 'single'
 
     singles = list(fp.glob('single_results*'))
     singles = [x for x in singles if f'model_{model}' in x.name]
@@ -590,7 +590,7 @@ def _any_single_merge(
     sub_data = data.query("NR in @wanted")
     sub_tuples = list(sub_data.itertuples(index=False, name='Sale'))
 
-    res = {k: v['all'] for k, v in single_results.copy().items()}
+    res = {k: v for k, v in single_results.copy().items()}
 
     mro_short = _method_resolution_any(res, 'short')
     mro_long = _method_resolution_any(res, 'long')

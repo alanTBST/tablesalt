@@ -122,9 +122,6 @@ def parseargs() -> Dict:
              "The default output filename is mergedsales.csv")
 
     parser.add_argument(
-        '-o', '--outfilename', help=ohelp, default='mergedsales.csv'
-        )
-    parser.add_argument(
         '-y', '--year', type=int
         )
     return vars(parser.parse_args())
@@ -556,7 +553,7 @@ def clean_frame(frame: pd.core.frame.DataFrame) -> pd.core.frame.DataFrame:
     return frame
 
 
-def main(dirpath, year, outfile):
+def main(dirpath, year):
     """main function"""
 
 
@@ -571,7 +568,7 @@ def main(dirpath, year, outfile):
     if not outdir.is_dir():
         outdir.mkdir(parents=True, exist_ok=True)
 
-    fp = outdir / f'{outfile}'
+    fp = outdir / 'mergedsales.csv'
     df.to_csv(fp, index=False)
 
 
@@ -580,7 +577,6 @@ if __name__ == "__main__":
     args = parseargs()
     dir_path = args['directory']
     year = args['year']
-    outfile = args['outfilename']
     st = datetime.now()
-    main(dir_path, year, outfile)
+    main(dir_path, year)
     print(datetime.now() - st)

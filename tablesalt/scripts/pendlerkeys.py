@@ -156,7 +156,9 @@ def load_valid(valid_kombi_store: str) -> Dict:
             for k, v in cursor:
                 valid_kombi[k.decode('utf8')] = msgpack.unpackb(v)
 
-    return {ast.literal_eval(k): v for k, v in valid_kombi.items()}
+    valid_kombi = {ast.literal_eval(k): v for k, v in valid_kombi.items()}
+
+    return valid_kombi
 
 # this gets done in pendlersetup now
 @lru_cache(2*16)
@@ -227,7 +229,7 @@ def trips_to_zone_combination(season_trips, zone_combo_users):
             'matching trips to zone combinations'
             ):
         useasons = set(chain(*[tuple((k, x) for x in v) for k, v in userseasons.items()]))
-        zone_trips = set(chain(*{v for k, v in season_trips.items() if k in useasons}))
+        zone_trips = set(chain(*(v for k, v in season_trips.items() if k in useasons)))
         zone_combo_trips[zones] = zone_trips
 
     return zone_combo_trips
@@ -251,7 +253,7 @@ def get_user_shares(all_trips):
     # TODO: import this from package
     n_trips = len(all_trips)
     single = [x for x in all_trips if isinstance(x[0], int)]
-    multi =  list(chain(*[x for x in all_trips if isinstance(x[0], tuple)]))
+    multi =  list(chain(*[x for x in all_trips if isinstance(x[0], list)]))
     all_trips = single + multi
     user_shares = _aggregate_zones(all_trips)
     user_shares['n_trips'] = n_trips
@@ -263,7 +265,7 @@ def n_operators(share_tuple):
 
     return len({x[1] for x in share_tuple})
 
-def get_zone_combination_shares(tofetch, db_path: str, model: int):
+def get_zone_combination_shares(tofetch, db_path: str):
 
     final = {}
 
@@ -275,12 +277,12 @@ def get_zone_combination_shares(tofetch, db_path: str, model: int):
                                      ):
                 all_trips = {}
                 for trip in trips:
-                    t = str(t).encode('utf8')
+                    t = str(trip).encode('utf8')
                     res = txn.get(t)
                     if not res:
                         continue
                     res = msgpack.unpackb(res)
-                    if res not in TRIP_ERRORS:
+                    if not isinstance(res, str): # means error
                         all_trips[trip] = res
                 combo_result = get_user_shares(all_trips.values())
                 final[combo] = combo_result
@@ -306,8 +308,8 @@ def _kombi_by_seasonpass(pendler_kombi, userdict):
                 except KeyError:
                     continue
                 if v:
-                    v = msgpack.unpack(v)
-                    valid.update(v)
+                    v = msgpack.unpackb(v)
+                    valid.update(set(v))
     return valid
 
 def _get_trips(db_path, tripkeys):
@@ -322,7 +324,7 @@ def _get_trips(db_path, tripkeys):
                 if not res:
                     continue
                 res = msgpack.unpackb(res)
-                if res not in TRIP_ERRORS:
+                if not isinstance(res, str):
                     out[int(k.decode('utf8'))] = res
 
     return out
@@ -346,7 +348,7 @@ def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, db_path, year, 
             all_users = userdict.get_data(paid_zones=paidzones, takst=takst)
             usertrips = _kombi_by_seasonpass(valid_kombi_store, all_users)
             trips = usertrips.intersection(zero_travel_price)
-            tripshares = _get_trips(db_path, trips, model)
+            tripshares = _get_trips(db_path, trips)
             shared = get_user_shares(tripshares.values())
             shared['n_users'] = len(all_users)
             shared['n_period_cards'] = sum(len(x) for x in all_users.values())
@@ -386,8 +388,6 @@ def _chosen_zones(
     zone_combo_users, statistics = \
         get_users_for_zones(userdict, zone_combinations)
 
-    season_times = proc_user_data(userdata, zone_combo_users)
-
     kombi_trips = load_valid(kombi_valid_db)
 
     zone_combo_trips = trips_to_zone_combination(
@@ -399,7 +399,7 @@ def _chosen_zones(
         )
 
     results = get_zone_combination_shares(
-        zone_combo_trips_valid, db_path, model
+        zone_combo_trips_valid, db_path
         )
 
     results = {tuple(sorted(k)): v for k, v in results.items()}
@@ -539,11 +539,12 @@ def main():
     paths = db_paths(find_datastores(), year)
     stores = paths['store_paths']
     db_path = paths['calculated_stores']
+    kombi_valid_db = paths['kombi_valid_trips']
     zone_path = args['zones']
     product_path = args['products']
     cpu_usage = args['cpu_usage']
 
-    processors = int(round(os.cpu_count()*cpu_usage))
+    processors = int(round(os.cpu_count() * cpu_usage))
     zero_travel_price = find_no_pay(stores, year, processors)
 
     userdict = PendlerKombiUsers(
@@ -559,7 +560,7 @@ def main():
         _chosen_zones(
             userdict,
             result_path,
-            paths['kombi_valid_trips'],
+            kombi_valid_db,
             zero_travel_price,
             year,
             model
@@ -567,7 +568,7 @@ def main():
 
         _npaid_zones(
             userdict,
-            paths['kombi_valid_trips'],
+            kombi_valid_db,
             zero_travel_price,
             result_path,
             year,
