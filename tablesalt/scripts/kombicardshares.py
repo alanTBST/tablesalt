@@ -624,6 +624,7 @@ def make_output(usershares, product_path, zone_path, model, year):
 
     period_products = _process_pendler_df(period_products, zone_path)
 
+    initial_columns = list(period_products.columns)
     kombi_products = period_products.loc[
         period_products.loc[:, 'ProductName'].str.lower().str.contains('kombi')
         ]
@@ -648,8 +649,7 @@ def make_output(usershares, product_path, zone_path, model, year):
 
 
     final = pd.concat([kombi_match, missed, pendler_results], axis=0)
-    final = final.drop('key', axis=1)
-    initial_columns = list(final.columns)
+
     stats_columns = ['n_trips', 'n_users', 'n_period_cards', 'note']
     operator_columns = [
         x for x in final.columns if x not in initial_columns
@@ -657,6 +657,7 @@ def make_output(usershares, product_path, zone_path, model, year):
         ]
 
     andel_columns = []
+    print(andel_columns)
     for col in operator_columns:
         new_col = f'{col}_andel'
         andel_columns.append(new_col)
