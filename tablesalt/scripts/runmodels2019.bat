@@ -1,5 +1,5 @@
 call conda activate tablesalt
-python salesdatamerge -y 2019 -d H:\revenue\inputdata\2019\salesdata
+python salesdatamerge.py -y 2019 -d H:\revenue\inputdata\2019\salesdata
 python delrejsersetup.py -y 2019 -i H:\Data\Rejsedata\2019\Delrejser -o H:\datastores -c 1000000
 python calculateshares.py -y 2019
 python pendlersetup.py -y 2019 -z H:\revenue\inputdata\2019\new_zoner.csv -p H:\revenue\inputdata\2019\new_products.csv
