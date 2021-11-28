@@ -657,7 +657,6 @@ def make_output(usershares, product_path, zone_path, model, year):
         ]
 
     andel_columns = []
-    print(andel_columns)
     for col in operator_columns:
         new_col = f'{col}_andel'
         andel_columns.append(new_col)
