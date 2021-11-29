@@ -1034,6 +1034,7 @@ def _pendler_tickets(
     out_frame = out_frame.reset_index()
 
     output = pd.merge(sub_data, out_frame, on='NR', how='left')
+    output = output.drop_duplicates()
     output.note = output.note.fillna('')
     output = output.fillna(0)
 

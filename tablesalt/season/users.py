@@ -246,7 +246,8 @@ class _PendlerInput:
                 ]
 
         return pendler_product.loc[
-            pendler_product.loc[:, 'ValidityEndDT_Cal'].str.contains(str(self.year))
+            pendler_product.loc[:, 'ValidityEndDT_Cal'].str.contains('2019') |
+            pendler_product.loc[:, 'ValidityStartDT_Cal'].str.contains('2019')
             ]
 
     def _get_product_zones(
@@ -273,7 +274,9 @@ class _PendlerInput:
                 on_bad_lines='skip'
                 )
 
-        pendler_zones = pendler_zones.drop_duplicates()
+        pendler_zones = pendler_zones.sort_values(['EncryptedCardEngravedID', 'SeasonPassID', 'ZoneNr'])
+
+        pendler_zones = pendler_zones.drop_duplicates(keep='first')
         pendler_zones['key'] = list(zip(
             pendler_zones['EncryptedCardEngravedID'],
             pendler_zones['SeasonPassID']

@@ -377,6 +377,7 @@ def _match_user_specific_results(
         on=['EncryptedCardEngravedID', 'SeasonPassID'],
         how='left'
         )
+    merged = merged.drop_duplicates()
     merged = merged.fillna(0)
     missed = merged.query("n_trips == 0").copy()
 
@@ -518,6 +519,7 @@ def _match_pendler(pendler_df, year, model):
     out_frame = out_frame.reset_index()
 
     output = pd.merge(pendler_df, out_frame, on='NR', how='left')
+    output = output.drop_duplicates()
 
     output.note = output.note.fillna('no_result')
     output = output.fillna(0)
