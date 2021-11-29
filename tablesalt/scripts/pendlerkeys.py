@@ -37,7 +37,7 @@ from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
 from re import M
-from typing import AnyStr, Dict, Set, Tuple
+from typing import AnyStr, Dict, Iterable, Set, Tuple, List, Union
 
 import lmdb
 import msgpack
@@ -138,16 +138,15 @@ def proc_user_data(udata, combo_users):
     return {k:v for k, v in outdata.items() if k in card_season}
 
 
+def load_valid(
+    valid_kombi_store: str
+    ) -> Dict[Tuple[str, int], List[List[Union[int, str]]]]:
+    """Load the valid kombi user trips from the store
 
-def load_valid(valid_kombi_store: str) -> Dict:
-    """
-    Load the valid kombi user trips
-
-    Returns
-    -------
-    valid_kombi : dict
-        DESCRIPTION.
-
+    :param valid_kombi_store: the path to the key-value store
+    :type valid_kombi_store: str
+    :return: [description]
+    :rtype: Dict[Tuple[str, int], List[List[Union[int, str]]]]
     """
     with lmdb.open(valid_kombi_store, readahead=False) as env:
         valid_kombi = {}
@@ -160,19 +159,13 @@ def load_valid(valid_kombi_store: str) -> Dict:
 
     return valid_kombi
 
-# this gets done in pendlersetup now
-@lru_cache(2*16)
-def _date_in_window(test_period, test_date) -> bool:
-    """test that a date is in a validity period"""
-    return min(test_period) <= test_date <= max(test_period)
-
-def _wrap_price(store):
+def _wrap_price(store: str):
     """
-
-    :param store: DESCRIPTION
-    :type store: TYPE
-    :return: DESCRIPTION
-    :rtype: TYPE
+    function wrapper for  loading price dataset from a hdfstore
+    :param store: the path to the hdf store
+    :type store: str
+    :return: the price dataset in the store
+    :rtype: np.ndarray
 
     """
 
@@ -180,6 +173,13 @@ def _wrap_price(store):
     return StoreReader(store).get_data('price')
 
 def get_zeros(p):
+    """get the trip keys where the price of the trip is zero
+
+    :param p: a price array
+    :type p: np.ndarray
+    :return: [description]
+    :rtype: tuple
+    """
     df = pd.DataFrame(p[:, (0, 1)],
                       columns=['tripkey', 'price']).set_index('tripkey')
     df = df.groupby(level=0)['price'].transform(max)
@@ -192,7 +192,19 @@ def proc(store):
 
     return get_zeros(price)
 
-def find_no_pay(stores, year, n_procs):
+def find_no_pay(stores: List[Path], year: int, n_procs: int):
+    """Find all of the trip keys that have a zero travel price and dump
+    them
+
+    :param stores: a list of the datastore paths
+    :type stores: List[Path]
+    :param year: the analysis year
+    :type year: int
+    :param n_procs: number of processors to use
+    :type n_procs: int
+    :return: a set of trip keys
+    :rtype: Set[int]
+    """
 
     fp = os.path.join(
         THIS_DIR,
@@ -218,6 +230,7 @@ def find_no_pay(stores, year, n_procs):
     return out
 
 def assert_internal_zones(zero_travel_price, zone_combo_trips):
+
 
     return {k: v.intersection(zero_travel_price) for k, v in zone_combo_trips.items()}
 
@@ -250,6 +263,13 @@ def _aggregate_zones(shares):
 
 
 def get_user_shares(all_trips):
+    """aggregate the operator zone shares
+
+    :param all_trips: [description]
+    :type all_trips: [type]
+    :return: [description]
+    :rtype: [type]
+    """
     # TODO: import this from package
     n_trips = len(all_trips)
     single = [x for x in all_trips if isinstance(x[0], int)]
@@ -266,6 +286,15 @@ def n_operators(share_tuple):
     return len({x[1] for x in share_tuple})
 
 def get_zone_combination_shares(tofetch, db_path: str):
+    """For each Pendler kombi zone combination, aggregate the operator shares
+
+    :param tofetch: [description]
+    :type tofetch: [type]
+    :param db_path: [description]
+    :type db_path: str
+    :return: [description]
+    :rtype: [type]
+    """
 
     final = {}
 
@@ -293,6 +322,15 @@ def get_zone_combination_shares(tofetch, db_path: str):
 # aggregation by paid zones
 # =============================================================================
 def _kombi_by_seasonpass(pendler_kombi, userdict):
+    """Return a set of
+
+    :param pendler_kombi: [description]
+    :type pendler_kombi: [type]
+    :param userdict: [description]
+    :type userdict: [type]
+    :return: [description]
+    :rtype: [type]
+    """
 
     user_seasons = set()
     for cardnum, season in userdict.items():
@@ -312,7 +350,19 @@ def _kombi_by_seasonpass(pendler_kombi, userdict):
                     valid.update(set(v))
     return valid
 
-def _get_trips(db_path, tripkeys):
+def _get_trips(
+    db_path: str,
+    tripkeys: Iterable[int]
+    ) -> Dict[int, List[List[Union[int, str]]]]:
+    """Get all of the share results for the given trips
+
+    :param db_path: path to lmdb key-value store
+    :type db_path: str
+    :param tripkeys: the tripkeys to search for
+    :type tripkeys: Iterable[int]
+    :return: [description]
+    :rtype: [type]
+    """
 
     tripkeys_ = (str(x).encode('utf8') for x in tripkeys)
 
@@ -330,7 +380,29 @@ def _get_trips(db_path, tripkeys):
     return out
 
 
-def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, db_path, year, model):
+def _npaid_zones(
+    userdict: PendlerKombiUsers,
+    valid_kombi_store: str,
+    zero_travel_price: Set[int],
+    db_path: str,
+    year: int,
+    model: int
+    ) -> None:
+    """Load and aggregate trips by the number of paid zones for pendler kombi users
+
+    :param userdict: the pendlerkombi user data
+    :type userdict: PendlerKombiUsers
+    :param valid_kombi_store: the path to the key-value store
+    :type valid_kombi_store: str
+    :param zero_travel_price: the set of trips that have paid nothing
+    :type zero_travel_price: Set[int]
+    :param db_path: the path to the calculated stores key-value store
+    :type db_path: str
+    :param year: the analysis year
+    :type year: int
+    :param model: the model number
+    :type model: int
+    """
 
 
     takstsets = ["vestsjælland", "sydsjælland", "hovedstad", "dsb"]
@@ -374,12 +446,12 @@ def _npaid_zones(userdict, valid_kombi_store, zero_travel_price, db_path, year, 
 
 
 def _chosen_zones(
-        userdict,
-        db_path,
-        kombi_valid_db,
-        zero_travel_price,
-        year,
-        model
+        userdict: PendlerKombiUsers,
+        db_path: str,
+        kombi_valid_db: str,
+        zero_travel_price: Set[int],
+        year: int,
+        model: int
         ):
 
     userdata = userdict.get_data()
