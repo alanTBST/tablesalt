@@ -1,3 +1,6 @@
+
+::REMEMBER SOLO_ZONE_PRIS in resources/config/config_revenue.ini!!!!!!!!!!!!
+
 call conda activate tablesalt
 python salesdatamerge.py -y 2020 -d H:\revenue\inputdata\2020\salesdata 
 python delrejsersetup.py -y 2020 -i H:\Data\Rejsedata\2020\Delrejser -o H:\datastores -c 1000000 
