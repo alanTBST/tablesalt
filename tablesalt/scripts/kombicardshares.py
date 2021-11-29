@@ -399,7 +399,7 @@ def _match_pendler_record(
         ):
     """match a sales record to a result
 
-    :param record: [description]
+    :param record: a single row of the rejsekort user data
     :type record: Tuple[Any, ...]
     :param kombi_results: [description]
     :type kombi_results: [type]
@@ -568,6 +568,13 @@ def _process_pendler_df(period_products, zone_path):
     return period_products
 
 def _determine_city_note(chosen_zones):
+    """make the city not for the output data
+
+    :param chosen_zones: the valgezoner for the rejsekort pendler user
+    :type chosen_zones: [type]
+    :return: [description]
+    :rtype: [type]
+    """
 
     city_zones = (1001, 1002, 1003, 1004)
 
@@ -583,7 +590,6 @@ def _determine_city_note(chosen_zones):
         return 'all_city'
     if any(x in city_zones for x in chosen_zones):
         return 'with_city'
-
     return 'no_city'
 
 def add_city_note(df):
@@ -767,7 +773,7 @@ def main():
                     zones,
                     model,
                     year)
-        fp = THIS_DIR / '__result_cache__'/ f'{year}' /f'rejsekort_shares_model{model}.csv'
+        fp = THIS_DIR / '__result_cache__'/ f'{year}' /f'rejsekort_shares{year}_model{model}.csv'
 
         final.to_csv(fp, index=False, encoding='utf8')
 
