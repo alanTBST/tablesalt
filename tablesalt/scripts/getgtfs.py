@@ -12,10 +12,11 @@ from urllib.request import Request, urlopen
 
 import pandas as pd
 #from pandas.core.frame import DataFrame
+from tablesalt.transitfeed import load_gtfs_response_zip
 from tablesalt.transitfeed.feed import (ARCHIVE_DIR, Agency, Calendar,
                                         CalendarDates, Routes, Shapes, Stops,
                                         StopTimes, Transfers, TransitFeed,
-                                        Trips, load_gtfs_response_zip)
+                                        Trips)
 
 # args
 # period to find

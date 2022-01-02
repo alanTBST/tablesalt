@@ -13,5 +13,6 @@ from .feed import (
     archived_transitfeed,
     available_archives,
     download_latest_feed,
-    transitfeed_from_zip
+    transitfeed_from_zip, 
+    load_gtfs_response_zip
     )
