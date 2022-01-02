@@ -13,6 +13,7 @@ __pycache__
 *.pyi
 docs/build/
 tablesalt/scripts/__result_cache__/
+tablesalt/transitfeed/__gtfs_archive__/
 tablesalt/resources/networktopodk/gtfs/
 environment.yml
 
@@ -28,3 +29,4 @@ mtype*
 /temp_gtfs_data/
 /gtfs_archive/
 *.msgpack
+*.zip
