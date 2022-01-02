@@ -9,10 +9,9 @@ from urllib.error import URLError, HTTPError
 from urllib.request import urlopen, Request
 from datetime import datetime
 import pandas as pd
-from pandas.core.frame import DataFrame
+#from pandas.core.frame import DataFrame
 from pathlib import Path
-from tablesalt.preprocessing.tools import find_datastores
-from tablesalt.transitfeed.feed import _load_gtfs_response_zip
+from tablesalt.transitfeed import feed
 from multiprocessing.pool import ThreadPool
 
 # args
@@ -27,8 +26,7 @@ day = 1
 start = datetime(year=year, month=month, day=day)
 dates = pd.date_range(start=start, freq='D', periods=365)
 
-datastores = Path(find_datastores())
-BASE_DIR = datastores / 'rejsekortstores'/ f'{year}DataStores' / 'gtfsstores'
+BASE_DIR = feed.ARCHIVE_DIR
 BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_write(date):
@@ -38,17 +36,33 @@ def get_write(date):
     request_object = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
     try:
         resp = urlopen(request_object)
-        gtfs_data = _load_gtfs_response_zip(resp)
+        data = feed._load_gtfs_response_zip(resp)
     except HTTPError:
         return
-    year = datestring[:4]
-    new_dir = BASE_DIR / datestring
-    new_dir.mkdir(exist_ok=True, parents=True)
 
-    for name, data in gtfs_data.items():
-        fp = new_dir / name
-        if not fp.is_file():
-            data.to_csv(fp, index=False)
+    agency = feed.Agency.from_dataframe(data['agency.txt'])
+    stops = feed.Stops.from_dataframe(data['stops.txt'])
+    routes = feed.Routes.from_dataframe(data['routes.txt'])
+    trips = feed.Trips.from_dataframe(data['trips.txt'])
+    stop_times = feed.StopTimes.from_dataframe(data['stop_times.txt'])
+    calendar = feed.Calendar.from_dataframe(data['calendar.txt'])
+    calendar_dates = feed.CalendarDates.from_dataframe(data['calendar_dates.txt'])
+
+    transfers = feed.Transfers.from_dataframe(data['transfers.txt'])
+    shapes = feed.Shapes.from_dataframe(data['shapes.txt'])
+
+    feed = feed.TransitFeed(
+        agency,
+        stops,
+        routes,
+        trips,
+        stop_times,
+        calendar,
+        calendar_dates,
+        transfers=transfers,
+        shapes=shapes
+        )
+    feed.to_archive()
 
 with ThreadPool(4) as pool:
     pool.map(get_write, dates)
