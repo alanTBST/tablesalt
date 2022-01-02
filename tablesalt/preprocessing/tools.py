@@ -60,7 +60,7 @@ def _hdfstores(store_loc: str, year: int) -> List[Path]:
     :rtype: List[str]
     """
 
-    path = Path(store_loc) / 'rejsekortstores' / f'{year}Datastores' / 'hdfstores2'
+    path = Path(store_loc) / 'rejsekortstores' / f'{year}Datastores' / 'hdfstores'
 
     return list(path.glob('*.h5'))
 
