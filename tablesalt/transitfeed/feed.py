@@ -533,6 +533,7 @@ class Transfers(TransitFeedBase):
         transfers_data = [x._asdict() for x in transfers_data]
 
         return cls(transfers_data)
+    from_dataframe = latest
 
 class Calendar(TransitFeedBase):
 
@@ -572,6 +573,8 @@ class Calendar(TransitFeedBase):
         end_time = datetime.strptime(str(end), '%Y%m%d')
 
         return (start_time, end_time)
+
+    from_dataframe = latest
 
 class MultiCalendar:
 
@@ -637,6 +640,7 @@ class CalendarDates(TransitFeedBase):
             groupby(calendar_tuples, key=itemgetter(0))
         }
         return cls(calendar_dates_data)
+    from_dataframe = latest
 
 
 class MultiCalendarDates:
@@ -751,6 +755,8 @@ class Shapes(TransitFeedBase):
 
         return df
 
+    from_dataframe = latest
+
 
 class MultiShapes:
 
@@ -779,10 +785,8 @@ class MultiShapes:
         return pd.concat(gdfs)
 
 
-
 C = TypeVar('C', bound=Union[Calendar, MultiCalendar])
 CD = TypeVar('CD', bound=Union[CalendarDates, MultiCalendarDates])
-
 
 
 class TransitFeed:
