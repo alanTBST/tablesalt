@@ -284,9 +284,8 @@ def main():
 
     # allfeeds = transitfeed.available_archives()
     # year_archives = [x for x in allfeeds if str(year) in x]
-    feed = transitfeed.transitfeed_from_zip(
-        r'H:\datastores\GTFSstores\20190911_20191204.zip'
-        )
+    feed = transitfeed.archived_transitfeed('20190704_20190925')
+
     zonemap = feed.stop_zone_map()
     graph = ZoneGraph(feed, region='sjælland')
     # for archive in tqdm(year_archives[-2:], f'merging transit feeds for {year}'):
