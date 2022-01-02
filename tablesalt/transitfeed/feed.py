@@ -77,11 +77,11 @@ def download_latest_feed() -> Dict[str, DataFrame]:
         log.critical(f"GTFS download failed - error {resp.code}")
         raise URLError("Could not download GTFS data")
 
-    gtfs_data = _load_gtfs_response_zip(resp)
+    gtfs_data = load_gtfs_response_zip(resp)
 
     return gtfs_data
 
-def _load_gtfs_response_zip(resp: HTTPResponse) -> Dict[str, DataFrame]:
+def load_gtfs_response_zip(resp: HTTPResponse) -> Dict[str, DataFrame]:
 
     gtfs_data: Dict[str, pd.core.frame.DataFrame] = {}
 
